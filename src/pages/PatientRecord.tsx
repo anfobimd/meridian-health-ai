@@ -117,16 +117,33 @@ export default function PatientRecord() {
   const [aiRec, setAiRec] = useState<any>(null);
   const [aiLoading, setAiLoading] = useState(false);
 
+  const redeemSession = useMutation({
+    mutationFn: async ({ purchaseId, treatmentName }: { purchaseId: string; treatmentName: string }) => {
+      const purchase = packagePurchases?.find((p: any) => p.id === purchaseId);
+      if (!purchase) throw new Error("Purchase not found");
+      const revPerSession = purchase.sessions_total > 0 ? purchase.price_paid / purchase.sessions_total : 0;
+      const { error } = await supabase.from("patient_package_sessions").insert({
+        purchase_id: purchaseId,
+        treatment_name: treatmentName,
+        revenue_amount: revPerSession,
+        redeemed_at: new Date().toISOString(),
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["patient-packages", id] });
+      toast({ title: "Session redeemed" });
+    },
+    onError: () => toast({ title: "Failed to redeem session", variant: "destructive" }),
+  });
+
   const fetchAiRecommendation = async () => {
     setAiLoading(true);
     try {
-      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-      const res = await fetch(`https://${projectId}.supabase.co/functions/v1/ai-package-engine`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
-        body: JSON.stringify({ mode: "recommend_package", patient_id: id }),
+      const { data, error } = await supabase.functions.invoke("ai-package-engine", {
+        body: { mode: "recommend_package", patient_id: id },
       });
-      const data = await res.json();
+      if (error) throw error;
       setAiRec(data);
     } catch (e) {
       toast({ title: "AI recommendation failed", variant: "destructive" });
