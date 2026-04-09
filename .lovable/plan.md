@@ -1,95 +1,93 @@
 
 
-# Physician Oversight & Hierarchy System — MD Chart Review (v2.0 AI-Native)
+# Provider Marketplace — Integrated with Meridian EHR
 
-This implements the MD Oversight Specification v2.0 from the uploaded document. Due to the scale (~7-8 week full spec), we will implement in 3 incremental batches. This plan covers **Batch 1: Database Foundation + Chart Review Queue + AI Analysis Pipeline**.
+## Overview
 
-## What We're Building
+A marketplace module that lets clinics activate a provider availability/booking system. Providers set their availability windows, declare their skills/modalities, and the system uses AI to match patients with the right provider based on skills, availability, and clinic needs. This draws from the Dr. Z Collective model (flat-fee membership, modality-based pricing, provider independence).
 
-A Medical Director chart review system where:
-- Encounters from NP/RN providers are queued for MD review
-- AI analyzes each chart and generates a pre-review brief with risk scores, flags, and recommendations
-- MDs review charts sorted by AI-calculated priority (not random)
-- Anti-rubber-stamp timer prevents speed-signing
-- Super-admin oversight dashboard shows AI intelligence reports, provider patterns, and MD performance
+## Database Migration (5 new tables, 1 altered table)
 
-## Batch 1 Scope (this implementation)
+### New Tables
 
-### 1. Database Migration — 8 new tables + 1 altered table
+**`marketplace_config`** — Per-clinic marketplace activation and settings
+- `id`, `is_active`, `clinic_name`, `membership_tiers` (jsonb — founding/standard rates from the doc), `modalities` (jsonb — injectables, weight_loss, laser), `laser_hourly_rate` (default $150), `created_at`, `updated_at`
 
-| Table | Purpose |
-|-------|---------|
-| `chart_review_records` | Core review queue — links encounter to MD, tracks status, AI scores, review time |
-| `ai_chart_analysis` | AI-generated brief per chart (risk score, flags, documentation score, structured JSON brief) |
-| `ai_provider_intelligence` | Rolling provider metrics: correction rate, doc scores, recurring issues, coaching state |
-| `ai_oversight_reports` | Monthly AI-generated narrative reports for super-admin |
-| `ai_doc_checklists` | Procedure-specific documentation checklists used by AI scoring |
-| `ai_md_consistency` | Cross-MD correction rate comparison per clinic per month |
-| `ai_api_calls` | Cost tracking and debugging log for all AI calls |
-| `ai_prompts` | Versioned system prompts (chart_brief, comment_draft, monthly_report) — editable without deploy |
-| Alter `encounters` | Add `encounter_type` column for invasive procedure classification |
+**`provider_skills`** — What each provider can do
+- `id`, `provider_id`, `skill_name` (e.g. "Botox", "CO2 Laser", "GLP-1"), `modality` (injectables/weight_loss/laser), `certification_level` (beginner/intermediate/expert), `verified_at`, `created_at`
 
-All tables get open RLS policies (matching existing pattern — no auth yet).
+**`provider_availability`** — When providers are available
+- `id`, `provider_id`, `day_of_week` (0-6), `start_time`, `end_time`, `is_recurring`, `specific_date` (for one-offs), `room_preference_id`, `is_active`, `created_at`
 
-### 2. AI Edge Function: `ai-chart-review` 
+**`marketplace_bookings`** — Patient-facing booking records that link to appointments
+- `id`, `patient_id`, `provider_id`, `treatment_id`, `appointment_id` (links to existing appointments table), `requested_at`, `status` (pending/confirmed/completed/cancelled), `ai_match_reasoning` (text), `created_at`
 
-A single edge function using Lovable AI (not Anthropic — adapting the spec to use our gateway) that:
-- Accepts an encounter ID
-- Reads the encounter's SOAP note, patient context, provider history
-- Generates a structured JSON brief with: `procedure_summary`, `documentation_status`, `documentation_score`, `ai_flags[]`, `patient_context`, `risk_score`, `risk_tier`, `recommended_action`, `estimated_review_seconds`
-- Stores result in `ai_chart_analysis`
-- Logs the call in `ai_api_calls`
+**`provider_memberships`** — Track provider membership tier and billing
+- `id`, `provider_id`, `tier` (founding_all/single/double/triple), `modalities` (text[]), `monthly_rate`, `start_date`, `is_active`, `created_at`, `updated_at`
 
-### 3. New Page: `/md-oversight` — Medical Director Chart Review
+### Alter `providers` table
+- Add `marketplace_enabled` (boolean, default false)
+- Add `marketplace_bio` (text) — public-facing bio for the marketplace
+- Add `modalities` (text[]) — which modalities they offer
+- Add `hourly_rate_override` (numeric, nullable)
 
-**Queue View (default)**
-- Table of encounters awaiting review, sorted by `ai_priority_score` DESC
-- Each row: risk tier badge (color-coded border), provider name + days-at-clinic, patient name, procedure, AI flags preview, doc score circle, time remaining
-- "Analyzing..." skeleton while AI is pending
-- Filter by risk tier, status, provider
+## AI Edge Function: `ai-smart-schedule` (update existing)
 
-**Chart Review Panel (dialog on row click)**
-- AI Brief Card at top (dark card with 6 structured fields from the analysis)
-- Provider Intelligence Strip (correction rate, recurring issues, coaching flags)
-- Document tabs: SOAP Note / Encounter Details with AI-highlighted flags
-- MD Action Area at bottom: comment textarea, "Draft AI Comment" button, approve/correction/sign buttons
-- Elapsed timer with rubber-stamp threshold display
-- Secondary confirmation for CRITICAL charts signed without comment
+Enhance the existing smart-schedule function to also handle marketplace matching:
+- Accept a `mode: "marketplace_match"` parameter
+- Given a patient's requested treatment + preferred date/time, use AI to rank available providers by: skill match, availability overlap, patient history, provider ratings, room/device availability
+- Return ranked provider list with reasoning for each match
 
-### 4. New Page: `/md-oversight/dashboard` — Super-Admin Oversight
+## New Page: `/marketplace` — Provider Marketplace
 
-**Tab 1: AI Intelligence Report** — Monthly AI-generated narrative with alerts, highlights, recommendations
-**Tab 2: MD Performance** — Table with review %, avg review time, rubber stamp %, correction rate, consistency score
-**Tab 3: Provider Intelligence** — Searchable provider table with issue history drawer
-**Tab 4: System Intelligence** — AI API cost, success rates, rubber stamp incidents, sampling recommendations
+**3 tabs:**
 
-### 5. Navigation Updates
+**Tab 1: Marketplace Settings (admin)**
+- Toggle marketplace active/inactive
+- Configure membership tiers and rates (pre-populated from the Dr. Z model)
+- Manage modality definitions (Injectables, Weight Loss, Laser)
+- Set laser hourly rate
 
-- Add "MD Oversight" link to sidebar under a new "OVERSIGHT" section (ShieldCheck icon)
+**Tab 2: Provider Profiles**
+- Grid of marketplace-enabled providers with their skills, availability summary, and modalities
+- Click to expand: see full availability calendar, skill badges, membership tier
+- "Edit Profile" dialog: marketplace bio, skills (multi-select with modality grouping), availability schedule builder (day/time grid)
+- AI button: "Auto-Generate Profile" — uses AI to write a marketplace bio from the provider's specialty, credentials, and skills
+
+**Tab 3: Booking & Matching**
+- "Find a Provider" flow: select treatment → select date/time → AI returns ranked provider matches with reasoning
+- Shows availability conflicts, device requirements, room suggestions
+- "Book" button creates both a marketplace_booking and an appointment record
+- Recent bookings table with status badges
+
+## Updated Pages
+
+**Providers.tsx** — Add "Marketplace" toggle badge on each provider card. Add "Enable Marketplace" button that opens a quick-setup dialog for skills + availability.
+
+**Appointments.tsx** — Show marketplace booking badge on appointments that originated from the marketplace.
+
+## Navigation
+
+- Add "Marketplace" link to sidebar under ADMIN section (Store icon)
 - Add to mobile nav
-
-### 6. Seed Data
-
-- Seed `ai_prompts` with 3 initial prompts (chart_brief, comment_draft, monthly_report)
-- Seed `ai_doc_checklists` for 5 procedure types (Botox, Filler, GLP-1/Peptide, Hormone Injection, Laser/Energy)
 
 ## Files Changed
 
 | File | Change |
 |------|--------|
-| Migration SQL | 8 new tables, alter encounters |
-| `supabase/functions/ai-chart-review/index.ts` | New AI edge function for chart analysis |
-| `src/pages/MdOversight.tsx` | New — chart review queue + review panel |
-| `src/pages/MdOversightDashboard.tsx` | New — super-admin oversight dashboard (4 tabs) |
-| `src/App.tsx` | Add 2 new routes |
-| `src/components/AppSidebar.tsx` | Add oversight nav section |
-| `src/components/MobileNav.tsx` | Add oversight links |
+| Migration SQL | 5 new tables, alter providers |
+| `src/pages/Marketplace.tsx` | New — 3-tab marketplace management page |
+| `supabase/functions/ai-smart-schedule/index.ts` | Update — add marketplace matching mode |
+| `src/pages/Providers.tsx` | Add marketplace toggle + quick setup |
+| `src/pages/Appointments.tsx` | Show marketplace booking badge |
+| `src/App.tsx` | Add `/marketplace` route |
+| `src/components/AppSidebar.tsx` | Add nav link |
+| `src/components/MobileNav.tsx` | Add mobile nav link |
 
-## Technical Notes
+## AI Integration Points
 
-- Uses Lovable AI gateway (`openai/gpt-5`) for all AI analysis, not Anthropic as the spec suggests
-- Risk scoring uses the weighted factors from the spec: provider experience (25%), correction history (20%), doc completeness (20%), procedure risk (15%), patient complexity (10%), note similarity (10%)
-- Rubber-stamp thresholds: LOW=30s, MEDIUM=90s, HIGH=180s, CRITICAL=300s (floor 15s)
-- Charts with `ai_risk_tier` HIGH or CRITICAL are always reviewed regardless of sampling rate
-- Providers with <30 reviewed charts get mandatory review
+1. **Provider Profile Generation** — AI writes marketplace bio from credentials/skills
+2. **Smart Matching** — AI ranks providers for a requested treatment+time, explaining reasoning
+3. **Availability Optimization** — AI suggests optimal availability windows based on booking patterns
+4. **Skill Verification Suggestions** — AI flags when a provider's listed skills don't align with their encounter history
 
