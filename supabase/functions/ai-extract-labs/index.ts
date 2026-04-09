@@ -54,11 +54,11 @@ Extract these keys exactly:
 
 If a value is reported in different units, convert to the target unit. Include values that have range flags (H/L/HH/LL) — just provide the numeric value.`;
 
-    // For PDFs, convert to a text extraction approach; for images use vision
-    const isPDF = mediaType === "application/pdf";
-    
-    // Use GPT-5-mini for PDFs (better PDF support), Gemini for images
-    const model = isPDF ? "openai/gpt-5-mini" : "google/gemini-2.5-flash";
+    // Content is always an image (PDFs converted client-side)
+    const imageContent = {
+      type: "image_url" as const,
+      image_url: { url: `data:${mediaType};base64,${base64Data}` },
+    };
     
     const imageContent = {
       type: "image_url" as const,
