@@ -311,7 +311,7 @@ export type Database = {
           {
             foreignKeyName: "ai_provider_intelligence_provider_id_fkey"
             columns: ["provider_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "providers"
             referencedColumns: ["id"]
           },
@@ -894,6 +894,53 @@ export type Database = {
           },
           {
             foreignKeyName: "clinical_notes_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "providers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coaching_actions: {
+        Row: {
+          action_type: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_resolved: boolean
+          provider_id: string
+          resolved_at: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          action_type?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_resolved?: boolean
+          provider_id: string
+          resolved_at?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          action_type?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_resolved?: boolean
+          provider_id?: string
+          resolved_at?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coaching_actions_provider_id_fkey"
             columns: ["provider_id"]
             isOneToOne: false
             referencedRelation: "providers"
@@ -1615,6 +1662,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      oversight_config: {
+        Row: {
+          config_key: string
+          config_value: Json
+          created_at: string
+          description: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          config_key: string
+          config_value?: Json
+          created_at?: string
+          description?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          config_key?: string
+          config_value?: Json
+          created_at?: string
+          description?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       patient_allergies: {
         Row: {
