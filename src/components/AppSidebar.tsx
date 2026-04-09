@@ -1,7 +1,7 @@
 import { NavLink, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, Users, Calendar, Stethoscope, ClipboardList, UserCog,
-  Activity, FlaskConical, FileText, Pill, DollarSign, ClipboardPlus,
+  Activity, FlaskConical, FileText, Pill, DollarSign, ClipboardPlus, ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -16,6 +16,7 @@ const navSections = [
       { to: "/clinical-notes", icon: ClipboardList, label: "Clinical Notes" },
       { to: "/hormone-visits", icon: FlaskConical, label: "Hormone Labs" },
       { to: "/hormone-intake", icon: ClipboardPlus, label: "Hormone Intake" },
+      { to: "/physician-approval", icon: ShieldCheck, label: "Approvals" },
       { to: "/protocols", icon: Pill, label: "Protocols" },
     ],
   },
