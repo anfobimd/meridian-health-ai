@@ -1,84 +1,133 @@
 
 
-# Meridian EHR — AI-Native Electronic Health Record
+# Meridian EHR — Full Integration Strategy
 
-## Vision
-A medspa EHR where AI handles the busywork — auto-generating clinical notes, pre-filling intake forms, scoring patient risk, and sending personalized communications — so staff focus on patient care, not paperwork.
+## What We Have vs. What's Missing
 
----
+### Currently Built (8 tables, basic CRUD UI)
+- patients, providers, appointments, treatments, clinical_notes, intake_forms, audit_logs, user_roles, hormone_visits
+- Basic pages: Dashboard, Patients, Patient Record, Appointments, Treatments, Clinical Notes, Providers, Hormone Labs
 
-## Phase 1: EHR Foundation (Core Data & UI)
-
-### Database Schema (Lovable Cloud / Supabase)
-- **patients** — demographics, contact info, insurance, preferences
-- **providers** — staff profiles, specialties, credentials, schedules
-- **appointments** — scheduling with status lifecycle (booked → checked-in → in-progress → completed → no-show)
-- **treatments** — service catalog (laser, injectables, facials, hormone therapy, etc.)
-- **clinical_notes** — SOAP notes linked to appointments (subjective, objective, assessment, plan)
-- **intake_forms** — patient intake responses (medical history, allergies, medications, consent)
-- **audit_logs** — HIPAA-compliant access tracking on all patient data
-- **user_roles** — role-based access (admin, provider, front-desk)
-
-### UI Pages
-- **Dashboard** — Today's appointments, pending tasks, AI alerts
-- **Patient Directory** — Searchable patient list with quick-view cards
-- **Patient Record** — Tabbed view: Demographics | Appointments | Clinical Notes | Intake | Hormone Protocols
-- **Appointment Calendar** — Day/week view with drag scheduling
-- **Provider Directory** — Staff management
+### Missing from Source Archives — Organized by Priority
 
 ---
 
-## Phase 2: Hormone & Peptide Protocol Tracking
+## Build Order (10 Phases)
 
-### Database Additions
-- **hormone_protocols** — prescribed treatment plans (compound, dose, frequency, route, cycle length)
-- **protocol_entries** — individual dose/injection records per visit
-- **protocol_templates** — reusable protocol blueprints (e.g., "TRT Standard", "BPC-157 Healing")
+### Phase 1: Enriched Schema Migration (~25 new tables from Meridian schema)
+Port the full Meridian PostgreSQL schema that's not yet in place:
 
-### UI
-- **Protocol tab** on patient record — active protocols with visual timeline
-- **Protocol builder** — Admin creates templates; providers assign to patients with customization
-- **Dosage log** — Track each administration with provider, date, lot number, site
+**Patient sub-tables:** `patient_allergies`, `patient_medications`, `patient_medical_history`, `patient_insurance`, `patient_contacts`
+
+**Encounters & Charting:** `encounters`, `encounter_notes`, `chart_templates`, `chart_template_sections`, `chart_template_fields`, `encounter_field_responses`, `chart_template_orders`
+
+**Protocols:** `protocol_templates`, `protocol_enrollments` (GLP-1, TRT, HRT tracking from Meridian schema — replaces the simpler "hormone_protocols" from the original plan)
+
+**Treatment Catalog:** `treatment_categories` (parent categories with vertical tagging)
+
+**Revenue Cycle:** `quotes`, `quote_items`, `invoices`, `invoice_items`, `payments`, `insurance_claims` (full billing from Meridian schema)
+
+**Scheduling:** `provider_availability`, `provider_availability_overrides`, `appointment_waitlist`
+
+**Lab System:** `lab_orders`, `lab_results`, `prescriptions`
+
+### Phase 2: AI SOAP Note Generation (Edge Function)
+Port the HCDSS `routes/ai.js` logic, replacing Anthropic with Lovable AI Gateway:
+- **Edge function `ai-soap-note`**: Takes appointment context (patient history, treatment, provider, prior notes) and generates structured SOAP note
+- **Edge function `ai-extract-labs`**: Takes base64 image/PDF of lab results, extracts 21 lab values into structured JSON (ported from HCDSS extract-labs route)
+- "Generate SOAP Note" button on completed appointments
+- Provider review/edit/sign-off workflow (draft → review → signed)
+
+### Phase 3: Charting Template Engine
+Port the full Meridian charting system (`routes/charting.js`):
+- Template CRUD: create/edit reusable chart templates with sections and fields
+- Chief-complaint keyword auto-suggest (type "botox" → suggests Botox template)
+- Field types: text, measurement, scale, select, checkbox, computed
+- Sign cascade: encounter → note → orders generated
+- **AI-assisted field population**: after template selection, AI pre-fills fields from patient history
+- Seed 5 system templates: Weight Loss, HRT, Medspa Botox, HydraFacial, IV Therapy
+
+### Phase 4: Scheduling Engine
+Port Meridian `routes/scheduling.js` + marketplace `slotEngine.js`:
+- Provider availability rules (weekly schedule with breaks per day-of-week)
+- Override system (time-off, modified hours)
+- Slot generation algorithm: intersect availability rules, overrides, and existing appointments → return bookable slots
+- Next-available finder: scan ahead up to 60 days
+- Waitlist management
+- Calendar UI: day/week view with provider columns, drag-to-book
+
+### Phase 5: Package Tracker (from PACKAGE_TRACKER_PLAN.md)
+6 new tables: `service_packages`, `service_package_items`, `patient_package_purchases`, `patient_package_sessions`, `package_notification_rules`, `package_notification_log`
+
+- Triggers: `sync_package_session_count()` auto-updates sessions_used and deferred revenue on redemption
+- `expire_stale_packages()` function for cron
+- Admin UI: package template CRUD, purchase management, session redemption
+- Patient Record "Packages" tab with progress bars (6/10 sessions used)
+- Deferred revenue tracking (GAAP accrual)
+
+### Phase 6: AI Notification System
+Port HCDSS `config/notifications.js` + Package Tracker notification cadence:
+- Edge function `ai-notifications`: generates personalized copy per patient using Lovable AI
+- 16 seeded notification rules (purchase confirmation, milestone celebrations, expiry warnings, win-back)
+- Notification job (edge function on cron): evaluates all active purchases against rules, sends via configured channel
+- Notification log and admin preview
+
+### Phase 7: AI Risk Scoring & Dashboard Intelligence
+- Edge function `ai-risk-scoring`: analyzes patient engagement patterns (missed appointments, lapsed protocols, overdue labs, package abandonment)
+- Dashboard "At-Risk Patients" widget with risk score, reason, and suggested action
+- AI-generated weekly narrative summary
+- Package abandonment risk scoring from PACKAGE_TRACKER_PLAN Section 6.3
+- Dashboard insights narrative (cached, daily refresh)
+
+### Phase 8: Revenue Cycle & Financial
+Port the invoicing/payment system from Meridian schema:
+- Quote generation (AI-assisted treatment recommendations with pricing)
+- Invoice creation from appointments/quotes
+- Payment recording (multiple payment methods)
+- Package revenue: deferred vs. recognized tracking
+- Revenue dashboard with monthly charts
+
+### Phase 9: Patient Photos & Before/After
+Port Meridian photo schema:
+- Supabase Storage bucket for patient photos
+- Photo upload with clinical metadata (category, treatment area, view angle)
+- Before/after pairing and photo series
+- Consent tracking
+- Photo gallery in patient record
+
+### Phase 10: Authentication & Multi-Clinic
+- Auth with login/signup (email + Google OAuth)
+- Role-based access: admin, provider, front_desk
+- Tighten RLS policies from anon → authenticated
+- Multi-clinic support from Meridian schema (clinics, clinic_staff, clinic_id isolation)
 
 ---
 
-## Phase 3: AI Automation Layer
+## AI Integration Points Summary
 
-All AI powered by **Lovable AI Gateway** (via edge functions).
+Every AI feature uses **Lovable AI Gateway** (Gemini 3 Flash) via edge functions:
 
-### 3a. Clinical Note Generation
-- After appointment completion, AI generates a draft SOAP note from:
-  - Treatment performed, provider, patient history, prior notes
-  - Provider reviews, edits, and signs off
-- One-click "Generate Note" button on appointment view
-
-### 3b. Smart Intake & Scheduling
-- AI pre-fills follow-up intake forms based on patient history
-- AI suggests optimal next appointment timing based on treatment type and protocol schedule
-- Auto-generate patient-facing appointment prep instructions
-
-### 3c. Risk Scoring & Insights
-- AI analyzes patient engagement patterns (missed appointments, lapsed protocols, overdue labs)
-- Dashboard widget: "At-Risk Patients" with risk score, reason, and suggested action
-- Weekly AI-generated narrative summary for admin: "3 hormone patients overdue for follow-up, 2 patients haven't completed their protocol..."
-
-### 3d. Smart Patient Notifications (edge function + cron)
-- AI-personalized appointment reminders, follow-up nudges, protocol adherence messages
-- Configurable notification rules (similar to the package tracker design)
-- Each message generated with patient context — not generic templates
+| Feature | Edge Function | Source Logic |
+|---|---|---|
+| SOAP Note Generation | `ai-soap-note` | HCDSS `routes/ai.js` → `/ai/recommend` |
+| Lab Value Extraction | `ai-extract-labs` | HCDSS `routes/ai.js` → `/ai/extract-labs` |
+| Chart Field Pre-fill | `ai-chart-assist` | Meridian charting template + patient context |
+| Hormone Recommendation | `ai-hormone-rec` | HCDSS system prompt + lab values |
+| Package Notifications | `ai-notifications` | Package Tracker Plan Section 6.1 |
+| Risk Scoring | `ai-risk-scoring` | Meridian churn logic + Package Plan Section 6.3 |
+| Dashboard Narrative | `ai-insights` | Package Plan Section 6.4 |
+| Package Recommendation | `ai-package-rec` | Package Plan Section 6.2 |
+| Smart Scheduling | `ai-scheduling` | Next-appointment suggestion from protocol data |
 
 ---
 
-## Phase 4: Package Tracker Integration (future)
-- Bring in the full package tracker (service bundles, session redemption, deferred revenue) per your planning documents
-- Embedded within the EHR patient record as a "Packages" tab
-- AI-powered package recommendations and abandonment risk scoring
+## Implementation Approach
 
----
+Each phase will be implemented as a self-contained increment:
+1. Database migration (new tables/triggers)
+2. Edge function(s) for AI features
+3. React UI pages and components
+4. Wire up to existing navigation and patient record tabs
 
-## Key Design Decisions
-- **Auth**: Lovable Cloud built-in auth with role-based access (admin, provider, front-desk)
-- **HIPAA**: Audit logging on all patient data access, RLS policies restricting data by role
-- **AI Model**: Lovable AI Gateway (Gemini 3 Flash) for all AI features
-- **UX**: Clean, professional medical UI — card-based layouts, muted color palette
+The Dr. Z's Collective project summary provides pricing benchmarks and business model context that will be used to seed treatment catalog pricing and inform package template defaults.
 
