@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   ClipboardList, ArrowRight, ArrowLeft, Upload, Sparkles, Loader2, AlertTriangle,
-  CheckCircle, FileText, FlaskConical, Brain, Shield, Target, Syringe,
+  CheckCircle, FileText, FlaskConical, Brain, Shield, Target, Syringe, ShieldCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
