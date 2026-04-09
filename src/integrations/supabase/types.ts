@@ -193,37 +193,52 @@ export type Database = {
       }
       chart_template_fields: {
         Row: {
+          ai_variable: string | null
+          config: Json | null
           created_at: string
           default_value: string | null
+          field_key: string | null
           field_type: string
           id: string
           is_required: boolean
           label: string
+          maps_to_column: string | null
           options: Json | null
+          placeholder: string | null
           section_id: string
           sort_order: number | null
           unit: string | null
         }
         Insert: {
+          ai_variable?: string | null
+          config?: Json | null
           created_at?: string
           default_value?: string | null
+          field_key?: string | null
           field_type?: string
           id?: string
           is_required?: boolean
           label: string
+          maps_to_column?: string | null
           options?: Json | null
+          placeholder?: string | null
           section_id: string
           sort_order?: number | null
           unit?: string | null
         }
         Update: {
+          ai_variable?: string | null
+          config?: Json | null
           created_at?: string
           default_value?: string | null
+          field_key?: string | null
           field_type?: string
           id?: string
           is_required?: boolean
           label?: string
+          maps_to_column?: string | null
           options?: Json | null
+          placeholder?: string | null
           section_id?: string
           sort_order?: number | null
           unit?: string | null
@@ -238,27 +253,92 @@ export type Database = {
           },
         ]
       }
+      chart_template_orders: {
+        Row: {
+          cpt_code: string | null
+          created_at: string | null
+          description: string | null
+          followup_days: number | null
+          id: string
+          is_auto_added: boolean | null
+          lab_panel: string | null
+          label: string
+          order_key: string
+          order_type: string
+          rx_name: string | null
+          sort_order: number | null
+          template_id: string
+        }
+        Insert: {
+          cpt_code?: string | null
+          created_at?: string | null
+          description?: string | null
+          followup_days?: number | null
+          id?: string
+          is_auto_added?: boolean | null
+          lab_panel?: string | null
+          label: string
+          order_key: string
+          order_type: string
+          rx_name?: string | null
+          sort_order?: number | null
+          template_id: string
+        }
+        Update: {
+          cpt_code?: string | null
+          created_at?: string | null
+          description?: string | null
+          followup_days?: number | null
+          id?: string
+          is_auto_added?: boolean | null
+          lab_panel?: string | null
+          label?: string
+          order_key?: string
+          order_type?: string
+          rx_name?: string | null
+          sort_order?: number | null
+          template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chart_template_orders_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "chart_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chart_template_sections: {
         Row: {
           created_at: string
+          icon: string | null
           id: string
+          is_collapsible: boolean | null
           is_required: boolean
+          section_key: string | null
           sort_order: number | null
           template_id: string
           title: string
         }
         Insert: {
           created_at?: string
+          icon?: string | null
           id?: string
+          is_collapsible?: boolean | null
           is_required?: boolean
+          section_key?: string | null
           sort_order?: number | null
           template_id: string
           title: string
         }
         Update: {
           created_at?: string
+          icon?: string | null
           id?: string
+          is_collapsible?: boolean | null
           is_required?: boolean
+          section_key?: string | null
           sort_order?: number | null
           template_id?: string
           title?: string
@@ -275,37 +355,64 @@ export type Database = {
       }
       chart_templates: {
         Row: {
+          auto_labs: boolean | null
+          auto_protocol_milestone: boolean | null
           category: string | null
+          cc_keywords: string[] | null
+          color: string | null
           created_at: string
+          default_cpt: string[] | null
+          default_icd10: string[] | null
           description: string | null
+          icon: string | null
           id: string
           is_active: boolean
+          is_shared: boolean | null
           is_system: boolean
           keywords: string[] | null
           name: string
           updated_at: string
+          usage_count: number | null
         }
         Insert: {
+          auto_labs?: boolean | null
+          auto_protocol_milestone?: boolean | null
           category?: string | null
+          cc_keywords?: string[] | null
+          color?: string | null
           created_at?: string
+          default_cpt?: string[] | null
+          default_icd10?: string[] | null
           description?: string | null
+          icon?: string | null
           id?: string
           is_active?: boolean
+          is_shared?: boolean | null
           is_system?: boolean
           keywords?: string[] | null
           name: string
           updated_at?: string
+          usage_count?: number | null
         }
         Update: {
+          auto_labs?: boolean | null
+          auto_protocol_milestone?: boolean | null
           category?: string | null
+          cc_keywords?: string[] | null
+          color?: string | null
           created_at?: string
+          default_cpt?: string[] | null
+          default_icd10?: string[] | null
           description?: string | null
+          icon?: string | null
           id?: string
           is_active?: boolean
+          is_shared?: boolean | null
           is_system?: boolean
           keywords?: string[] | null
           name?: string
           updated_at?: string
+          usage_count?: number | null
         }
         Relationships: []
       }
@@ -385,27 +492,63 @@ export type Database = {
           created_at: string
           encounter_id: string
           field_id: string
+          field_key: string | null
+          field_label: string | null
+          field_type: string | null
           id: string
+          is_abnormal: boolean | null
+          ref_range_high: number | null
+          ref_range_low: number | null
+          section_id: string | null
+          section_key: string | null
+          template_id: string | null
           updated_at: string
           value: string | null
+          value_boolean: boolean | null
+          value_json: Json | null
+          value_numeric: number | null
         }
         Insert: {
           ai_suggested?: boolean
           created_at?: string
           encounter_id: string
           field_id: string
+          field_key?: string | null
+          field_label?: string | null
+          field_type?: string | null
           id?: string
+          is_abnormal?: boolean | null
+          ref_range_high?: number | null
+          ref_range_low?: number | null
+          section_id?: string | null
+          section_key?: string | null
+          template_id?: string | null
           updated_at?: string
           value?: string | null
+          value_boolean?: boolean | null
+          value_json?: Json | null
+          value_numeric?: number | null
         }
         Update: {
           ai_suggested?: boolean
           created_at?: string
           encounter_id?: string
           field_id?: string
+          field_key?: string | null
+          field_label?: string | null
+          field_type?: string | null
           id?: string
+          is_abnormal?: boolean | null
+          ref_range_high?: number | null
+          ref_range_low?: number | null
+          section_id?: string | null
+          section_key?: string | null
+          template_id?: string | null
           updated_at?: string
           value?: string | null
+          value_boolean?: boolean | null
+          value_json?: Json | null
+          value_numeric?: number | null
         }
         Relationships: [
           {
@@ -420,6 +563,20 @@ export type Database = {
             columns: ["field_id"]
             isOneToOne: false
             referencedRelation: "chart_template_fields"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encounter_field_responses_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "chart_template_sections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encounter_field_responses_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "chart_templates"
             referencedColumns: ["id"]
           },
         ]
@@ -437,6 +594,7 @@ export type Database = {
           signed_by: string | null
           started_at: string | null
           status: Database["public"]["Enums"]["encounter_status"]
+          template_id: string | null
           updated_at: string
         }
         Insert: {
@@ -451,6 +609,7 @@ export type Database = {
           signed_by?: string | null
           started_at?: string | null
           status?: Database["public"]["Enums"]["encounter_status"]
+          template_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -465,6 +624,7 @@ export type Database = {
           signed_by?: string | null
           started_at?: string | null
           status?: Database["public"]["Enums"]["encounter_status"]
+          template_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -494,6 +654,13 @@ export type Database = {
             columns: ["signed_by"]
             isOneToOne: false
             referencedRelation: "providers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encounters_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "chart_templates"
             referencedColumns: ["id"]
           },
         ]
