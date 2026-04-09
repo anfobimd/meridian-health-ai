@@ -36,8 +36,13 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    const { mode, ...params } = await req.json();
-
+    let body;
+    try {
+      body = await req.json();
+    } catch {
+      return new Response(JSON.stringify({ error: "Invalid JSON body" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    const { mode, ...params } = body;
     if (mode === "earnings_analysis") {
       const result = await callAI(
         `You are a medspa financial advisor AI. Analyze provider earnings data and provide actionable insights.
