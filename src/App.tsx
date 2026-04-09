@@ -19,6 +19,8 @@ import EncounterChart from "./pages/EncounterChart";
 import Protocols from "./pages/Protocols";
 import RoomsDevices from "./pages/RoomsDevices";
 import Billing from "./pages/Billing";
+import MdOversight from "./pages/MdOversight";
+import MdOversightDashboard from "./pages/MdOversightDashboard";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -46,6 +48,8 @@ const App = () => (
             <Route path="/treatments" element={<Treatments />} />
             <Route path="/providers" element={<Providers />} />
             <Route path="/billing" element={<Billing />} />
+            <Route path="/md-oversight" element={<MdOversight />} />
+            <Route path="/md-oversight/dashboard" element={<MdOversightDashboard />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>

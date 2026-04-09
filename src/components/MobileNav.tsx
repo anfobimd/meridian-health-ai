@@ -17,6 +17,8 @@ const navItems = [
   { to: "/hormone-intake", icon: ClipboardPlus, label: "Hormone Intake" },
   { to: "/physician-approval", icon: ShieldCheck, label: "Approvals" },
   { to: "/protocols", icon: Pill, label: "Protocols" },
+  { to: "/md-oversight", icon: ShieldCheck, label: "MD Chart Review" },
+  { to: "/md-oversight/dashboard", icon: Activity, label: "Oversight Dashboard" },
   { to: "/treatments", icon: Stethoscope, label: "Treatments" },
   { to: "/rooms-devices", icon: DoorOpen, label: "Rooms & Devices" },
   { to: "/providers", icon: UserCog, label: "Providers" },

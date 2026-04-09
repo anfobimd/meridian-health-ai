@@ -21,6 +21,13 @@ const navSections = [
     ],
   },
   {
+    label: "OVERSIGHT",
+    items: [
+      { to: "/md-oversight", icon: ShieldCheck, label: "MD Chart Review" },
+      { to: "/md-oversight/dashboard", icon: Activity, label: "Oversight Dashboard" },
+    ],
+  },
+  {
     label: "ADMIN",
     items: [
       { to: "/treatments", icon: Stethoscope, label: "Treatments" },
