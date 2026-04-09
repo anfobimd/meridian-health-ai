@@ -19,8 +19,10 @@ async function callAI(systemPrompt: string, userMessage: string) {
       ],
       temperature: 0.7,
     }),
-  });
-  const data = await res.json();
+  const rawText = await res.text();
+  console.log("AI API raw response (first 200):", rawText.substring(0, 200));
+  let data;
+  try { data = JSON.parse(rawText); } catch { return { narrative: rawText }; }
   const content = data.choices?.[0]?.message?.content || "{}";
   // Try to extract JSON from the response
   try {
