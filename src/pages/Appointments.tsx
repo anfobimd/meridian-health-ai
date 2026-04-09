@@ -7,8 +7,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Calendar } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Plus, Calendar, Sparkles, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
 
@@ -23,6 +23,10 @@ const statusColors: Record<string, string> = {
 
 export default function Appointments() {
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [soapDialogOpen, setSoapDialogOpen] = useState(false);
+  const [selectedApt, setSelectedApt] = useState<any>(null);
+  const [soapNote, setSoapNote] = useState<any>(null);
+  const [generatingNote, setGeneratingNote] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: appointments, isLoading } = useQuery({
@@ -30,7 +34,7 @@ export default function Appointments() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("appointments")
-        .select("*, patients(first_name, last_name), providers(first_name, last_name), treatments(name)")
+        .select("*, patients(id, first_name, last_name, date_of_birth, gender, allergies, medications), providers(id, first_name, last_name, credentials, specialty), treatments(id, name, description, category)")
         .order("scheduled_at", { ascending: false })
         .limit(50);
       if (error) throw error;
@@ -83,6 +87,87 @@ export default function Appointments() {
     onError: () => toast.error("Failed to create appointment"),
   });
 
+  const updateStatus = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const updates: any = { status };
+      if (status === "checked_in") updates.checked_in_at = new Date().toISOString();
+      if (status === "completed") updates.completed_at = new Date().toISOString();
+      const { error } = await supabase.from("appointments").update(updates).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["appointments"] });
+      toast.success("Status updated");
+    },
+  });
+
+  const generateSoapNote = async (apt: any) => {
+    setSelectedApt(apt);
+    setSoapNote(null);
+    setSoapDialogOpen(true);
+    setGeneratingNote(true);
+
+    try {
+      // Get prior notes for this patient
+      const { data: priorNotes } = await supabase
+        .from("clinical_notes")
+        .select("subjective, objective, assessment, plan, created_at")
+        .eq("patient_id", apt.patients?.id)
+        .order("created_at", { ascending: false })
+        .limit(3);
+
+      const { data, error } = await supabase.functions.invoke("ai-soap-note", {
+        body: {
+          patient: apt.patients,
+          appointment: apt,
+          treatment: apt.treatments,
+          provider: apt.providers,
+          priorNotes: priorNotes ?? [],
+        },
+      });
+
+      if (error) throw error;
+      setSoapNote(data);
+    } catch (e: any) {
+      toast.error(e.message || "Failed to generate SOAP note");
+    } finally {
+      setGeneratingNote(false);
+    }
+  };
+
+  const saveSoapNote = useMutation({
+    mutationFn: async () => {
+      if (!soapNote || !selectedApt) return;
+      const { error } = await supabase.from("clinical_notes").insert({
+        patient_id: selectedApt.patients?.id ?? selectedApt.patient_id,
+        provider_id: selectedApt.provider_id,
+        appointment_id: selectedApt.id,
+        subjective: soapNote.subjective,
+        objective: soapNote.objective,
+        assessment: soapNote.assessment,
+        plan: soapNote.plan,
+        ai_generated: true,
+        status: "draft",
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["clinical-notes"] });
+      setSoapDialogOpen(false);
+      toast.success("SOAP note saved as draft");
+    },
+    onError: () => toast.error("Failed to save note"),
+  });
+
+  const nextStatus = (current: string) => {
+    const flow: Record<string, string> = {
+      booked: "checked_in",
+      checked_in: "in_progress",
+      in_progress: "completed",
+    };
+    return flow[current];
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -101,27 +186,21 @@ export default function Appointments() {
                 <Label>Patient *</Label>
                 <select name="patient_id" required className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
                   <option value="">Select patient</option>
-                  {patients?.map((p) => (
-                    <option key={p.id} value={p.id}>{p.last_name}, {p.first_name}</option>
-                  ))}
+                  {patients?.map((p) => <option key={p.id} value={p.id}>{p.last_name}, {p.first_name}</option>)}
                 </select>
               </div>
               <div className="space-y-2">
                 <Label>Provider</Label>
                 <select name="provider_id" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
                   <option value="">Select provider</option>
-                  {providersList?.map((p) => (
-                    <option key={p.id} value={p.id}>Dr. {p.last_name}, {p.first_name}</option>
-                  ))}
+                  {providersList?.map((p) => <option key={p.id} value={p.id}>Dr. {p.last_name}, {p.first_name}</option>)}
                 </select>
               </div>
               <div className="space-y-2">
                 <Label>Treatment</Label>
                 <select name="treatment_id" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
                   <option value="">Select treatment</option>
-                  {treatments?.map((t) => (
-                    <option key={t.id} value={t.id}>{t.name} ({t.duration_minutes} min)</option>
-                  ))}
+                  {treatments?.map((t) => <option key={t.id} value={t.id}>{t.name} ({t.duration_minutes} min)</option>)}
                 </select>
               </div>
               <div className="space-y-2">
@@ -144,6 +223,46 @@ export default function Appointments() {
         </Dialog>
       </div>
 
+      {/* SOAP Note AI Dialog */}
+      <Dialog open={soapDialogOpen} onOpenChange={setSoapDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-primary" />
+              AI-Generated SOAP Note
+            </DialogTitle>
+          </DialogHeader>
+          {generatingNote ? (
+            <div className="flex flex-col items-center py-12 gap-3">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="text-sm text-muted-foreground">Generating clinical note with AI...</p>
+            </div>
+          ) : soapNote ? (
+            <div className="space-y-4">
+              {(["subjective", "objective", "assessment", "plan"] as const).map((section) => (
+                <div key={section}>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">{section}</p>
+                  <Textarea
+                    value={soapNote[section] || ""}
+                    onChange={(e) => setSoapNote({ ...soapNote, [section]: e.target.value })}
+                    rows={3}
+                    className="text-sm"
+                  />
+                </div>
+              ))}
+              <div className="flex gap-2">
+                <Button onClick={() => saveSoapNote.mutate()} disabled={saveSoapNote.isPending} className="flex-1">
+                  {saveSoapNote.isPending ? "Saving..." : "Save as Draft"}
+                </Button>
+                <Button variant="outline" onClick={() => setSoapDialogOpen(false)}>Cancel</Button>
+              </div>
+            </div>
+          ) : (
+            <p className="text-muted-foreground text-center py-8">No note generated</p>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {isLoading ? (
         <div className="space-y-3">{[1,2,3].map(i => <Card key={i} className="animate-pulse"><CardContent className="p-6 h-20" /></Card>)}</div>
       ) : appointments && appointments.length > 0 ? (
@@ -164,9 +283,21 @@ export default function Appointments() {
                     </p>
                   </div>
                 </div>
-                <Badge variant="secondary" className={statusColors[apt.status] ?? ""}>
-                  {apt.status.replace("_", " ")}
-                </Badge>
+                <div className="flex items-center gap-2">
+                  {apt.status === "completed" && (
+                    <Button size="sm" variant="outline" className="text-xs gap-1" onClick={() => generateSoapNote(apt)}>
+                      <Sparkles className="h-3 w-3" /> Generate Note
+                    </Button>
+                  )}
+                  {nextStatus(apt.status) && (
+                    <Button size="sm" variant="ghost" className="text-xs" onClick={() => updateStatus.mutate({ id: apt.id, status: nextStatus(apt.status)! })}>
+                      → {nextStatus(apt.status)!.replace("_", " ")}
+                    </Button>
+                  )}
+                  <Badge variant="secondary" className={statusColors[apt.status] ?? ""}>
+                    {apt.status.replace("_", " ")}
+                  </Badge>
+                </div>
               </CardContent>
             </Card>
           ))}
