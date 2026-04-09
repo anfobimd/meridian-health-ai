@@ -72,7 +72,7 @@ If a value is reported in different units, convert to the target unit. Include v
         Authorization: `Bearer ${LOVABLE_API_KEY}`,
       },
       body: JSON.stringify({
-        model,
+        model: "google/gemini-2.5-flash",
         messages: [{
           role: "user",
           content: [
