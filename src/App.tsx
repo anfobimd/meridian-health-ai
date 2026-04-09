@@ -12,6 +12,7 @@ import Treatments from "./pages/Treatments";
 import ClinicalNotes from "./pages/ClinicalNotes";
 import Providers from "./pages/Providers";
 import HormoneVisits from "./pages/HormoneVisits";
+import HormoneIntake from "./pages/HormoneIntake";
 import Encounters from "./pages/Encounters";
 import EncounterChart from "./pages/EncounterChart";
 import Protocols from "./pages/Protocols";
@@ -36,6 +37,7 @@ const App = () => (
             <Route path="/encounters/:encounterId/chart" element={<EncounterChart />} />
             <Route path="/clinical-notes" element={<ClinicalNotes />} />
             <Route path="/hormone-visits" element={<HormoneVisits />} />
+            <Route path="/hormone-intake" element={<HormoneIntake />} />
             <Route path="/protocols" element={<Protocols />} />
             <Route path="/treatments" element={<Treatments />} />
             <Route path="/providers" element={<Providers />} />
