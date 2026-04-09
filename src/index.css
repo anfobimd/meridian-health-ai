@@ -1,82 +1,93 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;600&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,400&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --background: 210 20% 98%;
-    --foreground: 215 25% 15%;
+    /* Meridian Wellness palette — Navy/Teal */
+    --background: 210 20% 97%;
+    --foreground: 213 32% 12%;
 
     --card: 0 0% 100%;
-    --card-foreground: 215 25% 15%;
+    --card-foreground: 213 32% 12%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 215 25% 15%;
+    --popover-foreground: 213 32% 12%;
 
-    --primary: 210 70% 45%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 175 85% 37%;
+    --primary-foreground: 213 32% 12%;
 
     --secondary: 210 20% 94%;
-    --secondary-foreground: 215 25% 15%;
+    --secondary-foreground: 213 32% 12%;
 
-    --muted: 210 15% 95%;
-    --muted-foreground: 215 15% 50%;
+    --muted: 210 18% 96%;
+    --muted-foreground: 215 16% 47%;
 
-    --accent: 170 55% 42%;
+    --accent: 175 85% 37%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 214 20% 90%;
-    --input: 214 20% 90%;
-    --ring: 210 70% 45%;
+    --border: 214 22% 89%;
+    --input: 214 22% 89%;
+    --ring: 175 85% 37%;
 
     --radius: 0.5rem;
 
-    --success: 142 60% 40%;
+    --success: 160 60% 39%;
     --success-foreground: 0 0% 100%;
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 100%;
+    --info: 217 71% 53%;
+    --info-foreground: 0 0% 100%;
+    --violet: 263 70% 50%;
+    --violet-foreground: 0 0% 100%;
+    --coral: 24 95% 53%;
+    --coral-foreground: 0 0% 100%;
 
-    --sidebar-background: 215 25% 15%;
+    /* Meridian sidebar: dark navy */
+    --sidebar-background: 213 38% 12%;
     --sidebar-foreground: 210 20% 90%;
-    --sidebar-primary: 210 70% 55%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 215 20% 22%;
-    --sidebar-accent-foreground: 210 20% 90%;
-    --sidebar-border: 215 15% 25%;
-    --sidebar-ring: 210 70% 55%;
+    --sidebar-primary: 175 85% 41%;
+    --sidebar-primary-foreground: 213 38% 12%;
+    --sidebar-accent: 175 85% 37%;
+    --sidebar-accent-foreground: 213 38% 12%;
+    --sidebar-border: 213 25% 20%;
+    --sidebar-ring: 175 85% 41%;
+    --sidebar-muted: 213 20% 18%;
   }
 
   .dark {
-    --background: 215 25% 10%;
+    --background: 213 38% 8%;
     --foreground: 210 20% 95%;
-    --card: 215 25% 13%;
+    --card: 213 35% 11%;
     --card-foreground: 210 20% 95%;
-    --popover: 215 25% 13%;
+    --popover: 213 35% 11%;
     --popover-foreground: 210 20% 95%;
-    --primary: 210 70% 55%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 215 20% 18%;
+    --primary: 175 85% 41%;
+    --primary-foreground: 213 38% 12%;
+    --secondary: 213 25% 16%;
     --secondary-foreground: 210 20% 95%;
-    --muted: 215 20% 18%;
+    --muted: 213 25% 16%;
     --muted-foreground: 215 15% 60%;
-    --accent: 170 55% 45%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 175 85% 41%;
+    --accent-foreground: 213 38% 12%;
     --destructive: 0 62% 30%;
     --destructive-foreground: 210 40% 98%;
-    --border: 215 15% 22%;
-    --input: 215 15% 22%;
-    --ring: 210 70% 55%;
-    --sidebar-background: 215 30% 8%;
+    --border: 213 20% 18%;
+    --input: 213 20% 18%;
+    --ring: 175 85% 41%;
+    --sidebar-background: 213 40% 6%;
     --sidebar-foreground: 210 15% 85%;
-    --sidebar-primary: 210 70% 55%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 215 25% 14%;
+    --sidebar-primary: 175 85% 41%;
+    --sidebar-primary-foreground: 213 38% 12%;
+    --sidebar-accent: 213 30% 12%;
     --sidebar-accent-foreground: 210 15% 85%;
-    --sidebar-border: 215 20% 16%;
-    --sidebar-ring: 210 70% 55%;
+    --sidebar-border: 213 25% 14%;
+    --sidebar-ring: 175 85% 41%;
   }
 }
 
@@ -86,6 +97,13 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-family: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  h1, h2, h3 {
+    font-family: 'Fraunces', Georgia, serif;
+    letter-spacing: -0.025em;
   }
 }
