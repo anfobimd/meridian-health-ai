@@ -100,6 +100,39 @@ export default function PatientRecord() {
     enabled: !!id,
   });
 
+  const { data: packagePurchases } = useQuery({
+    queryKey: ["patient-packages", id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("patient_package_purchases")
+        .select("*, service_packages(name, session_count, price, package_type), patient_package_sessions(*)")
+        .eq("patient_id", id!)
+        .order("created_at", { ascending: false });
+      return data ?? [];
+    },
+    enabled: !!id,
+  });
+
+  const [aiRec, setAiRec] = useState<any>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+
+  const fetchAiRecommendation = async () => {
+    setAiLoading(true);
+    try {
+      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+      const res = await fetch(`https://${projectId}.supabase.co/functions/v1/ai-package-engine`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
+        body: JSON.stringify({ mode: "recommend_package", patient_id: id }),
+      });
+      const data = await res.json();
+      setAiRec(data);
+    } catch (e) {
+      toast({ title: "AI recommendation failed", variant: "destructive" });
+    }
+    setAiLoading(false);
+  };
+
   if (isLoading) return <div className="p-8 text-center text-muted-foreground">Loading patient record...</div>;
   if (!patient) return <div className="p-8 text-center text-muted-foreground">Patient not found</div>;
 
