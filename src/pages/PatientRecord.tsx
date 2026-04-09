@@ -1,12 +1,15 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, User, FlaskConical, CheckCircle, Clock, AlertTriangle } from "lucide-react";
-import { format, parseISO } from "date-fns";
+import { Progress } from "@/components/ui/progress";
+import { ArrowLeft, User, FlaskConical, CheckCircle, Clock, AlertTriangle, Package, Sparkles, Loader2 } from "lucide-react";
+import { format, parseISO, differenceInDays } from "date-fns";
+import { useState } from "react";
+import { toast } from "@/hooks/use-toast";
 
 const LAB_FIELDS = [
   { key: "lab_tt", label: "Total Testosterone", unit: "ng/dL" },
@@ -97,6 +100,39 @@ export default function PatientRecord() {
     enabled: !!id,
   });
 
+  const { data: packagePurchases } = useQuery({
+    queryKey: ["patient-packages", id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("patient_package_purchases")
+        .select("*, service_packages(name, session_count, price, package_type), patient_package_sessions(*)")
+        .eq("patient_id", id!)
+        .order("created_at", { ascending: false });
+      return data ?? [];
+    },
+    enabled: !!id,
+  });
+
+  const [aiRec, setAiRec] = useState<any>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+
+  const fetchAiRecommendation = async () => {
+    setAiLoading(true);
+    try {
+      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+      const res = await fetch(`https://${projectId}.supabase.co/functions/v1/ai-package-engine`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
+        body: JSON.stringify({ mode: "recommend_package", patient_id: id }),
+      });
+      const data = await res.json();
+      setAiRec(data);
+    } catch (e) {
+      toast({ title: "AI recommendation failed", variant: "destructive" });
+    }
+    setAiLoading(false);
+  };
+
   if (isLoading) return <div className="p-8 text-center text-muted-foreground">Loading patient record...</div>;
   if (!patient) return <div className="p-8 text-center text-muted-foreground">Patient not found</div>;
 
@@ -119,6 +155,7 @@ export default function PatientRecord() {
           <TabsTrigger value="notes">Notes ({notes?.length ?? 0})</TabsTrigger>
           <TabsTrigger value="hormone">Hormone ({hormoneVisits?.length ?? 0})</TabsTrigger>
           <TabsTrigger value="intake">Intake ({intakeForms?.length ?? 0})</TabsTrigger>
+          <TabsTrigger value="packages">Packages ({packagePurchases?.length ?? 0})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="demographics">
@@ -310,6 +347,118 @@ export default function PatientRecord() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+        {/* Packages Tab */}
+        <TabsContent value="packages">
+          <div className="space-y-4">
+            {/* AI Recommendation Card */}
+            <Card className="border-primary/20 bg-primary/5">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-primary" />
+                    <span className="text-sm font-medium">AI Package Recommendations</span>
+                  </div>
+                  <Button size="sm" variant="outline" onClick={fetchAiRecommendation} disabled={aiLoading}>
+                    {aiLoading ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Sparkles className="h-3 w-3 mr-1" />}
+                    {aiLoading ? "Analyzing…" : "Get Suggestions"}
+                  </Button>
+                </div>
+                {aiRec?.recommendations?.length > 0 && (
+                  <div className="space-y-2 mt-3">
+                    {aiRec.recommendations.slice(0, 3).map((rec: any, i: number) => (
+                      <div key={i} className="p-3 bg-background rounded-md border">
+                        <p className="text-sm font-medium">{rec.package_name}</p>
+                        <p className="text-xs text-muted-foreground mt-1">{rec.reasoning}</p>
+                        {rec.estimated_savings && <p className="text-xs text-success mt-1">Savings: {rec.estimated_savings}</p>}
+                        {rec.synergy_note && <p className="text-xs text-primary mt-1">💡 {rec.synergy_note}</p>}
+                      </div>
+                    ))}
+                    {aiRec.insight && <p className="text-xs text-muted-foreground mt-2 italic">{aiRec.insight}</p>}
+                  </div>
+                )}
+                {aiRec && (!aiRec.recommendations || aiRec.recommendations.length === 0) && (
+                  <p className="text-xs text-muted-foreground mt-2">{aiRec.insight || "No specific recommendations at this time."}</p>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Active Packages */}
+            {packagePurchases && packagePurchases.length > 0 ? (
+              packagePurchases.map((purchase: any) => {
+                const pct = purchase.sessions_total > 0 ? (purchase.sessions_used / purchase.sessions_total) * 100 : 0;
+                const daysLeft = purchase.expires_at ? differenceInDays(parseISO(purchase.expires_at), new Date()) : null;
+                const isActive = purchase.status === "active";
+
+                return (
+                  <Card key={purchase.id}>
+                    <CardContent className="p-5">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <Package className="h-4 w-4 text-primary" />
+                          <span className="font-medium text-sm">{purchase.service_packages?.name}</span>
+                        </div>
+                        <Badge variant="secondary" className={
+                          purchase.status === "active" ? "bg-success/10 text-success" :
+                          purchase.status === "completed" ? "bg-primary/10 text-primary" :
+                          purchase.status === "expired" ? "bg-destructive/10 text-destructive" :
+                          "bg-muted text-muted-foreground"
+                        }>
+                          {purchase.status}
+                        </Badge>
+                      </div>
+
+                      {/* Punch card */}
+                      <div className="flex gap-1.5 mb-3 flex-wrap">
+                        {Array.from({ length: purchase.sessions_total }, (_, i) => (
+                          <div
+                            key={i}
+                            className={`w-6 h-6 rounded-full border-2 flex items-center justify-center text-[10px] ${
+                              i < purchase.sessions_used
+                                ? "bg-primary border-primary text-primary-foreground"
+                                : "border-muted-foreground/30"
+                            }`}
+                          >
+                            {i < purchase.sessions_used ? "✓" : i + 1}
+                          </div>
+                        ))}
+                      </div>
+
+                      <Progress value={pct} className="h-2 mb-2" />
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span>{purchase.sessions_used}/{purchase.sessions_total} sessions used</span>
+                        {daysLeft !== null && (
+                          <span className={daysLeft < 7 ? "text-destructive font-medium" : ""}>
+                            <Clock className="h-3 w-3 inline mr-0.5" />{daysLeft} days remaining
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Session history */}
+                      {purchase.patient_package_sessions?.length > 0 && (
+                        <div className="mt-3 space-y-1">
+                          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Redeemed Sessions</p>
+                          {purchase.patient_package_sessions.map((s: any) => (
+                            <div key={s.id} className="flex justify-between text-xs text-muted-foreground">
+                              <span>{s.treatment_name || "Session"}</span>
+                              <span>{format(parseISO(s.redeemed_at), "MMM d, yyyy")}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })
+            ) : (
+              <Card>
+                <CardContent className="py-8 text-center">
+                  <Package className="h-10 w-10 mx-auto text-muted-foreground/50" />
+                  <p className="mt-3 text-muted-foreground text-sm">No packages purchased</p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </TabsContent>
       </Tabs>
     </div>

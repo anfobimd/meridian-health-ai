@@ -2,7 +2,7 @@ import { useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import {
   Menu, X, Activity, LayoutDashboard, Users, Calendar, Stethoscope,
-  ClipboardList, UserCog, FlaskConical, FileText, Pill, DollarSign, ClipboardPlus, ShieldCheck, DoorOpen, Store,
+  ClipboardList, UserCog, FlaskConical, FileText, Pill, DollarSign, ClipboardPlus, ShieldCheck, DoorOpen, Store, Package,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,7 @@ const navItems = [
   { to: "/providers", icon: UserCog, label: "Providers" },
   { to: "/billing", icon: DollarSign, label: "Billing" },
   { to: "/marketplace", icon: Store, label: "Marketplace" },
+  { to: "/packages", icon: Package, label: "Packages" },
 ];
 
 export function MobileNav() {

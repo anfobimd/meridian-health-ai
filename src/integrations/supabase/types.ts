@@ -1788,6 +1788,105 @@ export type Database = {
         }
         Relationships: []
       }
+      package_notification_log: {
+        Row: {
+          body: string | null
+          channel: string
+          created_at: string
+          id: string
+          purchase_id: string
+          rule_id: string | null
+          sent_at: string
+          status: string
+          subject: string | null
+        }
+        Insert: {
+          body?: string | null
+          channel?: string
+          created_at?: string
+          id?: string
+          purchase_id: string
+          rule_id?: string | null
+          sent_at?: string
+          status?: string
+          subject?: string | null
+        }
+        Update: {
+          body?: string | null
+          channel?: string
+          created_at?: string
+          id?: string
+          purchase_id?: string
+          rule_id?: string | null
+          sent_at?: string
+          status?: string
+          subject?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "package_notification_log_purchase_id_fkey"
+            columns: ["purchase_id"]
+            isOneToOne: false
+            referencedRelation: "patient_package_purchases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "package_notification_log_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "package_notification_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      package_notification_rules: {
+        Row: {
+          channel: string
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          template_body: string | null
+          template_subject: string | null
+          threshold_sessions: number | null
+          timing_days: number | null
+          tone: string
+          trigger_label: string
+          trigger_type: string
+          updated_at: string
+        }
+        Insert: {
+          channel?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          template_body?: string | null
+          template_subject?: string | null
+          threshold_sessions?: number | null
+          timing_days?: number | null
+          tone?: string
+          trigger_label: string
+          trigger_type: string
+          updated_at?: string
+        }
+        Update: {
+          channel?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          template_body?: string | null
+          template_subject?: string | null
+          threshold_sessions?: number | null
+          timing_days?: number | null
+          tone?: string
+          trigger_label?: string
+          trigger_type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       patient_allergies: {
         Row: {
           allergen: string
@@ -2010,6 +2109,146 @@ export type Database = {
             columns: ["patient_id"]
             isOneToOne: false
             referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      patient_package_purchases: {
+        Row: {
+          cancelled_at: string | null
+          created_at: string
+          deferred_revenue_amount: number
+          expires_at: string | null
+          id: string
+          notes: string | null
+          package_id: string
+          patient_id: string
+          paused_at: string | null
+          price_paid: number
+          provider_id: string | null
+          purchased_at: string
+          revenue_recognized_amount: number
+          sessions_total: number
+          sessions_used: number
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          cancelled_at?: string | null
+          created_at?: string
+          deferred_revenue_amount?: number
+          expires_at?: string | null
+          id?: string
+          notes?: string | null
+          package_id: string
+          patient_id: string
+          paused_at?: string | null
+          price_paid?: number
+          provider_id?: string | null
+          purchased_at?: string
+          revenue_recognized_amount?: number
+          sessions_total?: number
+          sessions_used?: number
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          cancelled_at?: string | null
+          created_at?: string
+          deferred_revenue_amount?: number
+          expires_at?: string | null
+          id?: string
+          notes?: string | null
+          package_id?: string
+          patient_id?: string
+          paused_at?: string | null
+          price_paid?: number
+          provider_id?: string | null
+          purchased_at?: string
+          revenue_recognized_amount?: number
+          sessions_total?: number
+          sessions_used?: number
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "patient_package_purchases_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "service_packages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "patient_package_purchases_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "patient_package_purchases_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "providers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      patient_package_sessions: {
+        Row: {
+          appointment_id: string | null
+          created_at: string
+          id: string
+          notes: string | null
+          provider_id: string | null
+          purchase_id: string
+          redeemed_at: string
+          revenue_amount: number
+          treatment_name: string | null
+        }
+        Insert: {
+          appointment_id?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          provider_id?: string | null
+          purchase_id: string
+          redeemed_at?: string
+          revenue_amount?: number
+          treatment_name?: string | null
+        }
+        Update: {
+          appointment_id?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          provider_id?: string | null
+          purchase_id?: string
+          redeemed_at?: string
+          revenue_amount?: number
+          treatment_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "patient_package_sessions_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "patient_package_sessions_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "providers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "patient_package_sessions_purchase_id_fkey"
+            columns: ["purchase_id"]
+            isOneToOne: false
+            referencedRelation: "patient_package_purchases"
             referencedColumns: ["id"]
           },
         ]
@@ -2771,6 +3010,96 @@ export type Database = {
           },
         ]
       }
+      service_package_items: {
+        Row: {
+          created_at: string
+          id: string
+          package_id: string
+          sessions_included: number
+          treatment_id: string | null
+          treatment_name: string
+          unit_price: number | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          package_id: string
+          sessions_included?: number
+          treatment_id?: string | null
+          treatment_name: string
+          unit_price?: number | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          package_id?: string
+          sessions_included?: number
+          treatment_id?: string | null
+          treatment_name?: string
+          unit_price?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_package_items_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "service_packages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_package_items_treatment_id_fkey"
+            columns: ["treatment_id"]
+            isOneToOne: false
+            referencedRelation: "treatments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      service_packages: {
+        Row: {
+          category: string | null
+          created_at: string
+          description: string | null
+          id: string
+          individual_price: number | null
+          is_active: boolean
+          name: string
+          package_type: string
+          price: number
+          session_count: number
+          updated_at: string
+          valid_days: number | null
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          individual_price?: number | null
+          is_active?: boolean
+          name: string
+          package_type?: string
+          price?: number
+          session_count?: number
+          updated_at?: string
+          valid_days?: number | null
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          individual_price?: number | null
+          is_active?: boolean
+          name?: string
+          package_type?: string
+          price?: number
+          session_count?: number
+          updated_at?: string
+          valid_days?: number | null
+        }
+        Relationships: []
+      }
       treatment_categories: {
         Row: {
           created_at: string
@@ -2913,6 +3242,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      expire_stale_packages: { Args: never; Returns: number }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
