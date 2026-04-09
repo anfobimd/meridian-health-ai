@@ -13,6 +13,7 @@ import ClinicalNotes from "./pages/ClinicalNotes";
 import Providers from "./pages/Providers";
 import HormoneVisits from "./pages/HormoneVisits";
 import Encounters from "./pages/Encounters";
+import EncounterChart from "./pages/EncounterChart";
 import Protocols from "./pages/Protocols";
 import Billing from "./pages/Billing";
 import NotFound from "./pages/NotFound";
@@ -32,6 +33,7 @@ const App = () => (
             <Route path="/patients/:id" element={<PatientRecord />} />
             <Route path="/appointments" element={<Appointments />} />
             <Route path="/encounters" element={<Encounters />} />
+            <Route path="/encounters/:encounterId/chart" element={<EncounterChart />} />
             <Route path="/clinical-notes" element={<ClinicalNotes />} />
             <Route path="/hormone-visits" element={<HormoneVisits />} />
             <Route path="/protocols" element={<Protocols />} />
