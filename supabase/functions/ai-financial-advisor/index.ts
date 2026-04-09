@@ -19,6 +19,7 @@ async function callAI(systemPrompt: string, userMessage: string) {
       ],
       temperature: 0.7,
     }),
+  });
   const rawText = await res.text();
   console.log("AI API raw response (first 200):", rawText.substring(0, 200));
   let data;
