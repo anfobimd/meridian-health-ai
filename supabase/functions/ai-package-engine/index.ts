@@ -18,7 +18,7 @@ Deno.serve(async (req) => {
     if (!lovableKey) throw new Error("LOVABLE_API_KEY not set");
 
     const callAI = async (systemPrompt: string, userPrompt: string) => {
-      const res = await fetch("https://ai-gateway.lovable.dev/v1/chat/completions", {
+      const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
         headers: { Authorization: `Bearer ${lovableKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({
