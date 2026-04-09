@@ -18,11 +18,18 @@ async function callAI(systemPrompt: string, userMessage: string) {
         { role: "user", content: userMessage },
       ],
       temperature: 0.7,
-      response_format: { type: "json_object" },
     }),
   });
   const data = await res.json();
-  return JSON.parse(data.choices?.[0]?.message?.content || "{}");
+  const content = data.choices?.[0]?.message?.content || "{}";
+  // Try to extract JSON from the response
+  try {
+    // Remove markdown code fences if present
+    const cleaned = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+    return JSON.parse(cleaned);
+  } catch {
+    return { narrative: content };
+  }
 }
 
 Deno.serve(async (req) => {
