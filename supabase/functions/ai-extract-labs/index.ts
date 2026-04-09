@@ -59,11 +59,6 @@ If a value is reported in different units, convert to the target unit. Include v
       type: "image_url" as const,
       image_url: { url: `data:${mediaType};base64,${base64Data}` },
     };
-    
-    const imageContent = {
-      type: "image_url" as const,
-      image_url: { url: `data:${mediaType};base64,${base64Data}` },
-    };
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
