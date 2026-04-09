@@ -1,71 +1,95 @@
 
 
-# Rooms, Devices & Provider Assignment System
+# Physician Oversight & Hierarchy System — MD Chart Review (v2.0 AI-Native)
 
-## What Exists Today
-Nothing. There are no `rooms` or `devices` tables, no room assignment on appointments, and no provider-to-room mapping. The previous plan was proposed but not approved or built.
+This implements the MD Oversight Specification v2.0 from the uploaded document. Due to the scale (~7-8 week full spec), we will implement in 3 incremental batches. This plan covers **Batch 1: Database Foundation + Chart Review Queue + AI Analysis Pipeline**.
 
-## What We Will Build
+## What We're Building
 
-### 1. Database Migration (3 new tables, 1 altered table)
+A Medical Director chart review system where:
+- Encounters from NP/RN providers are queued for MD review
+- AI analyzes each chart and generates a pre-review brief with risk scores, flags, and recommendations
+- MDs review charts sorted by AI-calculated priority (not random)
+- Anti-rubber-stamp timer prevents speed-signing
+- Super-admin oversight dashboard shows AI intelligence reports, provider patterns, and MD performance
 
-**`rooms`** — Physical treatment rooms
-- `id`, `name` (e.g. "Room 1", "Laser Suite A"), `room_type` (exam / procedure / consult), `is_active`, `sort_order`
-- `assigned_provider_id` (uuid, nullable) — default provider assigned to this room
+## Batch 1 Scope (this implementation)
 
-**`devices`** — Equipment and lasers (exclusive-use resources)
-- `id`, `name` (e.g. "PicoSure Laser"), `device_type`, `is_active`, `maintenance_notes`
-- `room_id` (uuid, nullable) — which room this device lives in
+### 1. Database Migration — 8 new tables + 1 altered table
 
-**`treatment_device_requirements`** — Which treatments need which devices
-- `id`, `treatment_id`, `device_id`, `is_required` (hard vs. preferred)
+| Table | Purpose |
+|-------|---------|
+| `chart_review_records` | Core review queue — links encounter to MD, tracks status, AI scores, review time |
+| `ai_chart_analysis` | AI-generated brief per chart (risk score, flags, documentation score, structured JSON brief) |
+| `ai_provider_intelligence` | Rolling provider metrics: correction rate, doc scores, recurring issues, coaching state |
+| `ai_oversight_reports` | Monthly AI-generated narrative reports for super-admin |
+| `ai_doc_checklists` | Procedure-specific documentation checklists used by AI scoring |
+| `ai_md_consistency` | Cross-MD correction rate comparison per clinic per month |
+| `ai_api_calls` | Cost tracking and debugging log for all AI calls |
+| `ai_prompts` | Versioned system prompts (chart_brief, comment_draft, monthly_report) — editable without deploy |
+| Alter `encounters` | Add `encounter_type` column for invasive procedure classification |
 
-**Alter `appointments`** — Add `room_id`, `device_id`, `roomed_at` columns. Add `roomed` value to the `appointment_status` enum (between `checked_in` and `in_progress`).
+All tables get open RLS policies (matching existing pattern — no auth yet).
 
-RLS: open read/write for anon + authenticated (matching existing pattern).
+### 2. AI Edge Function: `ai-chart-review` 
 
-### 2. New Page: Rooms & Devices (`/rooms-devices`)
+A single edge function using Lovable AI (not Anthropic — adapting the spec to use our gateway) that:
+- Accepts an encounter ID
+- Reads the encounter's SOAP note, patient context, provider history
+- Generates a structured JSON brief with: `procedure_summary`, `documentation_status`, `documentation_score`, `ai_flags[]`, `patient_context`, `risk_score`, `risk_tier`, `recommended_action`, `estimated_review_seconds`
+- Stores result in `ai_chart_analysis`
+- Logs the call in `ai_api_calls`
 
-A management page with two tabs:
+### 3. New Page: `/md-oversight` — Medical Director Chart Review
 
-**Rooms Tab**
-- List all rooms with name, type, assigned provider, and devices in that room
-- Create / edit room dialog: name, type, assign a default provider (dropdown from providers table)
-- Toggle active/inactive
+**Queue View (default)**
+- Table of encounters awaiting review, sorted by `ai_priority_score` DESC
+- Each row: risk tier badge (color-coded border), provider name + days-at-clinic, patient name, procedure, AI flags preview, doc score circle, time remaining
+- "Analyzing..." skeleton while AI is pending
+- Filter by risk tier, status, provider
 
-**Devices Tab**
-- List all devices with name, type, assigned room
-- Create / edit device dialog: name, type, assign to a room, maintenance notes
-- Toggle active/inactive
-- Link treatments to required devices (multi-select)
+**Chart Review Panel (dialog on row click)**
+- AI Brief Card at top (dark card with 6 structured fields from the analysis)
+- Provider Intelligence Strip (correction rate, recurring issues, coaching flags)
+- Document tabs: SOAP Note / Encounter Details with AI-highlighted flags
+- MD Action Area at bottom: comment textarea, "Draft AI Comment" button, approve/correction/sign buttons
+- Elapsed timer with rubber-stamp threshold display
+- Secondary confirmation for CRITICAL charts signed without comment
 
-### 3. AI Smart-Schedule Edge Function (`ai-smart-schedule`)
+### 4. New Page: `/md-oversight/dashboard` — Super-Admin Oversight
 
-Called when booking or rooming a patient. Uses Lovable AI to:
-- **Detect device conflicts**: Block double-booking a laser across overlapping appointments
-- **Recommend a room**: Based on treatment requirements, device location, and availability
-- **Auto-assign provider**: If no provider selected, pick best match by specialty, room assignment, and current load
+**Tab 1: AI Intelligence Report** — Monthly AI-generated narrative with alerts, highlights, recommendations
+**Tab 2: MD Performance** — Table with review %, avg review time, rubber stamp %, correction rate, consistency score
+**Tab 3: Provider Intelligence** — Searchable provider table with issue history drawer
+**Tab 4: System Intelligence** — AI API cost, success rates, rubber stamp incidents, sampling recommendations
 
-### 4. Updated Appointments Page
+### 5. Navigation Updates
 
-- Booking dialog: after selecting a treatment, show required devices and auto-suggest room + provider via AI
-- Check-in flow: "Room Patient" button appears at `checked_in` status, opens AI-powered room picker showing available rooms with reasoning
-- Status flow becomes: `booked → checked_in → roomed → in_progress → completed`
-- Room and device badges shown on appointment cards
+- Add "MD Oversight" link to sidebar under a new "OVERSIGHT" section (ShieldCheck icon)
+- Add to mobile nav
 
-### 5. Navigation
+### 6. Seed Data
 
-- Add "Rooms & Devices" link to sidebar (under ADMIN section) and mobile nav
+- Seed `ai_prompts` with 3 initial prompts (chart_brief, comment_draft, monthly_report)
+- Seed `ai_doc_checklists` for 5 procedure types (Botox, Filler, GLP-1/Peptide, Hormone Injection, Laser/Energy)
 
-### Files Changed
+## Files Changed
 
 | File | Change |
 |------|--------|
-| New migration SQL | Create 3 tables, alter appointments, update enum |
-| `src/pages/RoomsDevices.tsx` | New CRUD page for rooms and devices |
-| `supabase/functions/ai-smart-schedule/index.ts` | New AI edge function |
-| `src/pages/Appointments.tsx` | Room/device selection, rooming flow, AI suggestions |
-| `src/App.tsx` | Add `/rooms-devices` route |
-| `src/components/AppSidebar.tsx` | Add nav link |
-| `src/components/MobileNav.tsx` | Add mobile nav link |
+| Migration SQL | 8 new tables, alter encounters |
+| `supabase/functions/ai-chart-review/index.ts` | New AI edge function for chart analysis |
+| `src/pages/MdOversight.tsx` | New — chart review queue + review panel |
+| `src/pages/MdOversightDashboard.tsx` | New — super-admin oversight dashboard (4 tabs) |
+| `src/App.tsx` | Add 2 new routes |
+| `src/components/AppSidebar.tsx` | Add oversight nav section |
+| `src/components/MobileNav.tsx` | Add oversight links |
+
+## Technical Notes
+
+- Uses Lovable AI gateway (`openai/gpt-5`) for all AI analysis, not Anthropic as the spec suggests
+- Risk scoring uses the weighted factors from the spec: provider experience (25%), correction history (20%), doc completeness (20%), procedure risk (15%), patient complexity (10%), note similarity (10%)
+- Rubber-stamp thresholds: LOW=30s, MEDIUM=90s, HIGH=180s, CRITICAL=300s (floor 15s)
+- Charts with `ai_risk_tier` HIGH or CRITICAL are always reviewed regardless of sampling rate
+- Providers with <30 reviewed charts get mandatory review
 
