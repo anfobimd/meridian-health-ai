@@ -187,6 +187,142 @@ export type Database = {
           },
         ]
       }
+      hormone_visits: {
+        Row: {
+          ai_recommendation: string | null
+          ai_sections: Json | null
+          approval_notes: string | null
+          approval_status: string | null
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          edited_monitoring: string | null
+          edited_treatment: string | null
+          id: string
+          lab_a1c: number | null
+          lab_alt: number | null
+          lab_ast: number | null
+          lab_crt: number | null
+          lab_dhea: number | null
+          lab_e2: number | null
+          lab_fsh: number | null
+          lab_ft: number | null
+          lab_ft3: number | null
+          lab_ft4: number | null
+          lab_glc: number | null
+          lab_hct: number | null
+          lab_hgb: number | null
+          lab_lh: number | null
+          lab_p4: number | null
+          lab_prl: number | null
+          lab_psa: number | null
+          lab_rbc: number | null
+          lab_shbg: number | null
+          lab_tsh: number | null
+          lab_tt: number | null
+          patient_id: string
+          provider_id: string | null
+          updated_at: string
+          visit_date: string
+        }
+        Insert: {
+          ai_recommendation?: string | null
+          ai_sections?: Json | null
+          approval_notes?: string | null
+          approval_status?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          edited_monitoring?: string | null
+          edited_treatment?: string | null
+          id?: string
+          lab_a1c?: number | null
+          lab_alt?: number | null
+          lab_ast?: number | null
+          lab_crt?: number | null
+          lab_dhea?: number | null
+          lab_e2?: number | null
+          lab_fsh?: number | null
+          lab_ft?: number | null
+          lab_ft3?: number | null
+          lab_ft4?: number | null
+          lab_glc?: number | null
+          lab_hct?: number | null
+          lab_hgb?: number | null
+          lab_lh?: number | null
+          lab_p4?: number | null
+          lab_prl?: number | null
+          lab_psa?: number | null
+          lab_rbc?: number | null
+          lab_shbg?: number | null
+          lab_tsh?: number | null
+          lab_tt?: number | null
+          patient_id: string
+          provider_id?: string | null
+          updated_at?: string
+          visit_date?: string
+        }
+        Update: {
+          ai_recommendation?: string | null
+          ai_sections?: Json | null
+          approval_notes?: string | null
+          approval_status?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          edited_monitoring?: string | null
+          edited_treatment?: string | null
+          id?: string
+          lab_a1c?: number | null
+          lab_alt?: number | null
+          lab_ast?: number | null
+          lab_crt?: number | null
+          lab_dhea?: number | null
+          lab_e2?: number | null
+          lab_fsh?: number | null
+          lab_ft?: number | null
+          lab_ft3?: number | null
+          lab_ft4?: number | null
+          lab_glc?: number | null
+          lab_hct?: number | null
+          lab_hgb?: number | null
+          lab_lh?: number | null
+          lab_p4?: number | null
+          lab_prl?: number | null
+          lab_psa?: number | null
+          lab_rbc?: number | null
+          lab_shbg?: number | null
+          lab_tsh?: number | null
+          lab_tt?: number | null
+          patient_id?: string
+          provider_id?: string | null
+          updated_at?: string
+          visit_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hormone_visits_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "providers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hormone_visits_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hormone_visits_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "providers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       intake_forms: {
         Row: {
           created_at: string
