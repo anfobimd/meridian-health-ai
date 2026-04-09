@@ -62,7 +62,7 @@ export default function HormoneVisits() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("hormone_visits")
-        .select("*, patients(id, first_name, last_name, date_of_birth, gender), providers(first_name, last_name)")
+        .select("*, patients(id, first_name, last_name, date_of_birth, gender), providers!hormone_visits_provider_id_fkey(first_name, last_name)")
         .order("visit_date", { ascending: false })
         .limit(50);
       if (error) throw error;
