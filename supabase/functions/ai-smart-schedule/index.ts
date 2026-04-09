@@ -11,13 +11,111 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { action, appointment_id, treatment_id, scheduled_at, duration_minutes, patient_id } = await req.json();
+    const body = await req.json();
+    const { mode } = body;
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const sb = createClient(supabaseUrl, supabaseKey);
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
-    // Fetch context data
+    // ===== MARKETPLACE: Generate Bio =====
+    if (mode === "generate_bio") {
+      const { provider } = body;
+      const prompt = `Write a professional, warm marketplace bio (2-3 sentences) for this aesthetic medicine provider:
+Name: ${provider.first_name} ${provider.last_name}
+Credentials: ${provider.credentials || "N/A"}
+Specialty: ${provider.specialty || "Aesthetics"}
+Skills: ${(provider.skills || []).join(", ") || "General aesthetics"}
+
+Return JSON: {"bio": "..."}`;
+
+      const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "google/gemini-3-flash-preview",
+          messages: [
+            { role: "system", content: "Return only valid JSON, no markdown." },
+            { role: "user", content: prompt },
+          ],
+        }),
+      });
+      if (!aiResp.ok) throw new Error(`AI error: ${aiResp.status}`);
+      const aiData = await aiResp.json();
+      const content = aiData.choices?.[0]?.message?.content ?? "{}";
+      const cleaned = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+      const result = JSON.parse(cleaned);
+      return new Response(JSON.stringify(result), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // ===== MARKETPLACE: Match Providers =====
+    if (mode === "marketplace_match") {
+      const { treatment_id, preferred_date } = body;
+
+      const [
+        { data: treatment },
+        { data: mpProviders },
+        { data: skills },
+        { data: availability },
+        { data: memberships },
+      ] = await Promise.all([
+        sb.from("treatments").select("*").eq("id", treatment_id).single(),
+        sb.from("providers").select("*").eq("is_active", true).eq("marketplace_enabled", true),
+        sb.from("provider_skills").select("*"),
+        sb.from("provider_availability").select("*").eq("is_active", true),
+        sb.from("provider_memberships").select("*").eq("is_active", true),
+      ]);
+
+      const prompt = `You are a medspa provider matching AI. Rank these marketplace providers for the requested treatment.
+
+TREATMENT: ${treatment?.name || "Unknown"} (${treatment?.category || "general"})
+
+AVAILABLE PROVIDERS:
+${(mpProviders ?? []).map((p: any) => {
+  const pSkills = (skills ?? []).filter((s: any) => s.provider_id === p.id);
+  const pAvail = (availability ?? []).filter((a: any) => a.provider_id === p.id);
+  const pMembership = (memberships ?? []).find((m: any) => m.provider_id === p.id);
+  return `- ${p.first_name} ${p.last_name} (${p.credentials || "N/A"}, ${p.specialty || "General"})
+  Skills: ${pSkills.map((s: any) => `${s.skill_name}[${s.certification_level}]`).join(", ") || "none listed"}
+  Availability: ${pAvail.map((a: any) => `Day${a.day_of_week} ${a.start_time}-${a.end_time}`).join(", ") || "not set"}
+  Membership: ${pMembership ? pMembership.tier : "none"}
+  ID: ${p.id}`;
+}).join("\n\n")}
+
+PREFERRED DATE: ${preferred_date || "flexible"}
+
+Return JSON:
+{
+  "matches": [
+    {"provider_id": "uuid", "provider_name": "Name", "score": 95, "reasoning": "Why this provider is a good match"}
+  ]
+}
+Rank by skill match, certification level, and availability overlap. Return top 5 max.`;
+
+      const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "google/gemini-3-flash-preview",
+          messages: [
+            { role: "system", content: "Return only valid JSON, no markdown." },
+            { role: "user", content: prompt },
+          ],
+        }),
+      });
+      if (!aiResp.ok) throw new Error(`AI error: ${aiResp.status}`);
+      const aiData = await aiResp.json();
+      const content = aiData.choices?.[0]?.message?.content ?? "{}";
+      const cleaned = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+      const result = JSON.parse(cleaned);
+      return new Response(JSON.stringify({ ...result, treatment_id }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // ===== ORIGINAL: Room/Book scheduling =====
+    const { action, appointment_id, treatment_id, scheduled_at, duration_minutes, patient_id } = body;
+
     const [
       { data: rooms },
       { data: devices },
@@ -30,19 +128,16 @@ serve(async (req) => {
       sb.from("providers").select("*").eq("is_active", true),
     ]);
 
-    // If treatment selected, find required devices
     const requiredDeviceIds = (requirements ?? [])
       .filter((r: any) => r.treatment_id === treatment_id && r.is_required)
       .map((r: any) => r.device_id);
 
     const requiredDevices = (devices ?? []).filter((d: any) => requiredDeviceIds.includes(d.id));
 
-    // Check for device conflicts at the requested time
     let conflicts: any[] = [];
     if (scheduled_at && requiredDeviceIds.length > 0) {
       const startTime = new Date(scheduled_at);
       const endTime = new Date(startTime.getTime() + (duration_minutes || 30) * 60000);
-
       const { data: overlapping } = await sb
         .from("appointments")
         .select("id, device_id, room_id, scheduled_at, duration_minutes, patients(first_name, last_name)")
@@ -50,7 +145,6 @@ serve(async (req) => {
         .in("status", ["booked", "checked_in", "roomed", "in_progress"])
         .gte("scheduled_at", new Date(startTime.getTime() - 4 * 3600000).toISOString())
         .lte("scheduled_at", endTime.toISOString());
-
       conflicts = (overlapping ?? []).filter((apt: any) => {
         const aptStart = new Date(apt.scheduled_at);
         const aptEnd = new Date(aptStart.getTime() + (apt.duration_minutes || 30) * 60000);
@@ -58,12 +152,10 @@ serve(async (req) => {
       });
     }
 
-    // Find occupied rooms at the requested time
     let occupiedRoomIds: string[] = [];
     if (scheduled_at) {
       const startTime = new Date(scheduled_at);
       const endTime = new Date(startTime.getTime() + (duration_minutes || 30) * 60000);
-
       const { data: roomAppts } = await sb
         .from("appointments")
         .select("room_id, scheduled_at, duration_minutes")
@@ -71,7 +163,6 @@ serve(async (req) => {
         .in("status", ["booked", "checked_in", "roomed", "in_progress"])
         .gte("scheduled_at", new Date(startTime.getTime() - 4 * 3600000).toISOString())
         .lte("scheduled_at", endTime.toISOString());
-
       occupiedRoomIds = (roomAppts ?? [])
         .filter((apt: any) => {
           const aptStart = new Date(apt.scheduled_at);
@@ -81,7 +172,6 @@ serve(async (req) => {
         .map((apt: any) => apt.room_id);
     }
 
-    // Count today's appointments per provider for load balancing
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
     const { data: todayAppts } = await sb
@@ -94,10 +184,6 @@ serve(async (req) => {
     (todayAppts ?? []).forEach((a: any) => {
       if (a.provider_id) providerLoad[a.provider_id] = (providerLoad[a.provider_id] || 0) + 1;
     });
-
-    // Build AI prompt
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
     const prompt = `You are a medical clinic scheduling assistant. Given the following context, recommend the best room, device, and provider assignment.
 
@@ -117,22 +203,19 @@ PROVIDERS (with today's patient load):
 ${(providers ?? []).map((p: any) => `- ${p.first_name} ${p.last_name} (${p.specialty || "General"}) — ${providerLoad[p.id] || 0} patients today`).join("\n")}
 
 Respond with a JSON object (no markdown) with these keys:
-- "has_conflict": boolean — true if a device would be double-booked
-- "conflict_message": string or null — explanation of the conflict
-- "recommended_room_id": string or null — UUID of best room
+- "has_conflict": boolean
+- "conflict_message": string or null
+- "recommended_room_id": string or null
 - "recommended_room_name": string or null
-- "room_reasoning": string — why this room
-- "recommended_device_id": string or null — UUID if treatment needs a device
-- "recommended_provider_id": string or null — UUID of best provider
+- "room_reasoning": string
+- "recommended_device_id": string or null
+- "recommended_provider_id": string or null
 - "recommended_provider_name": string or null
-- "provider_reasoning": string — why this provider`;
+- "provider_reasoning": string`;
 
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
+      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         model: "google/gemini-3-flash-preview",
         messages: [
@@ -144,15 +227,13 @@ Respond with a JSON object (no markdown) with these keys:
 
     if (!aiResponse.ok) {
       const status = aiResponse.status;
-      if (status === 429) return new Response(JSON.stringify({ error: "Rate limit exceeded, please try again." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      if (status === 402) return new Response(JSON.stringify({ error: "AI credits exhausted. Please add funds." }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      if (status === 429) return new Response(JSON.stringify({ error: "Rate limit exceeded" }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      if (status === 402) return new Response(JSON.stringify({ error: "AI credits exhausted" }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       throw new Error(`AI gateway error: ${status}`);
     }
 
     const aiData = await aiResponse.json();
     const content = aiData.choices?.[0]?.message?.content ?? "{}";
-
-    // Parse JSON from AI (handle possible markdown fences)
     let recommendation;
     try {
       const cleaned = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
