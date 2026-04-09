@@ -14,6 +14,309 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_api_calls: {
+        Row: {
+          created_at: string
+          encounter_id: string | null
+          error_message: string | null
+          function_name: string
+          id: string
+          input_tokens: number | null
+          latency_ms: number | null
+          model_used: string | null
+          output_tokens: number | null
+          status: string | null
+        }
+        Insert: {
+          created_at?: string
+          encounter_id?: string | null
+          error_message?: string | null
+          function_name: string
+          id?: string
+          input_tokens?: number | null
+          latency_ms?: number | null
+          model_used?: string | null
+          output_tokens?: number | null
+          status?: string | null
+        }
+        Update: {
+          created_at?: string
+          encounter_id?: string | null
+          error_message?: string | null
+          function_name?: string
+          id?: string
+          input_tokens?: number | null
+          latency_ms?: number | null
+          model_used?: string | null
+          output_tokens?: number | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_api_calls_encounter_id_fkey"
+            columns: ["encounter_id"]
+            isOneToOne: false
+            referencedRelation: "encounters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_chart_analysis: {
+        Row: {
+          ai_flags: Json | null
+          brief: Json | null
+          created_at: string
+          documentation_score: number | null
+          encounter_id: string
+          estimated_review_seconds: number | null
+          id: string
+          model_used: string | null
+          prompt_version: string | null
+          recommended_action: string | null
+          review_record_id: string | null
+          risk_score: number | null
+          risk_tier: string | null
+        }
+        Insert: {
+          ai_flags?: Json | null
+          brief?: Json | null
+          created_at?: string
+          documentation_score?: number | null
+          encounter_id: string
+          estimated_review_seconds?: number | null
+          id?: string
+          model_used?: string | null
+          prompt_version?: string | null
+          recommended_action?: string | null
+          review_record_id?: string | null
+          risk_score?: number | null
+          risk_tier?: string | null
+        }
+        Update: {
+          ai_flags?: Json | null
+          brief?: Json | null
+          created_at?: string
+          documentation_score?: number | null
+          encounter_id?: string
+          estimated_review_seconds?: number | null
+          id?: string
+          model_used?: string | null
+          prompt_version?: string | null
+          recommended_action?: string | null
+          review_record_id?: string | null
+          risk_score?: number | null
+          risk_tier?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_chart_analysis_encounter_id_fkey"
+            columns: ["encounter_id"]
+            isOneToOne: false
+            referencedRelation: "encounters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_chart_analysis_review_record_id_fkey"
+            columns: ["review_record_id"]
+            isOneToOne: false
+            referencedRelation: "chart_review_records"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_doc_checklists: {
+        Row: {
+          checklist_items: Json
+          created_at: string
+          id: string
+          is_active: boolean
+          procedure_type: string
+          updated_at: string
+        }
+        Insert: {
+          checklist_items?: Json
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          procedure_type: string
+          updated_at?: string
+        }
+        Update: {
+          checklist_items?: Json
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          procedure_type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      ai_md_consistency: {
+        Row: {
+          avg_review_seconds: number | null
+          consistency_score: number | null
+          correction_rate: number | null
+          created_at: string
+          id: string
+          month: string
+          reviewer_id: string
+          rubber_stamp_count: number | null
+          total_reviews: number | null
+        }
+        Insert: {
+          avg_review_seconds?: number | null
+          consistency_score?: number | null
+          correction_rate?: number | null
+          created_at?: string
+          id?: string
+          month: string
+          reviewer_id: string
+          rubber_stamp_count?: number | null
+          total_reviews?: number | null
+        }
+        Update: {
+          avg_review_seconds?: number | null
+          consistency_score?: number | null
+          correction_rate?: number | null
+          created_at?: string
+          id?: string
+          month?: string
+          reviewer_id?: string
+          rubber_stamp_count?: number | null
+          total_reviews?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_md_consistency_reviewer_id_fkey"
+            columns: ["reviewer_id"]
+            isOneToOne: false
+            referencedRelation: "providers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_oversight_reports: {
+        Row: {
+          alerts: Json | null
+          created_at: string
+          generated_by: string | null
+          highlights: Json | null
+          id: string
+          metrics: Json | null
+          narrative: string | null
+          recommendations: Json | null
+          report_month: string
+          report_type: string
+        }
+        Insert: {
+          alerts?: Json | null
+          created_at?: string
+          generated_by?: string | null
+          highlights?: Json | null
+          id?: string
+          metrics?: Json | null
+          narrative?: string | null
+          recommendations?: Json | null
+          report_month: string
+          report_type?: string
+        }
+        Update: {
+          alerts?: Json | null
+          created_at?: string
+          generated_by?: string | null
+          highlights?: Json | null
+          id?: string
+          metrics?: Json | null
+          narrative?: string | null
+          recommendations?: Json | null
+          report_month?: string
+          report_type?: string
+        }
+        Relationships: []
+      }
+      ai_prompts: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          prompt_key: string
+          prompt_name: string
+          system_prompt: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          prompt_key: string
+          prompt_name: string
+          system_prompt: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          prompt_key?: string
+          prompt_name?: string
+          system_prompt?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: []
+      }
+      ai_provider_intelligence: {
+        Row: {
+          avg_documentation_score: number | null
+          coaching_notes: string | null
+          coaching_status: string | null
+          correction_rate: number | null
+          created_at: string
+          id: string
+          last_analyzed_at: string | null
+          provider_id: string
+          recurring_issues: Json | null
+          total_charts: number | null
+          updated_at: string
+        }
+        Insert: {
+          avg_documentation_score?: number | null
+          coaching_notes?: string | null
+          coaching_status?: string | null
+          correction_rate?: number | null
+          created_at?: string
+          id?: string
+          last_analyzed_at?: string | null
+          provider_id: string
+          recurring_issues?: Json | null
+          total_charts?: number | null
+          updated_at?: string
+        }
+        Update: {
+          avg_documentation_score?: number | null
+          coaching_notes?: string | null
+          coaching_status?: string | null
+          correction_rate?: number | null
+          created_at?: string
+          id?: string
+          last_analyzed_at?: string | null
+          provider_id?: string
+          recurring_issues?: Json | null
+          total_charts?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_provider_intelligence_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "providers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       appointment_waitlist: {
         Row: {
           created_at: string
@@ -213,6 +516,95 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: []
+      }
+      chart_review_records: {
+        Row: {
+          ai_priority_score: number | null
+          ai_risk_tier: string | null
+          correction_details: Json | null
+          created_at: string
+          encounter_id: string
+          id: string
+          md_action: string | null
+          md_comment: string | null
+          patient_id: string
+          provider_id: string | null
+          review_completed_at: string | null
+          review_duration_seconds: number | null
+          review_started_at: string | null
+          reviewer_id: string | null
+          rubber_stamp_threshold_seconds: number | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          ai_priority_score?: number | null
+          ai_risk_tier?: string | null
+          correction_details?: Json | null
+          created_at?: string
+          encounter_id: string
+          id?: string
+          md_action?: string | null
+          md_comment?: string | null
+          patient_id: string
+          provider_id?: string | null
+          review_completed_at?: string | null
+          review_duration_seconds?: number | null
+          review_started_at?: string | null
+          reviewer_id?: string | null
+          rubber_stamp_threshold_seconds?: number | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          ai_priority_score?: number | null
+          ai_risk_tier?: string | null
+          correction_details?: Json | null
+          created_at?: string
+          encounter_id?: string
+          id?: string
+          md_action?: string | null
+          md_comment?: string | null
+          patient_id?: string
+          provider_id?: string | null
+          review_completed_at?: string | null
+          review_duration_seconds?: number | null
+          review_started_at?: string | null
+          reviewer_id?: string | null
+          rubber_stamp_threshold_seconds?: number | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chart_review_records_encounter_id_fkey"
+            columns: ["encounter_id"]
+            isOneToOne: false
+            referencedRelation: "encounters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chart_review_records_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chart_review_records_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "providers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chart_review_records_reviewer_id_fkey"
+            columns: ["reviewer_id"]
+            isOneToOne: false
+            referencedRelation: "providers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       chart_template_fields: {
         Row: {
@@ -651,6 +1043,7 @@ export type Database = {
           chief_complaint: string | null
           completed_at: string | null
           created_at: string
+          encounter_type: string | null
           id: string
           patient_id: string
           provider_id: string | null
@@ -666,6 +1059,7 @@ export type Database = {
           chief_complaint?: string | null
           completed_at?: string | null
           created_at?: string
+          encounter_type?: string | null
           id?: string
           patient_id: string
           provider_id?: string | null
@@ -681,6 +1075,7 @@ export type Database = {
           chief_complaint?: string | null
           completed_at?: string | null
           created_at?: string
+          encounter_type?: string | null
           id?: string
           patient_id?: string
           provider_id?: string | null
