@@ -195,14 +195,37 @@ export default function HormoneIntake() {
     if (!file) return;
     setExtracting(true);
     try {
-      const reader = new FileReader();
-      const base64 = await new Promise<string>((resolve, reject) => {
-        reader.onload = () => resolve((reader.result as string).split(",")[1]);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
+      let mediaType = file.type;
+      let base64: string;
+
+      if (file.type === "application/pdf") {
+        // Convert PDF first page to PNG image for AI vision
+        const pdfjs = await import("pdfjs-dist");
+        pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+        const page = await pdf.getPage(1);
+        const viewport = page.getViewport({ scale: 2.0 });
+        const canvas = document.createElement("canvas");
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        const ctx = canvas.getContext("2d")!;
+        await page.render({ canvasContext: ctx, viewport }).promise;
+        const dataUrl = canvas.toDataURL("image/png");
+        base64 = dataUrl.split(",")[1];
+        mediaType = "image/png";
+      } else {
+        // Image file — read directly
+        const reader = new FileReader();
+        base64 = await new Promise<string>((resolve, reject) => {
+          reader.onload = () => resolve((reader.result as string).split(",")[1]);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+      }
+
       const { data, error } = await supabase.functions.invoke("ai-extract-labs", {
-        body: { mediaType: file.type, base64Data: base64 },
+        body: { mediaType, base64Data: base64 },
       });
       if (error) throw error;
       if (data?.labs) {

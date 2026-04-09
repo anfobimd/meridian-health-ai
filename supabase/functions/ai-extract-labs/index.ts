@@ -54,12 +54,11 @@ Extract these keys exactly:
 
 If a value is reported in different units, convert to the target unit. Include values that have range flags (H/L/HH/LL) — just provide the numeric value.`;
 
-    const isPDF = mediaType === "application/pdf";
-
-    // Build the content for multimodal request
-    const imageContent = isPDF
-      ? { type: "image_url" as const, image_url: { url: `data:${mediaType};base64,${base64Data}` } }
-      : { type: "image_url" as const, image_url: { url: `data:${mediaType};base64,${base64Data}` } };
+    // Content is always an image (PDFs converted client-side)
+    const imageContent = {
+      type: "image_url" as const,
+      image_url: { url: `data:${mediaType};base64,${base64Data}` },
+    };
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
