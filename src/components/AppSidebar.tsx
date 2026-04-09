@@ -2,6 +2,7 @@ import { NavLink, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, Users, Calendar, Stethoscope, ClipboardList, UserCog,
   Activity, FlaskConical, FileText, Pill, DollarSign, ClipboardPlus, ShieldCheck, DoorOpen, Store, Package,
+  CreditCard, TrendingUp, Calculator,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -36,6 +37,9 @@ const navSections = [
       { to: "/billing", icon: DollarSign, label: "Billing" },
       { to: "/marketplace", icon: Store, label: "Marketplace" },
       { to: "/packages", icon: Package, label: "Packages" },
+      { to: "/membership-billing", icon: CreditCard, label: "Memberships" },
+      { to: "/earnings", icon: TrendingUp, label: "Earnings" },
+      { to: "/proforma", icon: Calculator, label: "Proforma" },
     ],
   },
 ];
