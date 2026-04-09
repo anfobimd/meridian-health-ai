@@ -450,6 +450,14 @@ export default function PatientRecord() {
                             <Clock className="h-3 w-3 inline mr-0.5" />{daysLeft} days remaining
                           </span>
                         )}
+                        {isActive && purchase.sessions_used < purchase.sessions_total && (
+                          <Button size="sm" variant="default" className="h-7 text-xs"
+                            onClick={() => redeemSession.mutate({ purchaseId: purchase.id, treatmentName: purchase.service_packages?.name || "Session" })}
+                            disabled={redeemSession.isPending}
+                          >
+                            <CheckCircle className="h-3 w-3 mr-1" /> Redeem Session
+                          </Button>
+                        )}
                       </div>
 
                       {/* Session history */}
