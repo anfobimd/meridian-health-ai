@@ -22,6 +22,7 @@ import Billing from "./pages/Billing";
 import MdOversight from "./pages/MdOversight";
 import MdOversightDashboard from "./pages/MdOversightDashboard";
 import Marketplace from "./pages/Marketplace";
+import Packages from "./pages/Packages";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -52,6 +53,7 @@ const App = () => (
             <Route path="/md-oversight" element={<MdOversight />} />
             <Route path="/md-oversight/dashboard" element={<MdOversightDashboard />} />
             <Route path="/marketplace" element={<Marketplace />} />
+            <Route path="/packages" element={<Packages />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>

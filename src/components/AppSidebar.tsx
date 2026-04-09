@@ -35,6 +35,7 @@ const navSections = [
       { to: "/providers", icon: UserCog, label: "Providers" },
       { to: "/billing", icon: DollarSign, label: "Billing" },
       { to: "/marketplace", icon: Store, label: "Marketplace" },
+      { to: "/packages", icon: Package, label: "Packages" },
     ],
   },
 ];
