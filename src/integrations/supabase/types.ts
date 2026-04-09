@@ -1761,6 +1761,72 @@ export type Database = {
         }
         Relationships: []
       }
+      membership_invoices: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          laser_charges: number
+          laser_uses: number
+          membership_amount: number
+          membership_id: string
+          notes: string | null
+          paid_at: string | null
+          period_end: string
+          period_start: string
+          provider_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          id?: string
+          laser_charges?: number
+          laser_uses?: number
+          membership_amount?: number
+          membership_id: string
+          notes?: string | null
+          paid_at?: string | null
+          period_end: string
+          period_start: string
+          provider_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          laser_charges?: number
+          laser_uses?: number
+          membership_amount?: number
+          membership_id?: string
+          notes?: string | null
+          paid_at?: string | null
+          period_end?: string
+          period_start?: string
+          provider_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "membership_invoices_membership_id_fkey"
+            columns: ["membership_id"]
+            isOneToOne: false
+            referencedRelation: "provider_memberships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "membership_invoices_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "providers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       oversight_config: {
         Row: {
           config_key: string
@@ -2494,6 +2560,42 @@ export type Database = {
           },
         ]
       }
+      proforma_scenarios: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          inputs: Json
+          is_default: boolean
+          name: string
+          results: Json | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          inputs?: Json
+          is_default?: boolean
+          name: string
+          results?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          inputs?: Json
+          is_default?: boolean
+          name?: string
+          results?: Json | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       protocol_enrollments: {
         Row: {
           compound: string | null
@@ -2713,37 +2815,135 @@ export type Database = {
           },
         ]
       }
+      provider_earnings: {
+        Row: {
+          appointment_id: string | null
+          cogs: number
+          created_at: string
+          gross_revenue: number
+          id: string
+          modality: string
+          net_revenue: number
+          notes: string | null
+          patient_id: string | null
+          provider_id: string
+          service_date: string
+          time_minutes: number | null
+          treatment_id: string | null
+          units_used: number | null
+          updated_at: string
+        }
+        Insert: {
+          appointment_id?: string | null
+          cogs?: number
+          created_at?: string
+          gross_revenue?: number
+          id?: string
+          modality?: string
+          net_revenue?: number
+          notes?: string | null
+          patient_id?: string | null
+          provider_id: string
+          service_date?: string
+          time_minutes?: number | null
+          treatment_id?: string | null
+          units_used?: number | null
+          updated_at?: string
+        }
+        Update: {
+          appointment_id?: string | null
+          cogs?: number
+          created_at?: string
+          gross_revenue?: number
+          id?: string
+          modality?: string
+          net_revenue?: number
+          notes?: string | null
+          patient_id?: string | null
+          provider_id?: string
+          service_date?: string
+          time_minutes?: number | null
+          treatment_id?: string | null
+          units_used?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "provider_earnings_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "provider_earnings_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "provider_earnings_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "providers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "provider_earnings_treatment_id_fkey"
+            columns: ["treatment_id"]
+            isOneToOne: false
+            referencedRelation: "treatments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       provider_memberships: {
         Row: {
           created_at: string
+          end_date: string | null
+          founding_rate: number | null
+          founding_rate_locked: boolean
           id: string
           is_active: boolean
           modalities: string[]
           monthly_rate: number
+          notes: string | null
           provider_id: string
           start_date: string
+          status: string
           tier: string
           updated_at: string
         }
         Insert: {
           created_at?: string
+          end_date?: string | null
+          founding_rate?: number | null
+          founding_rate_locked?: boolean
           id?: string
           is_active?: boolean
           modalities?: string[]
           monthly_rate?: number
+          notes?: string | null
           provider_id: string
           start_date?: string
+          status?: string
           tier?: string
           updated_at?: string
         }
         Update: {
           created_at?: string
+          end_date?: string | null
+          founding_rate?: number | null
+          founding_rate_locked?: boolean
           id?: string
           is_active?: boolean
           modalities?: string[]
           monthly_rate?: number
+          notes?: string | null
           provider_id?: string
           start_date?: string
+          status?: string
           tier?: string
           updated_at?: string
         }
