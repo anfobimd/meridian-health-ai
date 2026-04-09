@@ -730,6 +730,9 @@ export default function HormoneIntake() {
                 <p className="text-sm whitespace-pre-wrap">{aiResult.risk_flags}</p>
               </div>
               <div className="flex gap-2 pt-2">
+                <Button onClick={() => { setAiDialogOpen(false); navigate(`/physician-approval?visit=${submitIntake.data?.id || ""}`); }}>
+                  <ShieldCheck className="h-4 w-4 mr-2" />Route to Physician Approval
+                </Button>
                 <Button variant="outline" onClick={() => { setAiDialogOpen(false); navigate("/hormone-visits"); }}>
                   <FileText className="h-4 w-4 mr-2" />View in Hormone Labs
                 </Button>
