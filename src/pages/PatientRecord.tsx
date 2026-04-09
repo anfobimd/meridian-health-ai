@@ -38,6 +38,7 @@ const LAB_FIELDS = [
 export default function PatientRecord() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const { data: patient, isLoading } = useQuery({
     queryKey: ["patient", id],
