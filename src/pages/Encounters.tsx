@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -8,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, FileText } from "lucide-react";
+import { Plus, FileText, Edit } from "lucide-react";
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
 
@@ -26,6 +27,7 @@ export default function Encounters() {
   const [selectedProvider, setSelectedProvider] = useState("");
   const [chiefComplaint, setChiefComplaint] = useState("");
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const { data: encounters, isLoading } = useQuery({
     queryKey: ["encounters"],
@@ -58,20 +60,22 @@ export default function Encounters() {
 
   const createEncounter = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("encounters").insert({
+      const { data, error } = await supabase.from("encounters").insert({
         patient_id: selectedPatient,
         provider_id: selectedProvider || null,
         chief_complaint: chiefComplaint || null,
-      });
+      }).select("id").single();
       if (error) throw error;
+      return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["encounters"] });
       setDialogOpen(false);
       setSelectedPatient("");
       setSelectedProvider("");
       setChiefComplaint("");
       toast.success("Encounter created");
+      navigate(`/encounters/${data.id}/chart`);
     },
     onError: () => toast.error("Failed to create encounter"),
   });
@@ -110,7 +114,7 @@ export default function Encounters() {
               </div>
               <div className="space-y-2">
                 <Label>Chief Complaint</Label>
-                <Input value={chiefComplaint} onChange={(e) => setChiefComplaint(e.target.value)} placeholder="e.g. Botox follow-up, TRT labs review" />
+                <Input value={chiefComplaint} onChange={(e) => setChiefComplaint(e.target.value)} placeholder="e.g. Botox follow-up, TRT labs review, weight loss check-in" />
               </div>
               <Button className="w-full" onClick={() => createEncounter.mutate()} disabled={!selectedPatient || createEncounter.isPending}>
                 {createEncounter.isPending ? "Creating..." : "Start Encounter"}
@@ -125,7 +129,7 @@ export default function Encounters() {
       ) : encounters && encounters.length > 0 ? (
         <div className="space-y-3">
           {encounters.map((enc: any) => (
-            <Card key={enc.id}>
+            <Card key={enc.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate(`/encounters/${enc.id}/chart`)}>
               <CardContent className="p-4 flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -140,7 +144,12 @@ export default function Encounters() {
                     </p>
                   </div>
                 </div>
-                <Badge variant="secondary" className={statusColors[enc.status] ?? ""}>{enc.status}</Badge>
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className={statusColors[enc.status] ?? ""}>{enc.status}</Badge>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); navigate(`/encounters/${enc.id}/chart`); }}>
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           ))}
