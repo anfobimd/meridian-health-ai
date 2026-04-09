@@ -2,7 +2,7 @@ import { useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import {
   Menu, X, Activity, LayoutDashboard, Users, Calendar, Stethoscope,
-  ClipboardList, UserCog, FlaskConical, FileText, Pill, DollarSign, ClipboardPlus, ShieldCheck,
+  ClipboardList, UserCog, FlaskConical, FileText, Pill, DollarSign, ClipboardPlus, ShieldCheck, DoorOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,7 @@ const navItems = [
   { to: "/physician-approval", icon: ShieldCheck, label: "Approvals" },
   { to: "/protocols", icon: Pill, label: "Protocols" },
   { to: "/treatments", icon: Stethoscope, label: "Treatments" },
+  { to: "/rooms-devices", icon: DoorOpen, label: "Rooms & Devices" },
   { to: "/providers", icon: UserCog, label: "Providers" },
   { to: "/billing", icon: DollarSign, label: "Billing" },
 ];

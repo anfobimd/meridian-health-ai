@@ -17,6 +17,7 @@ import PhysicianApproval from "./pages/PhysicianApproval";
 import Encounters from "./pages/Encounters";
 import EncounterChart from "./pages/EncounterChart";
 import Protocols from "./pages/Protocols";
+import RoomsDevices from "./pages/RoomsDevices";
 import Billing from "./pages/Billing";
 import NotFound from "./pages/NotFound";
 
@@ -41,6 +42,7 @@ const App = () => (
             <Route path="/hormone-intake" element={<HormoneIntake />} />
             <Route path="/physician-approval" element={<PhysicianApproval />} />
             <Route path="/protocols" element={<Protocols />} />
+            <Route path="/rooms-devices" element={<RoomsDevices />} />
             <Route path="/treatments" element={<Treatments />} />
             <Route path="/providers" element={<Providers />} />
             <Route path="/billing" element={<Billing />} />
