@@ -155,6 +155,7 @@ export default function PatientRecord() {
           <TabsTrigger value="notes">Notes ({notes?.length ?? 0})</TabsTrigger>
           <TabsTrigger value="hormone">Hormone ({hormoneVisits?.length ?? 0})</TabsTrigger>
           <TabsTrigger value="intake">Intake ({intakeForms?.length ?? 0})</TabsTrigger>
+          <TabsTrigger value="packages">Packages ({packagePurchases?.length ?? 0})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="demographics">
