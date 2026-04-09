@@ -1,14 +1,21 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-import { Shield, Brain, Users, Activity, DollarSign } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Shield, Brain, Users, Activity, DollarSign, Settings, Loader2, UserCog, Plus } from "lucide-react";
+import { toast } from "sonner";
 
 export default function MdOversightDashboard() {
+  const [coachingProviderId, setCoachingProviderId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+
   // Fetch oversight reports
   const { data: reports, isLoading: reportsLoading } = useQuery({
     queryKey: ["oversight-reports"],
@@ -76,9 +83,82 @@ export default function MdOversightDashboard() {
     },
   });
 
+  // Fetch oversight config
+  const { data: configData } = useQuery({
+    queryKey: ["oversight-config"],
+    queryFn: async () => {
+      const { data } = await supabase.from("oversight_config").select("*").order("config_key");
+      return data || [];
+    },
+  });
+
+  // Fetch coaching actions for selected provider
+  const { data: coachingActions } = useQuery({
+    queryKey: ["coaching-actions", coachingProviderId],
+    queryFn: async () => {
+      if (!coachingProviderId) return [];
+      const { data } = await supabase
+        .from("coaching_actions")
+        .select("*")
+        .eq("provider_id", coachingProviderId)
+        .order("created_at", { ascending: false });
+      return data || [];
+    },
+    enabled: !!coachingProviderId,
+  });
+
+  // Generate monthly report mutation
+  const generateReportMutation = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke("ai-monthly-report", {
+        body: {},
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      toast.success("Monthly report generated");
+      queryClient.invalidateQueries({ queryKey: ["oversight-reports"] });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  // Run AI coaching analysis
+  const coachProviderMutation = useMutation({
+    mutationFn: async (providerId: string) => {
+      const { data, error } = await supabase.functions.invoke("ai-provider-coach", {
+        body: { provider_id: providerId },
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      toast.success("Coaching analysis complete");
+      queryClient.invalidateQueries({ queryKey: ["coaching-actions", coachingProviderId] });
+      queryClient.invalidateQueries({ queryKey: ["provider-intelligence-all"] });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  // Update config mutation
+  const updateConfigMutation = useMutation({
+    mutationFn: async ({ id, value }: { id: string; value: string }) => {
+      const parsed = JSON.parse(value);
+      const { error } = await supabase.from("oversight_config").update({ config_value: parsed }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Config updated");
+      queryClient.invalidateQueries({ queryKey: ["oversight-config"] });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
   const totalCalls = apiStats?.length || 0;
   const successCalls = apiStats?.filter((c: any) => c.status === "success").length || 0;
   const avgLatency = totalCalls ? Math.round((apiStats?.reduce((s: number, c: any) => s + (c.latency_ms || 0), 0) || 0) / totalCalls) : 0;
+
+  const selectedProviderIntel = providerIntel?.find((p: any) => p.provider_id === coachingProviderId);
 
   return (
     <div className="space-y-6">
@@ -92,11 +172,11 @@ export default function MdOversightDashboard() {
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         {[
-          { label: "Total Reviews", value: reviewStats?.total || 0, icon: Activity },
-          { label: "Approved", value: reviewStats?.approved || 0, icon: Shield },
-          { label: "Corrections", value: reviewStats?.corrected || 0, icon: Brain },
-          { label: "Avg Review Time", value: `${reviewStats?.avgTime || 0}s`, icon: Activity },
-          { label: "Rubber Stamps", value: reviewStats?.rubberStamps || 0, icon: Activity },
+          { label: "Total Reviews", value: reviewStats?.total || 0 },
+          { label: "Approved", value: reviewStats?.approved || 0 },
+          { label: "Corrections", value: reviewStats?.corrected || 0 },
+          { label: "Avg Review Time", value: `${reviewStats?.avgTime || 0}s` },
+          { label: "Rubber Stamps", value: reviewStats?.rubberStamps || 0 },
         ].map((stat) => (
           <Card key={stat.label}>
             <CardContent className="pt-4 pb-3">
@@ -108,22 +188,33 @@ export default function MdOversightDashboard() {
       </div>
 
       <Tabs defaultValue="reports">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="reports"><Brain className="h-3 w-3 mr-1" /> AI Reports</TabsTrigger>
           <TabsTrigger value="md"><Shield className="h-3 w-3 mr-1" /> MD Performance</TabsTrigger>
           <TabsTrigger value="providers"><Users className="h-3 w-3 mr-1" /> Providers</TabsTrigger>
           <TabsTrigger value="system"><DollarSign className="h-3 w-3 mr-1" /> System</TabsTrigger>
+          <TabsTrigger value="config"><Settings className="h-3 w-3 mr-1" /> Config</TabsTrigger>
         </TabsList>
 
         {/* Tab 1: AI Intelligence Reports */}
         <TabsContent value="reports" className="space-y-4">
+          <div className="flex justify-end">
+            <Button
+              size="sm"
+              onClick={() => generateReportMutation.mutate()}
+              disabled={generateReportMutation.isPending}
+            >
+              {generateReportMutation.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Brain className="h-4 w-4 mr-1" />}
+              Generate Report
+            </Button>
+          </div>
           {reportsLoading ? (
             <Skeleton className="h-48 w-full" />
           ) : reports?.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center text-muted-foreground">
                 <Brain className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                No AI reports generated yet. Reports are generated monthly when sufficient review data exists.
+                No AI reports generated yet. Click "Generate Report" to create one.
               </CardContent>
             </Card>
           ) : (
@@ -135,6 +226,16 @@ export default function MdOversightDashboard() {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {report.narrative && <p className="text-sm">{report.narrative}</p>}
+                  {(report.highlights as any[])?.length > 0 && (
+                    <div>
+                      <p className="text-xs font-bold text-primary mb-1">Highlights</p>
+                      <ul className="text-sm list-disc pl-4 space-y-1">
+                        {(report.highlights as any[]).map((h: string, i: number) => (
+                          <li key={i}>{h}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                   {(report.alerts as any[])?.length > 0 && (
                     <div>
                       <p className="text-xs font-bold text-red-600 mb-1">Alerts</p>
@@ -221,12 +322,13 @@ export default function MdOversightDashboard() {
                     <TableHead>Avg Doc Score</TableHead>
                     <TableHead>Coaching</TableHead>
                     <TableHead>Issues</TableHead>
+                    <TableHead className="w-[80px]">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {providerIntel?.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center text-muted-foreground py-12">
+                      <TableCell colSpan={8} className="text-center text-muted-foreground py-12">
                         No provider intelligence data yet
                       </TableCell>
                     </TableRow>
@@ -245,7 +347,7 @@ export default function MdOversightDashboard() {
                         </TableCell>
                         <TableCell>{p.avg_documentation_score || "—"}</TableCell>
                         <TableCell>
-                          <Badge variant={p.coaching_status === "none" ? "secondary" : "outline"} className={p.coaching_status !== "none" ? "border-orange-300 text-orange-600" : ""}>
+                          <Badge variant={p.coaching_status === "none" ? "secondary" : "outline"} className={p.coaching_status === "probation" ? "border-red-300 text-red-600" : p.coaching_status === "monitoring" ? "border-orange-300 text-orange-600" : ""}>
                             {p.coaching_status}
                           </Badge>
                         </TableCell>
@@ -257,6 +359,11 @@ export default function MdOversightDashboard() {
                               ))}
                             </div>
                           ) : "—"}
+                        </TableCell>
+                        <TableCell>
+                          <Button size="sm" variant="ghost" onClick={() => setCoachingProviderId(p.provider_id)}>
+                            <UserCog className="h-4 w-4" />
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))
@@ -336,7 +443,136 @@ export default function MdOversightDashboard() {
             </Card>
           )}
         </TabsContent>
+
+        {/* Tab 5: Config */}
+        <TabsContent value="config" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm flex items-center gap-2"><Settings className="h-4 w-4" /> Oversight Configuration</CardTitle>
+              <CardDescription>Sampling rates, thresholds, and system settings</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {configData?.map((cfg: any) => (
+                <div key={cfg.id} className="flex items-start gap-4 p-3 border rounded-lg">
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">{cfg.config_key.replace(/_/g, " ").replace(/\b\w/g, (l: string) => l.toUpperCase())}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{cfg.description}</p>
+                    <Input
+                      className="mt-2 font-mono text-xs"
+                      defaultValue={JSON.stringify(cfg.config_value)}
+                      onBlur={(e) => {
+                        const newVal = e.target.value;
+                        if (newVal !== JSON.stringify(cfg.config_value)) {
+                          try {
+                            JSON.parse(newVal);
+                            updateConfigMutation.mutate({ id: cfg.id, value: newVal });
+                          } catch {
+                            toast.error("Invalid JSON");
+                          }
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
+
+      {/* Coaching Drawer */}
+      <Sheet open={!!coachingProviderId} onOpenChange={(o) => { if (!o) setCoachingProviderId(null); }}>
+        <SheetContent className="w-[450px] sm:max-w-[450px]">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2">
+              <UserCog className="h-5 w-5" />
+              Provider Coaching — {selectedProviderIntel?.providers?.first_name} {selectedProviderIntel?.providers?.last_name}
+            </SheetTitle>
+          </SheetHeader>
+
+          <div className="mt-4 space-y-4">
+            {/* Provider Stats */}
+            <div className="grid grid-cols-2 gap-2">
+              <Card>
+                <CardContent className="pt-3 pb-2">
+                  <p className="text-[10px] uppercase text-muted-foreground font-bold">Correction Rate</p>
+                  <p className="text-lg font-bold">{((selectedProviderIntel?.correction_rate || 0) * 100).toFixed(1)}%</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-3 pb-2">
+                  <p className="text-[10px] uppercase text-muted-foreground font-bold">Status</p>
+                  <Badge variant="outline" className={selectedProviderIntel?.coaching_status === "probation" ? "border-red-300 text-red-600 mt-1" : selectedProviderIntel?.coaching_status === "monitoring" ? "border-orange-300 text-orange-600 mt-1" : "mt-1"}>
+                    {selectedProviderIntel?.coaching_status || "none"}
+                  </Badge>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Coaching Notes */}
+            {selectedProviderIntel?.coaching_notes && (
+              <Card>
+                <CardContent className="pt-3 pb-2">
+                  <p className="text-[10px] uppercase text-muted-foreground font-bold mb-1">AI Coaching Summary</p>
+                  <p className="text-sm">{selectedProviderIntel.coaching_notes}</p>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Recurring Issues */}
+            {(selectedProviderIntel?.recurring_issues as any[])?.length > 0 && (
+              <div>
+                <p className="text-xs font-bold mb-1">Recurring Issues</p>
+                <div className="flex gap-1 flex-wrap">
+                  {(selectedProviderIntel.recurring_issues as any[]).map((issue: string, i: number) => (
+                    <Badge key={i} variant="outline">{issue}</Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Run AI Coaching */}
+            <Button
+              className="w-full"
+              onClick={() => coachingProviderId && coachProviderMutation.mutate(coachingProviderId)}
+              disabled={coachProviderMutation.isPending}
+            >
+              {coachProviderMutation.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Brain className="h-4 w-4 mr-1" />}
+              Run AI Coaching Analysis
+            </Button>
+
+            {/* Coaching Actions */}
+            <div>
+              <p className="text-xs font-bold mb-2">Coaching Actions</p>
+              {coachingActions?.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No coaching actions yet. Run AI analysis to generate recommendations.</p>
+              ) : (
+                <div className="space-y-2">
+                  {coachingActions?.map((action: any) => (
+                    <Card key={action.id} className={action.is_resolved ? "opacity-50" : ""}>
+                      <CardContent className="pt-3 pb-2">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="text-[10px]">{action.action_type}</Badge>
+                              <span className="text-sm font-medium">{action.title}</span>
+                            </div>
+                            {action.description && <p className="text-xs text-muted-foreground mt-1">{action.description}</p>}
+                          </div>
+                          {action.is_resolved && <Badge variant="secondary" className="text-[10px]">Resolved</Badge>}
+                        </div>
+                        <p className="text-[10px] text-muted-foreground mt-1">
+                          {action.created_by === "ai" ? "AI-generated" : "Manual"} • {new Date(action.created_at).toLocaleDateString()}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
