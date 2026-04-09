@@ -116,9 +116,14 @@ export default function Providers() {
                     <p className="font-medium">Dr. {p.first_name} {p.last_name}{p.credentials ? `, ${p.credentials}` : ""}</p>
                     {p.specialty && <p className="text-sm text-muted-foreground">{p.specialty}</p>}
                     {p.email && <p className="text-xs text-muted-foreground mt-1">{p.email}</p>}
-                    <Badge variant={p.is_active ? "secondary" : "outline"} className="mt-2">
-                      {p.is_active ? "Active" : "Inactive"}
-                    </Badge>
+                    <div className="flex gap-1.5 mt-2">
+                      <Badge variant={p.is_active ? "secondary" : "outline"}>
+                        {p.is_active ? "Active" : "Inactive"}
+                      </Badge>
+                      {(p as any).marketplace_enabled && (
+                        <Badge variant="default" className="text-xs">Marketplace</Badge>
+                      )}
+                    </div>
                   </div>
                 </div>
               </CardContent>
