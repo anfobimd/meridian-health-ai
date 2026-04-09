@@ -54,8 +54,13 @@ Extract these keys exactly:
 
 If a value is reported in different units, convert to the target unit. Include values that have range flags (H/L/HH/LL) — just provide the numeric value.`;
 
-    // Build content - use inline_data for proper multimodal support
-    const fileContent = {
+    // For PDFs, convert to a text extraction approach; for images use vision
+    const isPDF = mediaType === "application/pdf";
+    
+    // Use GPT-5-mini for PDFs (better PDF support), Gemini for images
+    const model = isPDF ? "openai/gpt-5-mini" : "google/gemini-2.5-flash";
+    
+    const imageContent = {
       type: "image_url" as const,
       image_url: { url: `data:${mediaType};base64,${base64Data}` },
     };
@@ -67,7 +72,7 @@ If a value is reported in different units, convert to the target unit. Include v
         Authorization: `Bearer ${LOVABLE_API_KEY}`,
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model,
         messages: [{
           role: "user",
           content: [
