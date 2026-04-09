@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -38,6 +38,7 @@ const LAB_FIELDS = [
 export default function PatientRecord() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const { data: patient, isLoading } = useQuery({
     queryKey: ["patient", id],
@@ -116,16 +117,33 @@ export default function PatientRecord() {
   const [aiRec, setAiRec] = useState<any>(null);
   const [aiLoading, setAiLoading] = useState(false);
 
+  const redeemSession = useMutation({
+    mutationFn: async ({ purchaseId, treatmentName }: { purchaseId: string; treatmentName: string }) => {
+      const purchase = packagePurchases?.find((p: any) => p.id === purchaseId);
+      if (!purchase) throw new Error("Purchase not found");
+      const revPerSession = purchase.sessions_total > 0 ? purchase.price_paid / purchase.sessions_total : 0;
+      const { error } = await supabase.from("patient_package_sessions").insert({
+        purchase_id: purchaseId,
+        treatment_name: treatmentName,
+        revenue_amount: revPerSession,
+        redeemed_at: new Date().toISOString(),
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["patient-packages", id] });
+      toast({ title: "Session redeemed" });
+    },
+    onError: () => toast({ title: "Failed to redeem session", variant: "destructive" }),
+  });
+
   const fetchAiRecommendation = async () => {
     setAiLoading(true);
     try {
-      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-      const res = await fetch(`https://${projectId}.supabase.co/functions/v1/ai-package-engine`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
-        body: JSON.stringify({ mode: "recommend_package", patient_id: id }),
+      const { data, error } = await supabase.functions.invoke("ai-package-engine", {
+        body: { mode: "recommend_package", patient_id: id },
       });
-      const data = await res.json();
+      if (error) throw error;
       setAiRec(data);
     } catch (e) {
       toast({ title: "AI recommendation failed", variant: "destructive" });
@@ -431,6 +449,14 @@ export default function PatientRecord() {
                           <span className={daysLeft < 7 ? "text-destructive font-medium" : ""}>
                             <Clock className="h-3 w-3 inline mr-0.5" />{daysLeft} days remaining
                           </span>
+                        )}
+                        {isActive && purchase.sessions_used < purchase.sessions_total && (
+                          <Button size="sm" variant="default" className="h-7 text-xs"
+                            onClick={() => redeemSession.mutate({ purchaseId: purchase.id, treatmentName: purchase.service_packages?.name || "Session" })}
+                            disabled={redeemSession.isPending}
+                          >
+                            <CheckCircle className="h-3 w-3 mr-1" /> Redeem Session
+                          </Button>
                         )}
                       </div>
 
