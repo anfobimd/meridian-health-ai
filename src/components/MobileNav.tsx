@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
-import { Menu, X, Activity, LayoutDashboard, Users, Calendar, Stethoscope, ClipboardList, UserCog, FlaskConical } from "lucide-react";
+import {
+  Menu, X, Activity, LayoutDashboard, Users, Calendar, Stethoscope,
+  ClipboardList, UserCog, FlaskConical, FileText, Pill, DollarSign,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
@@ -8,10 +11,13 @@ const navItems = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/patients", icon: Users, label: "Patients" },
   { to: "/appointments", icon: Calendar, label: "Appointments" },
+  { to: "/encounters", icon: FileText, label: "Encounters" },
   { to: "/clinical-notes", icon: ClipboardList, label: "Clinical Notes" },
   { to: "/hormone-visits", icon: FlaskConical, label: "Hormone Labs" },
+  { to: "/protocols", icon: Pill, label: "Protocols" },
   { to: "/treatments", icon: Stethoscope, label: "Treatments" },
   { to: "/providers", icon: UserCog, label: "Providers" },
+  { to: "/billing", icon: DollarSign, label: "Billing" },
 ];
 
 export function MobileNav() {
