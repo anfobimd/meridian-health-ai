@@ -21,6 +21,7 @@ import RoomsDevices from "./pages/RoomsDevices";
 import Billing from "./pages/Billing";
 import MdOversight from "./pages/MdOversight";
 import MdOversightDashboard from "./pages/MdOversightDashboard";
+import Marketplace from "./pages/Marketplace";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -50,6 +51,7 @@ const App = () => (
             <Route path="/billing" element={<Billing />} />
             <Route path="/md-oversight" element={<MdOversight />} />
             <Route path="/md-oversight/dashboard" element={<MdOversightDashboard />} />
+            <Route path="/marketplace" element={<Marketplace />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>

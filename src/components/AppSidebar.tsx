@@ -1,7 +1,7 @@
 import { NavLink, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, Users, Calendar, Stethoscope, ClipboardList, UserCog,
-  Activity, FlaskConical, FileText, Pill, DollarSign, ClipboardPlus, ShieldCheck, DoorOpen,
+  Activity, FlaskConical, FileText, Pill, DollarSign, ClipboardPlus, ShieldCheck, DoorOpen, Store,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -34,6 +34,7 @@ const navSections = [
       { to: "/rooms-devices", icon: DoorOpen, label: "Rooms & Devices" },
       { to: "/providers", icon: UserCog, label: "Providers" },
       { to: "/billing", icon: DollarSign, label: "Billing" },
+      { to: "/marketplace", icon: Store, label: "Marketplace" },
     ],
   },
 ];
