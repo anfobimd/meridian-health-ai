@@ -1663,6 +1663,104 @@ export type Database = {
           },
         ]
       }
+      marketplace_bookings: {
+        Row: {
+          ai_match_reasoning: string | null
+          appointment_id: string | null
+          created_at: string
+          id: string
+          patient_id: string
+          provider_id: string
+          requested_at: string
+          status: string
+          treatment_id: string | null
+        }
+        Insert: {
+          ai_match_reasoning?: string | null
+          appointment_id?: string | null
+          created_at?: string
+          id?: string
+          patient_id: string
+          provider_id: string
+          requested_at?: string
+          status?: string
+          treatment_id?: string | null
+        }
+        Update: {
+          ai_match_reasoning?: string | null
+          appointment_id?: string | null
+          created_at?: string
+          id?: string
+          patient_id?: string
+          provider_id?: string
+          requested_at?: string
+          status?: string
+          treatment_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_bookings_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketplace_bookings_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketplace_bookings_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "providers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketplace_bookings_treatment_id_fkey"
+            columns: ["treatment_id"]
+            isOneToOne: false
+            referencedRelation: "treatments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketplace_config: {
+        Row: {
+          clinic_name: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          laser_hourly_rate: number
+          membership_tiers: Json
+          modalities: Json
+          updated_at: string
+        }
+        Insert: {
+          clinic_name?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          laser_hourly_rate?: number
+          membership_tiers?: Json
+          modalities?: Json
+          updated_at?: string
+        }
+        Update: {
+          clinic_name?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          laser_hourly_rate?: number
+          membership_tiers?: Json
+          modalities?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
       oversight_config: {
         Row: {
           config_key: string
@@ -2291,6 +2389,7 @@ export type Database = {
           id: string
           is_active: boolean
           provider_id: string
+          room_preference_id: string | null
           start_time: string
         }
         Insert: {
@@ -2302,6 +2401,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           provider_id: string
+          room_preference_id?: string | null
           start_time: string
         }
         Update: {
@@ -2313,6 +2413,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           provider_id?: string
+          room_preference_id?: string | null
           start_time?: string
         }
         Relationships: [
@@ -2321,6 +2422,13 @@ export type Database = {
             columns: ["provider_id"]
             isOneToOne: false
             referencedRelation: "providers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "provider_availability_room_preference_id_fkey"
+            columns: ["room_preference_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
             referencedColumns: ["id"]
           },
         ]
@@ -2366,6 +2474,88 @@ export type Database = {
           },
         ]
       }
+      provider_memberships: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          modalities: string[]
+          monthly_rate: number
+          provider_id: string
+          start_date: string
+          tier: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          modalities?: string[]
+          monthly_rate?: number
+          provider_id: string
+          start_date?: string
+          tier?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          modalities?: string[]
+          monthly_rate?: number
+          provider_id?: string
+          start_date?: string
+          tier?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "provider_memberships_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "providers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      provider_skills: {
+        Row: {
+          certification_level: string
+          created_at: string
+          id: string
+          modality: string
+          provider_id: string
+          skill_name: string
+          verified_at: string | null
+        }
+        Insert: {
+          certification_level?: string
+          created_at?: string
+          id?: string
+          modality?: string
+          provider_id: string
+          skill_name: string
+          verified_at?: string | null
+        }
+        Update: {
+          certification_level?: string
+          created_at?: string
+          id?: string
+          modality?: string
+          provider_id?: string
+          skill_name?: string
+          verified_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "provider_skills_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "providers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       providers: {
         Row: {
           bio: string | null
@@ -2373,10 +2563,14 @@ export type Database = {
           credentials: string | null
           email: string | null
           first_name: string
+          hourly_rate_override: number | null
           id: string
           is_active: boolean
           last_name: string
           license_number: string | null
+          marketplace_bio: string | null
+          marketplace_enabled: boolean
+          modalities: string[] | null
           npi: string | null
           phone: string | null
           specialty: string | null
@@ -2389,10 +2583,14 @@ export type Database = {
           credentials?: string | null
           email?: string | null
           first_name: string
+          hourly_rate_override?: number | null
           id?: string
           is_active?: boolean
           last_name: string
           license_number?: string | null
+          marketplace_bio?: string | null
+          marketplace_enabled?: boolean
+          modalities?: string[] | null
           npi?: string | null
           phone?: string | null
           specialty?: string | null
@@ -2405,10 +2603,14 @@ export type Database = {
           credentials?: string | null
           email?: string | null
           first_name?: string
+          hourly_rate_override?: number | null
           id?: string
           is_active?: boolean
           last_name?: string
           license_number?: string | null
+          marketplace_bio?: string | null
+          marketplace_enabled?: boolean
+          modalities?: string[] | null
           npi?: string | null
           phone?: string | null
           specialty?: string | null
