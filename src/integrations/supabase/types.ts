@@ -93,11 +93,14 @@ export type Database = {
           checked_in_at: string | null
           completed_at: string | null
           created_at: string
+          device_id: string | null
           duration_minutes: number | null
           id: string
           notes: string | null
           patient_id: string
           provider_id: string | null
+          room_id: string | null
+          roomed_at: string | null
           scheduled_at: string
           status: Database["public"]["Enums"]["appointment_status"]
           treatment_id: string | null
@@ -107,11 +110,14 @@ export type Database = {
           checked_in_at?: string | null
           completed_at?: string | null
           created_at?: string
+          device_id?: string | null
           duration_minutes?: number | null
           id?: string
           notes?: string | null
           patient_id: string
           provider_id?: string | null
+          room_id?: string | null
+          roomed_at?: string | null
           scheduled_at: string
           status?: Database["public"]["Enums"]["appointment_status"]
           treatment_id?: string | null
@@ -121,17 +127,27 @@ export type Database = {
           checked_in_at?: string | null
           completed_at?: string | null
           created_at?: string
+          device_id?: string | null
           duration_minutes?: number | null
           id?: string
           notes?: string | null
           patient_id?: string
           provider_id?: string | null
+          room_id?: string | null
+          roomed_at?: string | null
           scheduled_at?: string
           status?: Database["public"]["Enums"]["appointment_status"]
           treatment_id?: string | null
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "appointments_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "devices"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "appointments_patient_id_fkey"
             columns: ["patient_id"]
@@ -144,6 +160,13 @@ export type Database = {
             columns: ["provider_id"]
             isOneToOne: false
             referencedRelation: "providers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
             referencedColumns: ["id"]
           },
           {
@@ -482,6 +505,47 @@ export type Database = {
             columns: ["provider_id"]
             isOneToOne: false
             referencedRelation: "providers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      devices: {
+        Row: {
+          created_at: string
+          device_type: string
+          id: string
+          is_active: boolean
+          maintenance_notes: string | null
+          name: string
+          room_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          device_type?: string
+          id?: string
+          is_active?: boolean
+          maintenance_notes?: string | null
+          name: string
+          room_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          device_type?: string
+          id?: string
+          is_active?: boolean
+          maintenance_notes?: string | null
+          name?: string
+          room_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "devices_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
             referencedColumns: ["id"]
           },
         ]
@@ -1995,6 +2059,47 @@ export type Database = {
           },
         ]
       }
+      rooms: {
+        Row: {
+          assigned_provider_id: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          room_type: string
+          sort_order: number | null
+          updated_at: string
+        }
+        Insert: {
+          assigned_provider_id?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          room_type?: string
+          sort_order?: number | null
+          updated_at?: string
+        }
+        Update: {
+          assigned_provider_id?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          room_type?: string
+          sort_order?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rooms_assigned_provider_id_fkey"
+            columns: ["assigned_provider_id"]
+            isOneToOne: false
+            referencedRelation: "providers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       treatment_categories: {
         Row: {
           created_at: string
@@ -2024,6 +2129,45 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      treatment_device_requirements: {
+        Row: {
+          created_at: string
+          device_id: string
+          id: string
+          is_required: boolean
+          treatment_id: string
+        }
+        Insert: {
+          created_at?: string
+          device_id: string
+          id?: string
+          is_required?: boolean
+          treatment_id: string
+        }
+        Update: {
+          created_at?: string
+          device_id?: string
+          id?: string
+          is_required?: boolean
+          treatment_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "treatment_device_requirements_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "devices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "treatment_device_requirements_treatment_id_fkey"
+            columns: ["treatment_id"]
+            isOneToOne: false
+            referencedRelation: "treatments"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       treatments: {
         Row: {
@@ -2111,6 +2255,7 @@ export type Database = {
       appointment_status:
         | "booked"
         | "checked_in"
+        | "roomed"
         | "in_progress"
         | "completed"
         | "no_show"
@@ -2270,6 +2415,7 @@ export const Constants = {
       appointment_status: [
         "booked",
         "checked_in",
+        "roomed",
         "in_progress",
         "completed",
         "no_show",
