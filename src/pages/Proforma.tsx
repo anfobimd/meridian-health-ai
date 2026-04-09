@@ -378,6 +378,3 @@ export default function Proforma() {
     </div>
   );
 }
-
-// Need Cell import for recharts
-import { Cell } from "recharts";
