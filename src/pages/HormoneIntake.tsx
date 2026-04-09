@@ -359,12 +359,12 @@ export default function HormoneIntake() {
       </div>
 
       {/* Step indicator */}
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 overflow-x-auto">
         {STEPS.map((s, i) => (
-          <div key={i} className="flex items-center gap-1 flex-1">
+          <div key={i} className="flex items-center gap-1 flex-shrink-0">
             <button
               onClick={() => i < step && setStep(i)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors w-full ${
+              className={`flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
                 i === step ? "bg-primary text-primary-foreground" :
                 i < step ? "bg-primary/10 text-primary cursor-pointer hover:bg-primary/20" :
                 "bg-muted text-muted-foreground"
