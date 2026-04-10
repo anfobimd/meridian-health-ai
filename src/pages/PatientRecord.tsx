@@ -6,10 +6,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, User, FlaskConical, CheckCircle, Clock, AlertTriangle, Package, Sparkles, Loader2, Camera } from "lucide-react";
+import { ArrowLeft, User, FlaskConical, CheckCircle, Clock, AlertTriangle, Package, Sparkles, Loader2, Camera, Wand2 } from "lucide-react";
 import { PhotoGallery } from "@/components/clinical-photos/PhotoGallery";
 import { PhotoUpload } from "@/components/clinical-photos/PhotoUpload";
 import { ComparisonView } from "@/components/clinical-photos/ComparisonView";
+import { TreatmentRecommendations } from "@/components/TreatmentRecommendations";
 import { format, parseISO, differenceInDays } from "date-fns";
 import { useState } from "react";
 import { toast } from "@/hooks/use-toast";
@@ -178,6 +179,7 @@ export default function PatientRecord() {
           <TabsTrigger value="hormone">Hormone ({hormoneVisits?.length ?? 0})</TabsTrigger>
           <TabsTrigger value="intake">Intake ({intakeForms?.length ?? 0})</TabsTrigger>
           <TabsTrigger value="packages">Packages ({packagePurchases?.length ?? 0})</TabsTrigger>
+          <TabsTrigger value="recommendations">AI Recs</TabsTrigger>
           <TabsTrigger value="photos">Photos</TabsTrigger>
         </TabsList>
 
@@ -507,6 +509,10 @@ export default function PatientRecord() {
             </div>
           </div>
           <PhotoUpload patientId={id!} open={photoUploadOpen} onOpenChange={setPhotoUploadOpen} />
+        </TabsContent>
+
+        <TabsContent value="recommendations">
+          <TreatmentRecommendations patientId={id!} patientName={`${patient.first_name} ${patient.last_name}`} />
         </TabsContent>
       </Tabs>
     </div>
