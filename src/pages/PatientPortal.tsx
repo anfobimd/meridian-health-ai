@@ -145,7 +145,7 @@ function AppointmentsTab({ patientId }: { patientId: string }) {
                       </p>
                     </div>
                   </div>
-                  <Badge variant={apt.status === "scheduled" ? "secondary" : "default"} className="text-[10px]">{apt.status}</Badge>
+                  <Badge variant={apt.status === "booked" ? "secondary" : "default"} className="text-[10px]">{apt.status}</Badge>
                 </CardContent>
               </Card>
             ))}
