@@ -2,7 +2,7 @@ import { NavLink, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, Users, Calendar, Stethoscope, ClipboardList, UserCog,
   Activity, FlaskConical, FileText, Pill, DollarSign, ClipboardPlus, ShieldCheck, DoorOpen, Store, Package,
-  CreditCard, TrendingUp, Calculator, MonitorCheck, Briefcase, Search, LogOut,
+  CreditCard, TrendingUp, Calculator, MonitorCheck, Briefcase, Search, LogOut, CalendarClock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -42,6 +42,7 @@ const navSections = [
     items: [
       { to: "/treatments", icon: Stethoscope, label: "Treatments" },
       { to: "/rooms-devices", icon: DoorOpen, label: "Rooms & Devices" },
+      { to: "/provider-schedule", icon: CalendarClock, label: "Schedules" },
       { to: "/providers", icon: UserCog, label: "Providers" },
       { to: "/billing", icon: DollarSign, label: "Billing" },
       { to: "/marketplace", icon: Store, label: "Marketplace" },

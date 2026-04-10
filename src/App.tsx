@@ -32,6 +32,7 @@ import Proforma from "./pages/Proforma";
 import FrontDesk from "./pages/FrontDesk";
 import ProviderDay from "./pages/ProviderDay";
 import ProviderMarketplace from "./pages/ProviderMarketplace";
+import ProviderSchedule from "./pages/ProviderSchedule";
 import RemoteIntake from "./pages/RemoteIntake";
 import PatientPortal from "./pages/PatientPortal";
 import Auth from "./pages/Auth";
@@ -77,6 +78,7 @@ const App = () => (
                 <Route path="/earnings" element={<Earnings />} />
                 <Route path="/proforma" element={<Proforma />} />
                 <Route path="/my-marketplace" element={<ProviderMarketplace />} />
+                <Route path="/provider-schedule" element={<ProviderSchedule />} />
               </Route>
             </Route>
             {/* Public routes — no auth required */}
