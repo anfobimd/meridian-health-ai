@@ -989,6 +989,50 @@ export type Database = {
           },
         ]
       }
+      e_consents: {
+        Row: {
+          consent_text: string
+          consent_type: Database["public"]["Enums"]["consent_type"]
+          created_at: string
+          id: string
+          ip_address: string | null
+          patient_id: string
+          signature_data: string | null
+          signed_at: string
+          user_agent: string | null
+        }
+        Insert: {
+          consent_text: string
+          consent_type: Database["public"]["Enums"]["consent_type"]
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          patient_id: string
+          signature_data?: string | null
+          signed_at?: string
+          user_agent?: string | null
+        }
+        Update: {
+          consent_text?: string
+          consent_type?: Database["public"]["Enums"]["consent_type"]
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          patient_id?: string
+          signature_data?: string | null
+          signed_at?: string
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "e_consents_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       encounter_field_responses: {
         Row: {
           ai_suggested: boolean
@@ -2323,6 +2367,7 @@ export type Database = {
         Row: {
           address: string | null
           allergies: string[] | null
+          auth_user_id: string | null
           city: string | null
           contraindications: string[] | null
           created_at: string
@@ -2358,6 +2403,7 @@ export type Database = {
         Insert: {
           address?: string | null
           allergies?: string[] | null
+          auth_user_id?: string | null
           city?: string | null
           contraindications?: string[] | null
           created_at?: string
@@ -2393,6 +2439,7 @@ export type Database = {
         Update: {
           address?: string | null
           allergies?: string[] | null
+          auth_user_id?: string | null
           city?: string | null
           contraindications?: string[] | null
           created_at?: string
@@ -3478,6 +3525,10 @@ export type Database = {
         Returns: boolean
       }
       is_staff: { Args: { _user_id: string }; Returns: boolean }
+      link_patient_auth: {
+        Args: { _email: string; _user_id: string }
+        Returns: string
+      }
     }
     Enums: {
       app_role: "admin" | "provider" | "front_desk"
@@ -3489,6 +3540,7 @@ export type Database = {
         | "completed"
         | "no_show"
         | "cancelled"
+      consent_type: "general" | "telehealth" | "hipaa"
       encounter_status:
         | "open"
         | "in_progress"
@@ -3650,6 +3702,7 @@ export const Constants = {
         "no_show",
         "cancelled",
       ],
+      consent_type: ["general", "telehealth", "hipaa"],
       encounter_status: [
         "open",
         "in_progress",
