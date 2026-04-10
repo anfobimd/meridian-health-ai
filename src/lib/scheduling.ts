@@ -174,12 +174,12 @@ export async function checkConflicts(
 
   // Helper: find overlapping appointments for a given column
   const findOverlaps = async (column: string, value: string) => {
-    const { data } = await supabase
+    const { data } = await (supabase
       .from("appointments")
-      .select("id, scheduled_at, duration_minutes")
-      .eq(column as any, value)
-      .neq("status", "cancelled" as any)
-      .lt("scheduled_at", endIso) as any;
+      .select("id, scheduled_at, duration_minutes") as any)
+      .eq(column, value)
+      .neq("status", "cancelled")
+      .lt("scheduled_at", endIso);
 
     return ((data as any[]) ?? []).filter((apt) => {
       if (excludeAppointmentId && apt.id === excludeAppointmentId) return false;
