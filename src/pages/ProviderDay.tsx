@@ -197,14 +197,14 @@ export default function ProviderDay() {
           </p>
           <Card className="border-accent/30 bg-accent/5">
             <CardContent className="p-5">
-              <div className="flex items-start justify-between">
-                <div className="flex items-start gap-4">
-                  <div className="h-12 w-12 rounded-full bg-accent/10 flex items-center justify-center text-lg font-bold text-accent">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="flex items-start gap-4 min-w-0">
+                  <div className="h-12 w-12 shrink-0 rounded-full bg-accent/10 flex items-center justify-center text-lg font-bold text-accent">
                     {currentApt.patients?.first_name?.[0]}{currentApt.patients?.last_name?.[0]}
                   </div>
-                  <div>
-                    <p className="font-semibold text-lg">{currentApt.patients?.first_name} {currentApt.patients?.last_name}</p>
-                    <p className="text-sm text-muted-foreground">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-lg truncate">{currentApt.patients?.first_name} {currentApt.patients?.last_name}</p>
+                    <p className="text-sm text-muted-foreground truncate">
                       {currentApt.treatments?.name || "General"} · {format(parseISO(currentApt.scheduled_at), "h:mm a")}
                       {currentApt.rooms && ` · ${currentApt.rooms.name}`}
                     </p>
@@ -216,8 +216,8 @@ export default function ProviderDay() {
                     )}
                   </div>
                 </div>
-                <Button onClick={() => openChart(currentApt)}>
-                  <FileText className="h-4 w-4 mr-1.5" />Open Chart
+                <Button className="shrink-0" onClick={() => openChart(currentApt)}>
+                  <FileText className="h-4 w-4 sm:mr-1.5" /><span className="hidden sm:inline">Open Chart</span>
                 </Button>
               </div>
               {/* AI brief inline */}
