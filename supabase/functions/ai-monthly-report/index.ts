@@ -151,19 +151,29 @@ ${Object.entries(reviewerMap).map(([id, recs]) => {
 
     const aiData = await aiResponse.json();
     const content = aiData.choices?.[0]?.message?.content || "{}";
-    const report = JSON.parse(content);
+    let report;
+    try {
+      const cleaned = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+      report = JSON.parse(cleaned);
+    } catch {
+      report = { narrative: content, highlights: [], alerts: [], recommendations: [] };
+    }
 
     // Store the report
-    const { data: savedReport } = await supabase.from("ai_oversight_reports").insert({
+    const { data: savedReport, error: insertError } = await supabase.from("ai_oversight_reports").insert({
       report_month: reportMonth,
       report_type: "monthly",
-      narrative: report.narrative,
+      narrative: report.narrative || null,
       highlights: report.highlights || [],
       alerts: report.alerts || [],
       recommendations: report.recommendations || [],
       metrics,
       generated_by: "ai",
     }).select().single();
+
+    if (insertError) {
+      console.error("Failed to save report:", insertError);
+    }
 
     // Log API call
     const latency = Date.now() - startTime;
