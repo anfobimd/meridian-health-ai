@@ -249,27 +249,47 @@ export default function MdOversight() {
       {/* Summary Strip */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card>
-          <CardContent className="pt-4 pb-3">
-            <p className="text-[10px] uppercase text-muted-foreground font-bold">Chart Reviews Pending</p>
-            <p className="text-2xl font-bold mt-1">{pendingCharts}</p>
+          <CardContent className="pt-4 pb-3 flex items-start gap-2">
+            <div className="h-8 w-8 shrink-0 rounded-lg bg-primary/10 flex items-center justify-center">
+              <FileText className="h-4 w-4 text-primary" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] uppercase text-muted-foreground font-bold truncate">Charts Pending</p>
+              <p className="text-2xl font-bold mt-0.5">{pendingCharts}</p>
+            </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-4 pb-3">
-            <p className="text-[10px] uppercase text-muted-foreground font-bold">Hormone Approvals Pending</p>
-            <p className="text-2xl font-bold mt-1">{pendingHormones}</p>
+          <CardContent className="pt-4 pb-3 flex items-start gap-2">
+            <div className="h-8 w-8 shrink-0 rounded-lg bg-primary/10 flex items-center justify-center">
+              <FlaskConical className="h-4 w-4 text-primary" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] uppercase text-muted-foreground font-bold truncate">Hormones</p>
+              <p className="text-2xl font-bold mt-0.5">{pendingHormones}</p>
+            </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-4 pb-3">
-            <p className="text-[10px] uppercase text-muted-foreground font-bold">Total Queue</p>
-            <p className="text-2xl font-bold mt-1">{pendingCharts + pendingHormones}</p>
+          <CardContent className="pt-4 pb-3 flex items-start gap-2">
+            <div className="h-8 w-8 shrink-0 rounded-lg bg-primary/10 flex items-center justify-center">
+              <Clock className="h-4 w-4 text-primary" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] uppercase text-muted-foreground font-bold truncate">Total Queue</p>
+              <p className="text-2xl font-bold mt-0.5">{pendingCharts + pendingHormones}</p>
+            </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-4 pb-3">
-            <p className="text-[10px] uppercase text-muted-foreground font-bold">Batch-Eligible (Low/Med)</p>
-            <p className="text-2xl font-bold mt-1">{lowRiskReviews.length}</p>
+          <CardContent className="pt-4 pb-3 flex items-start gap-2">
+            <div className="h-8 w-8 shrink-0 rounded-lg bg-primary/10 flex items-center justify-center">
+              <CheckCircle className="h-4 w-4 text-primary" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] uppercase text-muted-foreground font-bold truncate">Batch Ready</p>
+              <p className="text-2xl font-bold mt-0.5">{lowRiskReviews.length}</p>
+            </div>
           </CardContent>
         </Card>
       </div>
