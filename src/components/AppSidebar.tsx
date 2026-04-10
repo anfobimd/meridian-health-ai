@@ -13,6 +13,7 @@ const navSections = [
       { to: "/", icon: LayoutDashboard, label: "Dashboard" },
       { to: "/front-desk", icon: MonitorCheck, label: "Front Desk" },
       { to: "/provider-day", icon: Briefcase, label: "My Day" },
+      { to: "/my-marketplace", icon: Store, label: "My Marketplace" },
     ],
   },
   {
@@ -31,7 +32,7 @@ const navSections = [
   {
     label: "OVERSIGHT",
     items: [
-      { to: "/md-oversight", icon: ShieldCheck, label: "MD Chart Review" },
+      { to: "/md-oversight", icon: ShieldCheck, label: "Oversight Hub" },
       { to: "/md-oversight/dashboard", icon: Activity, label: "Oversight Dashboard" },
     ],
   },
