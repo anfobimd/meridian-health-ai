@@ -901,6 +901,70 @@ export type Database = {
           },
         ]
       }
+      clinical_photos: {
+        Row: {
+          body_area: string | null
+          created_at: string
+          encounter_id: string | null
+          id: string
+          notes: string | null
+          patient_id: string
+          photo_type: string
+          storage_path: string
+          taken_at: string | null
+          treatment_id: string | null
+          uploaded_by: string | null
+        }
+        Insert: {
+          body_area?: string | null
+          created_at?: string
+          encounter_id?: string | null
+          id?: string
+          notes?: string | null
+          patient_id: string
+          photo_type?: string
+          storage_path: string
+          taken_at?: string | null
+          treatment_id?: string | null
+          uploaded_by?: string | null
+        }
+        Update: {
+          body_area?: string | null
+          created_at?: string
+          encounter_id?: string | null
+          id?: string
+          notes?: string | null
+          patient_id?: string
+          photo_type?: string
+          storage_path?: string
+          taken_at?: string | null
+          treatment_id?: string | null
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clinical_photos_encounter_id_fkey"
+            columns: ["encounter_id"]
+            isOneToOne: false
+            referencedRelation: "encounters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clinical_photos_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clinical_photos_treatment_id_fkey"
+            columns: ["treatment_id"]
+            isOneToOne: false
+            referencedRelation: "treatments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       coaching_actions: {
         Row: {
           action_type: string
