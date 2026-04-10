@@ -55,6 +55,17 @@ const navSections = [
 
 export function AppSidebar() {
   const location = useLocation();
+  const { user, signOut } = useAuth();
+
+  const initials = user?.email
+    ? user.email.substring(0, 2).toUpperCase()
+    : "??";
+
+  const displayName =
+    user?.user_metadata?.full_name ||
+    user?.user_metadata?.name ||
+    user?.email?.split("@")[0] ||
+    "User";
 
   return (
     <aside className="hidden md:flex w-56 flex-col bg-sidebar text-sidebar-foreground min-h-screen flex-shrink-0">
@@ -104,11 +115,20 @@ export function AppSidebar() {
 
       <div className="px-3 py-3 border-t border-sidebar-border">
         <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-[10px] font-bold text-sidebar-primary flex-shrink-0">PP</div>
-          <div className="min-w-0">
-            <p className="text-[11.5px] text-white truncate font-medium">Priya Patel, NP</p>
-            <p className="text-[10px] text-sidebar-foreground/40">Aesthetic Nursing</p>
+          <div className="w-7 h-7 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-[10px] font-bold text-sidebar-primary flex-shrink-0">
+            {initials}
           </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-[11.5px] text-white truncate font-medium">{displayName}</p>
+            <p className="text-[10px] text-sidebar-foreground/40 truncate">{user?.email}</p>
+          </div>
+          <button
+            onClick={signOut}
+            className="p-1.5 rounded-md text-sidebar-foreground/30 hover:text-sidebar-foreground/70 hover:bg-white/5 transition-colors flex-shrink-0"
+            title="Sign out"
+          >
+            <LogOut className="h-3.5 w-3.5" />
+          </button>
         </div>
       </div>
     </aside>
