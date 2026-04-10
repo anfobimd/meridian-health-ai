@@ -1,78 +1,98 @@
 
 
-# Security Overhaul: Authentication + RLS Lockdown
+# Patient Portal Auth + Remote Intake Branding + E-Consent
 
-## Current State
-- **236 RLS warnings**: Every table has `USING (true)` / `WITH CHECK (true)` for INSERT and UPDATE on both `anon` and `authenticated` roles. Any anonymous user can read, insert, and modify all patient records, billing data, clinical notes, and AI oversight data.
-- **No authentication**: Zero auth code exists in the frontend. No login page, no auth context, no route protection.
-- **`user_roles` table exists** with `has_role()` function already built — the infrastructure is ready, just unused.
+## What We're Building
 
-## Plan (3 batches)
+Three patient-facing improvements that complete the Batch D workflow items:
 
-### Batch 1: Authentication System
-Build login/signup UI and auth context to gate all internal routes.
+1. **Patient Portal with real authentication** — Replace the insecure email-lookup with proper login/signup so patients access only their own data
+2. **Remote Intake branding & polish** — Make the standalone intake wizard feel like a branded, professional experience
+3. **E-consent with signature capture** — Add a proper consent/e-signature step to both intake and portal
 
-**Files to create:**
-- `src/pages/Auth.tsx` — Login/signup form (email + password, Google OAuth)
-- `src/pages/ResetPassword.tsx` — Password reset page
-- `src/contexts/AuthContext.tsx` — Auth provider with `onAuthStateChange`, session state, role loading from `user_roles`
-- `src/components/ProtectedRoute.tsx` — Wrapper that redirects unauthenticated users to `/auth`
+---
 
-**Files to modify:**
-- `src/App.tsx` — Wrap with `AuthProvider`, protect internal routes with `ProtectedRoute`, add `/auth` and `/reset-password` routes
-- `src/components/AppSidebar.tsx` — Add logout button, show current user
+## 1. Patient Portal Authentication
 
-**Database migration:**
-- Create `profiles` table (id, user_id FK, display_name, avatar_url) with trigger to auto-create on signup
-- RLS: users can only read/update their own profile
+**Current problem:** Anyone can type any email and see that patient's full medical records, appointments, and labs. No password, no verification.
 
-**Auth config:**
-- Enable Google OAuth via `configure_auth`
-- Do NOT enable auto-confirm (email verification required)
+**Solution:** Add Supabase Auth for patients. When a patient signs up, link their auth account to their `patients` record via email match.
 
-### Batch 2: RLS Policy Lockdown
-Replace all `true` policies with role-scoped rules. Tables fall into 4 tiers:
+### Database Changes
+- Add `auth_user_id` column to `patients` table (nullable UUID, unique) to link a patient record to their auth account
+- Add RLS policy: patients can only SELECT their own row (`auth.uid() = auth_user_id`)
+- Add RLS policies on `appointments`, `patient_package_purchases`, `clinical_notes`, `hormone_visits` scoped to patient's own `patient_id`
 
-| Tier | Tables | Rule |
-|------|--------|------|
-| **Service-only** | `ai_api_calls`, `ai_chart_analysis`, `ai_md_consistency`, `ai_oversight_reports`, `ai_provider_intelligence`, `ai_prompts`, `ai_doc_checklists`, `coaching_actions` | Drop anon policies. Authenticated SELECT only. INSERT/UPDATE restricted to `service_role` (edge functions use service key, so client policies become deny-all for writes). |
-| **Staff (admin + provider + front_desk)** | `patients`, `appointments`, `encounters`, `clinical_notes`, `hormone_visits`, `lab_results`, `lab_orders`, `prescriptions`, `invoices`, `invoice_items`, `payments`, `providers`, `treatments`, `rooms`, `devices`, `chart_templates`, `chart_template_*`, `encounter_field_responses`, `protocol_*`, `provider_*`, `marketplace_*`, `package_*`, `service_packages`, `service_package_items`, `proforma_scenarios`, `quotes`, `quote_items`, `membership_invoices` | Drop anon policies. Authenticated users with any `app_role` can SELECT. INSERT/UPDATE scoped to `has_role(auth.uid(), 'admin')` OR `has_role(auth.uid(), 'provider')` OR `has_role(auth.uid(), 'front_desk')` as appropriate per table. |
-| **Audit** | `audit_logs` | Authenticated INSERT only (via `auth.uid() = user_id`). SELECT for admin only. No UPDATE/DELETE. |
-| **Public-read** | `treatments`, `treatment_categories`, `marketplace_config`, `oversight_config` | Keep SELECT for anon. INSERT/UPDATE admin-only. |
+### Frontend Changes (`src/pages/PatientPortal.tsx`)
+- Replace email-lookup login with real email/password signup + login (reuse auth patterns from `Auth.tsx`)
+- Add Google OAuth option via `lovable.auth.signInWithOAuth`
+- On first login, auto-link: match `auth.user.email` to `patients.email`, set `auth_user_id`
+- After auth, fetch patient data using the linked `patient_id` — RLS ensures they only see their own records
+- Add password reset flow
 
-**Single migration** with ~60 `DROP POLICY` + `CREATE POLICY` statements using the existing `has_role()` function.
-
-### Batch 3: Verify + Harden
-- Test that unauthenticated users are redirected to `/auth`
-- Test that logged-in users can still CRUD on their permitted tables
-- Test that edge functions (which use `service_role` key) still work
-- Run the security scanner again to confirm 0 warnings
-- Public routes (`/intake`, `/portal`) remain accessible without login
-
-## Technical Details
-
-**RLS pattern** (repeated per table):
-```sql
-DROP POLICY IF EXISTS "Anon insert tablename" ON public.tablename;
-DROP POLICY IF EXISTS "Anon update tablename" ON public.tablename;
--- Keep or drop anon SELECT depending on tier
-CREATE POLICY "Staff can insert tablename" ON public.tablename
-  FOR INSERT TO authenticated
-  WITH CHECK (public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'provider') OR public.has_role(auth.uid(), 'front_desk'));
+### UX Flow
+```text
+/portal → Login/Signup card → Email+Password or Google
+  ↓ (first time)
+  Auto-link auth account to patient record by email
+  ↓
+  Dashboard: Appointments | Packages | Records tabs (existing UI)
+  ↓
+  Sign Out button in header
 ```
 
-**Auth context pattern:**
-```typescript
-// Listen for auth changes, load role from user_roles
-const { data: { subscription } } = supabase.auth.onAuthStateChange(
-  async (event, session) => { /* set user, fetch role */ }
-);
+---
+
+## 2. Remote Intake Branding
+
+**Current state:** Functional 5-step wizard but plain. Needs standalone branded feel.
+
+### Changes (`src/pages/RemoteIntake.tsx`)
+- Add clinic logo/branding area in header (driven by `?clinic=` query param)
+- Add a welcome splash step (Step 0) before demographics: clinic name, what to expect, estimated time
+- Add progress percentage indicator alongside step pills
+- Add subtle gradient background and branded card styling
+- Add "Save & Continue Later" — store partial form in `localStorage` keyed by email
+- Mobile-first responsive polish (the stepper already scrolls horizontally)
+
+---
+
+## 3. E-Consent & E-Signature
+
+**Current state:** Two checkboxes ("I consent" + "telehealth consent") with no legal weight or audit trail.
+
+### Database Changes
+- Create `e_consents` table: `id`, `patient_id`, `consent_type` (enum: general, telehealth, hipaa), `consent_text`, `signature_data` (text — base64 of canvas), `ip_address`, `user_agent`, `signed_at`, `created_at`
+- RLS: patients can INSERT their own consents and SELECT their own; staff can SELECT all
+
+### Frontend Changes
+- Create `src/components/SignaturePad.tsx` — HTML5 canvas signature capture component (draw-to-sign)
+- Update Remote Intake Step 4 to show full consent text + signature pad instead of checkboxes
+- Update Patient Portal Records tab to show signed consents
+- Each consent stores: full legal text shown, signature image, timestamp, IP, user agent
+
+### Consent Flow
+```text
+Step 4 (Goals & Consent):
+  ├── Treatment goals (existing)
+  ├── General Consent — expandable full text + signature pad
+  ├── Telehealth Consent — expandable full text + signature pad
+  └── Submit (disabled until both signed)
 ```
 
-**Edge functions are unaffected** — they use `SUPABASE_SERVICE_ROLE_KEY` which bypasses RLS entirely.
+---
 
-## Estimated scope
-- 1 migration (~200 SQL statements)
-- 5 new files, 2 modified files
-- ~500 lines of new code
+## Files Changed
+
+| Action | File |
+|--------|------|
+| Create | `src/components/SignaturePad.tsx` |
+| Create | Migration: `e_consents` table + `patients.auth_user_id` column + patient-scoped RLS |
+| Modify | `src/pages/PatientPortal.tsx` — Replace email lookup with real auth |
+| Modify | `src/pages/RemoteIntake.tsx` — Branding, welcome step, signature consent |
+
+## Estimated Scope
+- 1 migration (~40 SQL statements)
+- 1 new component, 2 major page rewrites
+- ~600 lines of new/changed code
 
