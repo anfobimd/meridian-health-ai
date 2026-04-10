@@ -119,6 +119,7 @@ export default function PatientRecord() {
 
   const [aiRec, setAiRec] = useState<any>(null);
   const [aiLoading, setAiLoading] = useState(false);
+  const [photoUploadOpen, setPhotoUploadOpen] = useState(false);
 
   const redeemSession = useMutation({
     mutationFn: async ({ purchaseId, treatmentName }: { purchaseId: string; treatmentName: string }) => {
