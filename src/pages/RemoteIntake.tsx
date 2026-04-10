@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,12 +13,16 @@ import {
 import {
   ArrowRight, ArrowLeft, Upload, Loader2, AlertTriangle,
   CheckCircle, FlaskConical, Shield, Target, ClipboardList, Activity,
-  FileSignature, Sparkles,
+  FileSignature, Sparkles, Clock, Heart,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useSearchParams } from "react-router-dom";
+import SignaturePad from "@/components/SignaturePad";
+import {
+  Collapsible, CollapsibleContent, CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
-// ── Reuse constants from HormoneIntake ────────────────────────────────────────
+// ── Constants ─────────────────────────────────────────────────────────────────
 const FOCUS_OPTIONS = [
   { value: "hormone_male", label: "Male Hormone Optimization (TRT)", icon: "💪" },
   { value: "hormone_female", label: "Female Hormone Optimization (HRT)", icon: "🌸" },
@@ -66,7 +70,12 @@ const CORE_LAB_FIELDS = [
   { key: "lab_psa", label: "PSA", unit: "ng/mL" },
 ];
 
+const GENERAL_CONSENT_TEXT = `I consent to the collection and use of my health information for clinical evaluation and treatment planning. I understand that this intake form does not establish a patient-provider relationship and that all treatment recommendations will be reviewed by a licensed physician. I acknowledge that the information I have provided is accurate and complete to the best of my knowledge. I understand that I may withdraw my consent at any time by contacting the clinic.`;
+
+const TELEHEALTH_CONSENT_TEXT = `I consent to receive telehealth services, which involve the delivery of healthcare services using electronic communications, information technology, or other means. I understand that telehealth consultations have limitations compared to in-person visits, including the inability to perform a physical examination. I acknowledge that my provider may determine that an in-person visit is necessary and that I have the right to refuse telehealth services at any time. I understand that electronic communications carry some level of risk and that the clinic uses reasonable safeguards to protect my information.`;
+
 const STEPS = [
+  { title: "Welcome", icon: Heart },
   { title: "About You", icon: ClipboardList },
   { title: "Treatment Interest", icon: Target },
   { title: "Lab Results", icon: FlaskConical },
@@ -74,14 +83,16 @@ const STEPS = [
   { title: "Goals & Consent", icon: FileSignature },
 ];
 
+const SAVE_KEY = "meridian_intake_draft";
+
 export default function RemoteIntake() {
   const [searchParams] = useSearchParams();
   const clinicName = searchParams.get("clinic") || "Meridian Wellness";
-  
+
   const [step, setStep] = useState(0);
   const [submitted, setSubmitted] = useState(false);
 
-  // Step 0: Demographics
+  // Step 1: Demographics
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -92,29 +103,56 @@ export default function RemoteIntake() {
   const [heightIn, setHeightIn] = useState("");
   const [menoStatus, setMenoStatus] = useState("");
 
-  // Step 1: Focus & Symptoms
+  // Step 2: Focus & Symptoms
   const [focus, setFocus] = useState<string[]>([]);
   const [symptoms, setSymptoms] = useState<string[]>([]);
 
-  // Step 2: Labs
+  // Step 3: Labs
   const [labValues, setLabValues] = useState<Record<string, string>>({});
   const [extracting, setExtracting] = useState(false);
   const [extractedCount, setExtractedCount] = useState(0);
 
-  // Step 3: History
+  // Step 4: History
   const [medications, setMedications] = useState("");
   const [priorTherapy, setPriorTherapy] = useState("");
   const [contraindications, setContraindications] = useState<string[]>([]);
   const [allergies, setAllergies] = useState("");
 
-  // Step 4: Goals & Consent
+  // Step 5: Goals & Consent
   const [goals, setGoals] = useState<string[]>([]);
-  const [consentChecked, setConsentChecked] = useState(false);
-  const [teleHealthConsent, setTeleHealthConsent] = useState(false);
+  const [generalSig, setGeneralSig] = useState<string | null>(null);
+  const [telehealthSig, setTelehealthSig] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const relevantSymptoms = [...new Set(focus.flatMap(f => SYMPTOM_OPTIONS[f] ?? []))];
   const absoluteFlags = CONTRAINDICATION_ITEMS.filter(c => c.severity === "absolute" && contraindications.includes(c.key));
+  const progressPct = Math.round((step / (STEPS.length - 1)) * 100);
+
+  // Restore draft from localStorage
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(SAVE_KEY);
+      if (saved) {
+        const d = JSON.parse(saved);
+        if (d.firstName) setFirstName(d.firstName);
+        if (d.lastName) setLastName(d.lastName);
+        if (d.email) setEmail(d.email);
+        if (d.phone) setPhone(d.phone);
+        if (d.dob) setDob(d.dob);
+        if (d.sex) setSex(d.sex);
+        if (d.step) setStep(d.step);
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  // Save draft on step change
+  useEffect(() => {
+    if (step > 0 && email) {
+      try {
+        localStorage.setItem(SAVE_KEY, JSON.stringify({ firstName, lastName, email, phone, dob, sex, step }));
+      } catch { /* ignore */ }
+    }
+  }, [step, firstName, lastName, email, phone, dob, sex]);
 
   // Lab upload
   const handleLabUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -169,14 +207,14 @@ export default function RemoteIntake() {
       const labData: Record<string, any> = {};
       CORE_LAB_FIELDS.forEach(f => { const v = labValues[f.key]; labData[f.key] = v ? parseFloat(v) : null; });
 
-      // Create intake form record
+      // Create intake form
       await supabase.from("intake_forms").insert({
         patient_id: patient.id,
         form_type: "remote_hormone",
         responses: {
           focus, symptoms, goals, medications, priorTherapy, contraindications, allergies,
           sex, weightLbs, heightIn, menoStatus,
-          consent: { general: consentChecked, telehealth: teleHealthConsent, timestamp: new Date().toISOString() },
+          consent: { general: !!generalSig, telehealth: !!telehealthSig, timestamp: new Date().toISOString() },
         },
         submitted_at: new Date().toISOString(),
       });
@@ -190,6 +228,33 @@ export default function RemoteIntake() {
         peptide_contraindications: contraindications,
       } as any);
 
+      // Save e-consents
+      const consents = [];
+      if (generalSig) {
+        consents.push({
+          patient_id: patient.id,
+          consent_type: "general" as const,
+          consent_text: GENERAL_CONSENT_TEXT,
+          signature_data: generalSig,
+          ip_address: null,
+          user_agent: navigator.userAgent,
+        });
+      }
+      if (telehealthSig) {
+        consents.push({
+          patient_id: patient.id,
+          consent_type: "telehealth" as const,
+          consent_text: TELEHEALTH_CONSENT_TEXT,
+          signature_data: telehealthSig,
+          ip_address: null,
+          user_agent: navigator.userAgent,
+        });
+      }
+      if (consents.length > 0) {
+        await supabase.from("e_consents").insert(consents);
+      }
+
+      localStorage.removeItem(SAVE_KEY);
       setSubmitted(true);
       toast.success("Intake submitted successfully!");
     } catch (err: any) { toast.error(err.message || "Submission failed"); }
@@ -198,19 +263,20 @@ export default function RemoteIntake() {
 
   const canProceed = () => {
     switch (step) {
-      case 0: return firstName.trim() && lastName.trim() && email.trim() && sex;
-      case 1: return focus.length > 0;
-      case 2: return true;
+      case 0: return true; // Welcome
+      case 1: return firstName.trim() && lastName.trim() && email.trim() && sex;
+      case 2: return focus.length > 0;
       case 3: return true;
-      case 4: return goals.length > 0 && consentChecked && teleHealthConsent;
+      case 4: return true;
+      case 5: return goals.length > 0 && !!generalSig && !!telehealthSig;
       default: return true;
     }
   };
 
   if (submitted) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <Card className="max-w-lg w-full text-center">
+      <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-primary/5 flex items-center justify-center p-4">
+        <Card className="max-w-lg w-full text-center shadow-lg">
           <CardContent className="py-12 space-y-4">
             <CheckCircle className="h-16 w-16 text-primary mx-auto" />
             <h2 className="text-2xl font-serif font-bold">Intake Complete!</h2>
@@ -225,80 +291,107 @@ export default function RemoteIntake() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b bg-card px-4 py-3">
-        <div className="max-w-2xl mx-auto flex items-center gap-3">
-          <Activity className="h-6 w-6 text-primary" />
-          <div>
-            <h1 className="font-serif font-semibold text-lg">{clinicName}</h1>
-            <p className="text-[10px] font-bold tracking-[0.14em] uppercase text-primary">REMOTE INTAKE</p>
+    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-primary/5">
+      {/* Branded Header */}
+      <header className="border-b bg-card/80 backdrop-blur-sm px-4 py-3 sticky top-0 z-10">
+        <div className="max-w-2xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Activity className="h-6 w-6 text-primary" />
+            <div>
+              <h1 className="font-serif font-semibold text-lg">{clinicName}</h1>
+              <p className="text-[10px] font-bold tracking-[0.14em] uppercase text-primary">REMOTE INTAKE</p>
+            </div>
           </div>
+          <Badge variant="outline" className="text-xs">{progressPct}% Complete</Badge>
         </div>
       </header>
 
       <div className="max-w-2xl mx-auto p-4 space-y-4">
         {/* Progress */}
-        <div className="flex items-center gap-1 overflow-x-auto pb-2">
-          {STEPS.map((s, i) => (
-            <div key={i} className="flex items-center gap-1 flex-shrink-0">
-              <div className={`flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-medium transition-colors ${
-                i === step ? "bg-primary text-accent-foreground" :
-                i < step ? "bg-primary/10 text-primary" :
-                "bg-muted text-muted-foreground"
-              }`}>
-                <s.icon className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">{s.title}</span>
-                <span className="sm:hidden">{i + 1}</span>
+        <div className="space-y-2">
+          <div className="w-full bg-muted rounded-full h-1.5">
+            <div className="bg-primary rounded-full h-1.5 transition-all duration-500" style={{ width: `${progressPct}%` }} />
+          </div>
+          <div className="flex items-center gap-1 overflow-x-auto pb-2">
+            {STEPS.map((s, i) => (
+              <div key={i} className="flex items-center gap-1 flex-shrink-0">
+                <div className={`flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-medium transition-colors ${
+                  i === step ? "bg-primary text-primary-foreground" :
+                  i < step ? "bg-primary/10 text-primary" :
+                  "bg-muted text-muted-foreground"
+                }`}>
+                  <s.icon className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">{s.title}</span>
+                  <span className="sm:hidden">{i}</span>
+                </div>
+                {i < STEPS.length - 1 && <ArrowRight className="h-3 w-3 text-muted-foreground" />}
               </div>
-              {i < STEPS.length - 1 && <ArrowRight className="h-3 w-3 text-muted-foreground" />}
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
 
-        <Card>
+        <Card className="shadow-md">
           <CardHeader>
             <CardTitle className="text-lg font-serif flex items-center gap-2">
               {(() => { const Icon = STEPS[step].icon; return <Icon className="h-5 w-5 text-primary" />; })()}
               {STEPS[step].title}
             </CardTitle>
             <CardDescription>
-              {step === 0 && "Please provide your basic information."}
-              {step === 1 && "What areas of health are you looking to optimize?"}
-              {step === 2 && "Upload or enter your most recent lab results."}
-              {step === 3 && "Help us understand your medical background."}
-              {step === 4 && "Select your goals and review consent."}
+              {step === 0 && `Welcome to ${clinicName}. Let's get you started.`}
+              {step === 1 && "Please provide your basic information."}
+              {step === 2 && "What areas of health are you looking to optimize?"}
+              {step === 3 && "Upload or enter your most recent lab results."}
+              {step === 4 && "Help us understand your medical background."}
+              {step === 5 && "Select your goals and sign your consent forms."}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
-            {/* STEP 0: Demographics */}
+            {/* STEP 0: Welcome */}
             {step === 0 && (
+              <div className="space-y-6 py-4">
+                <div className="text-center space-y-3">
+                  <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+                    <Activity className="h-8 w-8 text-primary" />
+                  </div>
+                  <h2 className="text-xl font-serif font-bold">Welcome to {clinicName}</h2>
+                  <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                    This intake form will help our clinical team understand your health goals and create a personalized treatment plan.
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
+                  <div className="p-4 rounded-lg bg-muted/50">
+                    <Clock className="h-5 w-5 text-primary mx-auto mb-2" />
+                    <p className="text-xs font-semibold">~10 minutes</p>
+                    <p className="text-[10px] text-muted-foreground">Estimated time</p>
+                  </div>
+                  <div className="p-4 rounded-lg bg-muted/50">
+                    <Shield className="h-5 w-5 text-primary mx-auto mb-2" />
+                    <p className="text-xs font-semibold">HIPAA Secure</p>
+                    <p className="text-[10px] text-muted-foreground">Encrypted & private</p>
+                  </div>
+                  <div className="p-4 rounded-lg bg-muted/50">
+                    <FlaskConical className="h-5 w-5 text-primary mx-auto mb-2" />
+                    <p className="text-xs font-semibold">AI-Assisted</p>
+                    <p className="text-[10px] text-muted-foreground">Lab auto-extraction</p>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground text-center">Your progress is saved automatically. You can return to finish later.</p>
+              </div>
+            )}
+
+            {/* STEP 1: Demographics */}
+            {step === 1 && (
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>First Name *</Label>
-                    <Input value={firstName} onChange={e => setFirstName(e.target.value)} placeholder="Jane" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Last Name *</Label>
-                    <Input value={lastName} onChange={e => setLastName(e.target.value)} placeholder="Doe" />
-                  </div>
+                  <div className="space-y-2"><Label>First Name *</Label><Input value={firstName} onChange={e => setFirstName(e.target.value)} placeholder="Jane" /></div>
+                  <div className="space-y-2"><Label>Last Name *</Label><Input value={lastName} onChange={e => setLastName(e.target.value)} placeholder="Doe" /></div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Email *</Label>
-                    <Input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@email.com" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Phone</Label>
-                    <Input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="(555) 123-4567" />
-                  </div>
+                  <div className="space-y-2"><Label>Email *</Label><Input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@email.com" /></div>
+                  <div className="space-y-2"><Label>Phone</Label><Input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="(555) 123-4567" /></div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label>Date of Birth</Label>
-                    <Input type="date" value={dob} onChange={e => setDob(e.target.value)} />
-                  </div>
+                  <div className="space-y-2"><Label>Date of Birth</Label><Input type="date" value={dob} onChange={e => setDob(e.target.value)} /></div>
                   <div className="space-y-2">
                     <Label>Biological Sex *</Label>
                     <Select value={sex} onValueChange={setSex}>
@@ -309,10 +402,7 @@ export default function RemoteIntake() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-2">
-                    <Label>Weight (lbs)</Label>
-                    <Input type="number" value={weightLbs} onChange={e => setWeightLbs(e.target.value)} placeholder="185" />
-                  </div>
+                  <div className="space-y-2"><Label>Weight (lbs)</Label><Input type="number" value={weightLbs} onChange={e => setWeightLbs(e.target.value)} placeholder="185" /></div>
                 </div>
                 {sex === "female" && (
                   <div className="p-4 bg-primary/5 rounded-lg">
@@ -331,8 +421,8 @@ export default function RemoteIntake() {
               </>
             )}
 
-            {/* STEP 1: Focus & Symptoms */}
-            {step === 1 && (
+            {/* STEP 2: Focus & Symptoms */}
+            {step === 2 && (
               <>
                 <div className="grid grid-cols-1 gap-2">
                   {FOCUS_OPTIONS.map(opt => (
@@ -359,22 +449,21 @@ export default function RemoteIntake() {
               </>
             )}
 
-            {/* STEP 2: Labs */}
-            {step === 2 && (
+            {/* STEP 3: Labs */}
+            {step === 3 && (
               <>
                 <div className="p-4 border-2 border-dashed border-primary/30 rounded-lg bg-primary/5">
                   <div className="flex items-center gap-3 mb-2">
                     <Upload className="h-5 w-5 text-primary" />
                     <div>
                       <p className="text-sm font-semibold">Upload Lab Results</p>
-                      <p className="text-xs text-muted-foreground">Upload a PDF or photo of your labs — AI will extract values automatically</p>
+                      <p className="text-xs text-muted-foreground">Upload a PDF or photo — AI will extract values automatically</p>
                     </div>
                   </div>
                   <Input type="file" accept=".pdf,image/*" onChange={handleLabUpload} disabled={extracting} className="text-sm" />
                   {extracting && <div className="flex items-center gap-2 mt-2 text-sm text-primary"><Loader2 className="h-4 w-4 animate-spin" /> Analyzing your lab document…</div>}
                   {extractedCount > 0 && <p className="text-xs text-primary mt-2 flex items-center gap-1"><Sparkles className="h-3 w-3" /> Auto-filled {extractedCount} values</p>}
                 </div>
-
                 <p className="text-sm text-muted-foreground">Or enter values manually:</p>
                 <div className="grid grid-cols-2 gap-3">
                   {CORE_LAB_FIELDS.map(f => (
@@ -391,8 +480,8 @@ export default function RemoteIntake() {
               </>
             )}
 
-            {/* STEP 3: History */}
-            {step === 3 && (
+            {/* STEP 4: History */}
+            {step === 4 && (
               <>
                 <div className="space-y-2">
                   <Label>Current Medications</Label>
@@ -404,13 +493,12 @@ export default function RemoteIntake() {
                 </div>
                 <div className="space-y-2">
                   <Label>Prior Hormone or Peptide Therapy</Label>
-                  <Textarea placeholder="Describe any prior hormone/peptide therapy, including compounds used and how you responded" value={priorTherapy} onChange={e => setPriorTherapy(e.target.value)} rows={3} />
+                  <Textarea placeholder="Describe any prior therapy, including compounds and response" value={priorTherapy} onChange={e => setPriorTherapy(e.target.value)} rows={3} />
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
                     <AlertTriangle className="h-4 w-4 text-destructive" /> Health Screening
                   </p>
-                  <p className="text-xs text-muted-foreground mb-3">Please check any that apply:</p>
                   <div className="space-y-2">
                     {CONTRAINDICATION_ITEMS.map(c => (
                       <label key={c.key} className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer ${contraindications.includes(c.key) ? "border-destructive bg-destructive/5" : "border-border"}`}>
@@ -423,14 +511,14 @@ export default function RemoteIntake() {
                 {absoluteFlags.length > 0 && (
                   <div className="p-3 bg-destructive/10 border border-destructive/30 rounded-lg text-sm text-destructive">
                     <p className="font-semibold flex items-center gap-2"><AlertTriangle className="h-4 w-4" /> Important Notice</p>
-                    <p className="mt-1 text-xs">Some of your responses may require additional evaluation before treatment. Our medical team will discuss these with you during your consultation.</p>
+                    <p className="mt-1 text-xs">Some of your responses may require additional evaluation before treatment.</p>
                   </div>
                 )}
               </>
             )}
 
-            {/* STEP 4: Goals & Consent */}
-            {step === 4 && (
+            {/* STEP 5: Goals & Consent */}
+            {step === 5 && (
               <>
                 <div>
                   <p className="text-sm font-semibold text-muted-foreground mb-3">What are your treatment goals?</p>
@@ -444,21 +532,47 @@ export default function RemoteIntake() {
                   </div>
                 </div>
 
-                {/* Consent */}
-                <div className="space-y-4 p-4 bg-muted/50 rounded-lg">
-                  <h3 className="text-sm font-bold">Consent & Acknowledgments</h3>
-                  <label className="flex items-start gap-3 cursor-pointer">
-                    <Checkbox checked={consentChecked} onCheckedChange={c => setConsentChecked(!!c)} className="mt-0.5" />
-                    <span className="text-xs text-muted-foreground">
-                      I consent to the collection and use of my health information for clinical evaluation. I understand that this intake form does not establish a patient-provider relationship and that all treatment recommendations will be reviewed by a licensed physician.
-                    </span>
-                  </label>
-                  <label className="flex items-start gap-3 cursor-pointer">
-                    <Checkbox checked={teleHealthConsent} onCheckedChange={c => setTeleHealthConsent(!!c)} className="mt-0.5" />
-                    <span className="text-xs text-muted-foreground">
-                      I consent to receive telehealth services and understand that telehealth consultations have limitations compared to in-person visits. I acknowledge that my provider may determine that an in-person visit is necessary.
-                    </span>
-                  </label>
+                {/* E-Consent with Signatures */}
+                <div className="space-y-4">
+                  <h3 className="text-sm font-bold flex items-center gap-2"><FileSignature className="h-4 w-4 text-primary" /> E-Consent & Signature</h3>
+
+                  {/* General Consent */}
+                  <Collapsible>
+                    <div className={`border rounded-lg overflow-hidden ${generalSig ? "border-primary" : "border-border"}`}>
+                      <CollapsibleTrigger className="w-full p-3 flex items-center justify-between text-left hover:bg-muted/50">
+                        <div className="flex items-center gap-2">
+                          {generalSig ? <CheckCircle className="h-4 w-4 text-primary" /> : <div className="h-4 w-4 rounded-full border-2 border-muted-foreground/30" />}
+                          <span className="text-sm font-medium">General Consent</span>
+                        </div>
+                        <Badge variant={generalSig ? "default" : "outline"} className="text-[10px]">{generalSig ? "Signed" : "Required"}</Badge>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <div className="px-3 pb-3 space-y-3 border-t">
+                          <p className="text-xs text-muted-foreground mt-3 leading-relaxed">{GENERAL_CONSENT_TEXT}</p>
+                          <SignaturePad onSignature={setGeneralSig} width={360} height={120} />
+                        </div>
+                      </CollapsibleContent>
+                    </div>
+                  </Collapsible>
+
+                  {/* Telehealth Consent */}
+                  <Collapsible>
+                    <div className={`border rounded-lg overflow-hidden ${telehealthSig ? "border-primary" : "border-border"}`}>
+                      <CollapsibleTrigger className="w-full p-3 flex items-center justify-between text-left hover:bg-muted/50">
+                        <div className="flex items-center gap-2">
+                          {telehealthSig ? <CheckCircle className="h-4 w-4 text-primary" /> : <div className="h-4 w-4 rounded-full border-2 border-muted-foreground/30" />}
+                          <span className="text-sm font-medium">Telehealth Consent</span>
+                        </div>
+                        <Badge variant={telehealthSig ? "default" : "outline"} className="text-[10px]">{telehealthSig ? "Signed" : "Required"}</Badge>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <div className="px-3 pb-3 space-y-3 border-t">
+                          <p className="text-xs text-muted-foreground mt-3 leading-relaxed">{TELEHEALTH_CONSENT_TEXT}</p>
+                          <SignaturePad onSignature={setTelehealthSig} width={360} height={120} />
+                        </div>
+                      </CollapsibleContent>
+                    </div>
+                  </Collapsible>
                 </div>
 
                 {/* Summary */}
@@ -471,6 +585,7 @@ export default function RemoteIntake() {
                     <span className="text-muted-foreground">Symptoms:</span><span>{symptoms.length} reported</span>
                     <span className="text-muted-foreground">Lab values:</span><span>{Object.values(labValues).filter(Boolean).length} entered</span>
                     <span className="text-muted-foreground">Goals:</span><span>{goals.length} selected</span>
+                    <span className="text-muted-foreground">Consents:</span><span>{[generalSig, telehealthSig].filter(Boolean).length}/2 signed</span>
                   </div>
                 </div>
               </>
