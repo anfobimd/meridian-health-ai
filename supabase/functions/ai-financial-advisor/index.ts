@@ -88,6 +88,21 @@ Return JSON: { "anomalies": [{"type": "...", "severity": "low|medium|high", "des
       return new Response(JSON.stringify(result), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    if (mode === "daily_briefing") {
+      const result = await callAI(
+        `You are a clinic operations AI assistant for a medspa wellness collective. Generate a concise morning briefing for the clinic admin/owner.
+Return JSON: {
+  "summary": "One paragraph executive summary of the day ahead",
+  "narrative": "2-3 sentence natural language overview",
+  "priorities": ["Priority 1...", "Priority 2...", "Priority 3..."],
+  "alerts": ["Short alert badge text..."]
+}
+Be specific, actionable, and reference the actual numbers provided. Flag anything unusual. Keep the tone professional but warm.`,
+        JSON.stringify(params.metrics || {})
+      );
+      return new Response(JSON.stringify(result), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     return new Response(JSON.stringify({ error: "Unknown mode" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e: any) {
     return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
