@@ -1,98 +1,91 @@
 
 
-# Patient Portal Auth + Remote Intake Branding + E-Consent
+# Scheduling Engine: Slot Generation, Conflict Detection, Availability UI, Booking Calendar
 
 ## What We're Building
 
-Three patient-facing improvements that complete the Batch D workflow items:
+A deterministic, TypeScript-based scheduling engine that replaces manual date/time entry with a visual calendar showing only valid, bookable slots. No AI/LLM involved -- pure rules and math.
 
-1. **Patient Portal with real authentication** — Replace the insecure email-lookup with proper login/signup so patients access only their own data
-2. **Remote Intake branding & polish** — Make the standalone intake wizard feel like a branded, professional experience
-3. **E-consent with signature capture** — Add a proper consent/e-signature step to both intake and portal
+## Existing Foundation
 
----
+Already in the database:
+- `provider_availability` — recurring weekly schedule (day_of_week, start_time, end_time, break_start/end, room_preference_id)
+- `provider_availability_overrides` — per-date overrides (PTO, special hours)
+- `appointments` — existing bookings with scheduled_at, duration_minutes, provider_id, room_id, device_id
+- `rooms` — with room_type and assigned_provider_id
+- `devices` — with device_type and room_id
+- `treatments` — with duration_minutes
 
-## 1. Patient Portal Authentication
-
-**Current problem:** Anyone can type any email and see that patient's full medical records, appointments, and labs. No password, no verification.
-
-**Solution:** Add Supabase Auth for patients. When a patient signs up, link their auth account to their `patients` record via email match.
-
-### Database Changes
-- Add `auth_user_id` column to `patients` table (nullable UUID, unique) to link a patient record to their auth account
-- Add RLS policy: patients can only SELECT their own row (`auth.uid() = auth_user_id`)
-- Add RLS policies on `appointments`, `patient_package_purchases`, `clinical_notes`, `hormone_visits` scoped to patient's own `patient_id`
-
-### Frontend Changes (`src/pages/PatientPortal.tsx`)
-- Replace email-lookup login with real email/password signup + login (reuse auth patterns from `Auth.tsx`)
-- Add Google OAuth option via `lovable.auth.signInWithOAuth`
-- On first login, auto-link: match `auth.user.email` to `patients.email`, set `auth_user_id`
-- After auth, fetch patient data using the linked `patient_id` — RLS ensures they only see their own records
-- Add password reset flow
-
-### UX Flow
-```text
-/portal → Login/Signup card → Email+Password or Google
-  ↓ (first time)
-  Auto-link auth account to patient record by email
-  ↓
-  Dashboard: Appointments | Packages | Records tabs (existing UI)
-  ↓
-  Sign Out button in header
-```
+Currently: staff manually types a datetime into an `<input type="datetime-local">` with no validation. AI edge function gives soft suggestions but no hard conflict prevention.
 
 ---
 
-## 2. Remote Intake Branding
+## 1. Slot Generation Engine (TypeScript utility)
 
-**Current state:** Functional 5-step wizard but plain. Needs standalone branded feel.
+Create `src/lib/scheduling.ts` with pure functions:
 
-### Changes (`src/pages/RemoteIntake.tsx`)
-- Add clinic logo/branding area in header (driven by `?clinic=` query param)
-- Add a welcome splash step (Step 0) before demographics: clinic name, what to expect, estimated time
-- Add progress percentage indicator alongside step pills
-- Add subtle gradient background and branded card styling
-- Add "Save & Continue Later" — store partial form in `localStorage` keyed by email
-- Mobile-first responsive polish (the stepper already scrolls horizontally)
+- **`getProviderSlots(providerId, date, treatmentDuration)`** — Cross-references `provider_availability` (for that day_of_week) with `provider_availability_overrides` (for that specific date). Generates 15-minute interval slots within working hours, excluding breaks. Returns array of `{ start: Date, end: Date }`.
+
+- **`getAvailableSlots(providerId, date, treatmentDuration)`** — Takes output of `getProviderSlots`, then filters out slots that overlap with existing `appointments` for that provider on that date. Returns only truly open slots.
+
+- **`checkConflicts(providerId, roomId, deviceId, start, end)`** — Hard validation: queries appointments table to check if provider, room, or device is already booked during the proposed window. Returns `{ hasConflict: boolean, conflicts: { type: 'provider'|'room'|'device', existingAppointment }[] }`.
+
+No database changes needed for this.
 
 ---
 
-## 3. E-Consent & E-Signature
+## 2. Conflict Detection (booking-time validation)
 
-**Current state:** Two checkboxes ("I consent" + "telehealth consent") with no legal weight or audit trail.
+Modify the appointment creation flow in `Appointments.tsx`:
 
-### Database Changes
-- Create `e_consents` table: `id`, `patient_id`, `consent_type` (enum: general, telehealth, hipaa), `consent_text`, `signature_data` (text — base64 of canvas), `ip_address`, `user_agent`, `signed_at`, `created_at`
-- RLS: patients can INSERT their own consents and SELECT their own; staff can SELECT all
+- Before INSERT, call `checkConflicts()` — block submission if any conflict exists
+- Show inline conflict warnings: "Dr. Smith is already booked 2:00-2:30" or "Room 3 is in use"
+- Also validate on status transitions (rooming) to catch race conditions
 
-### Frontend Changes
-- Create `src/components/SignaturePad.tsx` — HTML5 canvas signature capture component (draw-to-sign)
-- Update Remote Intake Step 4 to show full consent text + signature pad instead of checkboxes
-- Update Patient Portal Records tab to show signed consents
-- Each consent stores: full legal text shown, signature image, timestamp, IP, user agent
+---
 
-### Consent Flow
-```text
-Step 4 (Goals & Consent):
-  ├── Treatment goals (existing)
-  ├── General Consent — expandable full text + signature pad
-  ├── Telehealth Consent — expandable full text + signature pad
-  └── Submit (disabled until both signed)
-```
+## 3. Availability Management UI
+
+New page: `src/pages/ProviderSchedule.tsx` (route: `/provider-schedule`)
+
+- **Weekly grid view** per provider: rows = providers, columns = Mon-Sun, cells show shift blocks
+- **Edit recurring availability**: click a cell to set start_time, end_time, break_start, break_end, room preference
+- **Override management**: add single-date overrides (PTO, half-days, extended hours) with a reason field
+- **Bulk actions**: copy one provider's schedule to another, set clinic-wide closures
+
+Uses existing `provider_availability` and `provider_availability_overrides` tables -- no schema changes.
+
+---
+
+## 4. Booking Calendar UI
+
+Replace the datetime-local input in the New Appointment dialog with a visual slot picker:
+
+- **Step 1**: Select patient + treatment (determines duration)
+- **Step 2**: Select provider (or "any available")
+- **Step 3**: Pick a date from a calendar widget, then see available time slots as clickable chips/buttons
+- Slots are color-coded: green = open, gray = unavailable
+- If "any provider" selected, show slots across all providers grouped by provider name
+- Selecting a slot auto-fills the form; conflict check runs on confirmation
 
 ---
 
 ## Files Changed
 
-| Action | File |
-|--------|------|
-| Create | `src/components/SignaturePad.tsx` |
-| Create | Migration: `e_consents` table + `patients.auth_user_id` column + patient-scoped RLS |
-| Modify | `src/pages/PatientPortal.tsx` — Replace email lookup with real auth |
-| Modify | `src/pages/RemoteIntake.tsx` — Branding, welcome step, signature consent |
+| Action | File | Purpose |
+|--------|------|---------|
+| Create | `src/lib/scheduling.ts` | Slot generation + conflict detection logic |
+| Create | `src/pages/ProviderSchedule.tsx` | Availability management UI |
+| Modify | `src/pages/Appointments.tsx` | Replace datetime input with slot picker, add conflict blocking |
+| Modify | `src/App.tsx` | Add `/provider-schedule` route |
+| Modify | `src/components/AppSidebar.tsx` | Add Provider Schedule nav link |
+
+No database migrations needed -- all tables already exist.
 
 ## Estimated Scope
-- 1 migration (~40 SQL statements)
-- 1 new component, 2 major page rewrites
-- ~600 lines of new/changed code
+- 1 new utility file (~150 lines)
+- 1 new page (~300 lines)
+- 1 major page modification
+- 2 minor file edits
+- ~550 lines total
 
