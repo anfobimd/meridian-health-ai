@@ -327,7 +327,7 @@ export default function FrontDesk() {
                           {apt.rooms && (
                             <p className="text-[10px] text-muted-foreground">Room: {apt.rooms.name}</p>
                           )}
-                          <div className="flex gap-1.5">
+                          <div className="flex flex-wrap gap-1.5">
                             {action && (
                               <Button
                                 size="sm"
