@@ -29,6 +29,7 @@ import Packages from "./pages/Packages";
 import MembershipBilling from "./pages/MembershipBilling";
 import Earnings from "./pages/Earnings";
 import Proforma from "./pages/Proforma";
+import ChurnRisk from "./pages/ChurnRisk";
 import FrontDesk from "./pages/FrontDesk";
 import ProviderDay from "./pages/ProviderDay";
 import ProviderMarketplace from "./pages/ProviderMarketplace";
@@ -77,6 +78,7 @@ const App = () => (
                 <Route path="/membership-billing" element={<MembershipBilling />} />
                 <Route path="/earnings" element={<Earnings />} />
                 <Route path="/proforma" element={<Proforma />} />
+                <Route path="/churn-risk" element={<ChurnRisk />} />
                 <Route path="/my-marketplace" element={<ProviderMarketplace />} />
                 <Route path="/provider-schedule" element={<ProviderSchedule />} />
               </Route>

@@ -2,7 +2,7 @@ import { NavLink, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, Users, Calendar, Stethoscope, ClipboardList, UserCog,
   Activity, FlaskConical, FileText, Pill, DollarSign, ClipboardPlus, ShieldCheck, DoorOpen, Store, Package,
-  CreditCard, TrendingUp, Calculator, MonitorCheck, Briefcase, Search, LogOut, CalendarClock,
+  CreditCard, TrendingUp, Calculator, MonitorCheck, Briefcase, Search, LogOut, CalendarClock, TrendingDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -35,6 +35,7 @@ const navSections = [
     items: [
       { to: "/md-oversight", icon: ShieldCheck, label: "Oversight Hub" },
       { to: "/md-oversight/dashboard", icon: Activity, label: "Oversight Dashboard" },
+      { to: "/churn-risk", icon: TrendingDown, label: "Churn Risk" },
     ],
   },
   {
