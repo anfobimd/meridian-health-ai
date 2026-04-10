@@ -337,97 +337,173 @@ export default function Appointments() {
           <h1 className="text-2xl font-bold">Appointments</h1>
           <p className="text-muted-foreground">Schedule and manage visits</p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={(o) => { setDialogOpen(o); if (!o) setAiSuggestion(null); }}>
+        <Dialog open={dialogOpen} onOpenChange={(o) => { if (!o) resetBookingForm(); else setDialogOpen(true); }}>
           <DialogTrigger asChild>
             <Button><Plus className="h-4 w-4 mr-2" />New Appointment</Button>
           </DialogTrigger>
-          <DialogContent className="max-w-lg">
+          <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
             <DialogHeader><DialogTitle>Schedule Appointment</DialogTitle></DialogHeader>
-            <form onSubmit={(e) => { e.preventDefault(); addAppointment.mutate(new FormData(e.currentTarget)); }} className="space-y-4">
-              <div className="space-y-2">
-                <Label>Patient *</Label>
-                <select name="patient_id" required className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
-                  <option value="">Select patient</option>
-                  {patients?.map((p) => <option key={p.id} value={p.id}>{p.last_name}, {p.first_name}</option>)}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <Label>Provider</Label>
-                <select name="provider_id" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" defaultValue={aiSuggestion?.recommended_provider_id ?? ""}>
-                  <option value="">AI will auto-assign</option>
-                  {providersList?.map((p) => <option key={p.id} value={p.id}>Dr. {p.last_name}, {p.first_name}</option>)}
-                </select>
-                {aiSuggestion?.recommended_provider_name && (
-                  <p className="text-xs text-primary flex items-center gap-1"><Brain className="h-3 w-3" />AI suggests: {aiSuggestion.recommended_provider_name}</p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label>Treatment</Label>
-                <select
-                  name="treatment_id"
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  onChange={(e) => {
-                    const form = e.target.closest("form");
-                    if (!form) return;
-                    const fd = new FormData(form);
-                    const sa = fd.get("scheduled_at") as string;
-                    const dur = parseInt(fd.get("duration") as string) || 30;
-                    if (e.target.value && sa) requestAiSuggestion(e.target.value, sa, dur);
-                  }}
-                >
-                  <option value="">Select treatment</option>
-                  {treatments?.map((t) => <option key={t.id} value={t.id}>{t.name} ({t.duration_minutes} min)</option>)}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <Label>Date & Time *</Label>
-                <Input name="scheduled_at" type="datetime-local" required />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label>Duration (min)</Label>
-                  <Input name="duration" type="number" defaultValue={30} />
+
+            {/* Step indicators */}
+            <div className="flex items-center gap-2 mb-2">
+              {["Patient & Treatment", "Provider", "Date & Slot"].map((label, i) => (
+                <div key={label} className="flex items-center gap-1.5">
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                    bookingStep > i ? "bg-primary text-primary-foreground" : bookingStep === i ? "bg-primary/20 text-primary border border-primary" : "bg-muted text-muted-foreground"
+                  }`}>
+                    {bookingStep > i ? <Check className="h-3 w-3" /> : i + 1}
+                  </div>
+                  <span className="text-[11px] text-muted-foreground hidden sm:inline">{label}</span>
+                  {i < 2 && <div className="w-4 h-px bg-border" />}
                 </div>
+              ))}
+            </div>
+
+            {/* Step 0: Patient + Treatment */}
+            {bookingStep === 0 && (
+              <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Room</Label>
-                  <select name="room_id" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={aiSuggestion?.recommended_room_id ?? ""} onChange={() => {}}>
-                    <option value="">None</option>
-                    {rooms?.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                  <Label>Patient *</Label>
+                  <select value={bookPatientId} onChange={(e) => setBookPatientId(e.target.value)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                    <option value="">Select patient</option>
+                    {patients?.map((p) => <option key={p.id} value={p.id}>{p.last_name}, {p.first_name}</option>)}
                   </select>
                 </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Device</Label>
-                <select name="device_id" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
-                  <option value="">None</option>
-                  {devices?.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                </select>
-              </div>
-
-              {/* AI conflict warning */}
-              {aiSuggestion?.has_conflict && (
-                <div className="rounded-md border border-destructive/50 bg-destructive/5 p-3 flex items-start gap-2">
-                  <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 flex-shrink-0" />
-                  <p className="text-xs text-destructive">{aiSuggestion.conflict_message}</p>
+                <div className="space-y-2">
+                  <Label>Treatment *</Label>
+                  <select value={bookTreatmentId} onChange={(e) => setBookTreatmentId(e.target.value)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                    <option value="">Select treatment</option>
+                    {treatments?.map((t) => <option key={t.id} value={t.id}>{t.name} ({t.duration_minutes} min)</option>)}
+                  </select>
                 </div>
-              )}
-              {aiSuggestion && !aiSuggestion.has_conflict && aiSuggestion.room_reasoning && (
-                <div className="rounded-md border border-primary/30 bg-primary/5 p-3 space-y-1">
-                  <p className="text-xs font-medium text-primary flex items-center gap-1"><Brain className="h-3 w-3" />AI Recommendation</p>
-                  <p className="text-xs text-muted-foreground">{aiSuggestion.room_reasoning}</p>
-                  {aiSuggestion.provider_reasoning && <p className="text-xs text-muted-foreground">{aiSuggestion.provider_reasoning}</p>}
-                </div>
-              )}
-              {loadingAi && <p className="text-xs text-muted-foreground flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" />Getting AI suggestions...</p>}
-
-              <div className="space-y-2">
-                <Label>Notes</Label>
-                <Input name="notes" />
+                <Button className="w-full" disabled={!bookPatientId || !bookTreatmentId} onClick={() => setBookingStep(1)}>
+                  Next: Choose Provider →
+                </Button>
               </div>
-              <Button type="submit" className="w-full" disabled={addAppointment.isPending}>
-                {addAppointment.isPending ? "Scheduling..." : "Schedule Appointment"}
-              </Button>
-            </form>
+            )}
+
+            {/* Step 1: Provider */}
+            {bookingStep === 1 && (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Provider</Label>
+                  <select value={bookProviderId} onChange={(e) => setBookProviderId(e.target.value)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                    <option value="">Select provider</option>
+                    {providersList?.map((p) => <option key={p.id} value={p.id}>Dr. {p.last_name}, {p.first_name}</option>)}
+                  </select>
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => setBookingStep(0)}>← Back</Button>
+                  <Button className="flex-1" disabled={!bookProviderId} onClick={() => setBookingStep(2)}>
+                    Next: Pick Slot →
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Step 2: Date + Slot picker */}
+            {bookingStep === 2 && (
+              <div className="space-y-4">
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <div>
+                    <Label className="text-xs mb-1 block">Select Date</Label>
+                    <CalendarWidget
+                      mode="single"
+                      selected={bookDate}
+                      onSelect={(d) => setBookDate(d)}
+                      disabled={(d) => d < new Date(new Date().setHours(0, 0, 0, 0))}
+                      className="rounded-md border"
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <Label className="text-xs mb-1 block">Available Slots</Label>
+                    {!bookDate ? (
+                      <p className="text-xs text-muted-foreground py-4">Pick a date to see slots</p>
+                    ) : loadingSlots ? (
+                      <div className="flex items-center gap-2 py-4">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span className="text-xs text-muted-foreground">Loading slots…</span>
+                      </div>
+                    ) : availableSlots.length === 0 ? (
+                      <p className="text-xs text-muted-foreground py-4">No available slots on this date</p>
+                    ) : (
+                      <div className="flex flex-wrap gap-1.5 max-h-[200px] overflow-y-auto">
+                        {availableSlots.map((slot, i) => {
+                          const isSelected = selectedSlot?.start.getTime() === slot.start.getTime();
+                          return (
+                            <button
+                              key={i}
+                              type="button"
+                              onClick={() => { setSelectedSlot(slot); setConflictResult(null); }}
+                              className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                                isSelected
+                                  ? "bg-primary text-primary-foreground"
+                                  : "bg-muted hover:bg-muted/80 text-foreground"
+                              }`}
+                            >
+                              {format(slot.start, "h:mm a")}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {selectedSlot && (
+                  <div className="rounded-md border border-primary/30 bg-primary/5 p-3">
+                    <p className="text-xs font-medium text-primary flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      Selected: {format(selectedSlot.start, "EEE, MMM d")} at {format(selectedSlot.start, "h:mm a")}–{format(selectedSlot.end, "h:mm a")}
+                    </p>
+                  </div>
+                )}
+
+                {/* Optional room/device */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Room</Label>
+                    <select value={bookRoomId} onChange={(e) => setBookRoomId(e.target.value)} className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm">
+                      <option value="">None</option>
+                      {rooms?.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Device</Label>
+                    <select value={bookDeviceId} onChange={(e) => setBookDeviceId(e.target.value)} className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm">
+                      <option value="">None</option>
+                      {devices?.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs">Notes</Label>
+                  <Input value={bookNotes} onChange={(e) => setBookNotes(e.target.value)} placeholder="Optional notes" />
+                </div>
+
+                {/* Conflict warnings */}
+                {conflictResult?.hasConflict && (
+                  <div className="rounded-md border border-destructive/50 bg-destructive/5 p-3 space-y-1">
+                    <p className="text-xs font-medium text-destructive flex items-center gap-1"><AlertTriangle className="h-3 w-3" />Conflicts Detected</p>
+                    {conflictResult.conflicts.map((c: any, i: number) => (
+                      <p key={i} className="text-xs text-destructive">• {c.label}</p>
+                    ))}
+                  </div>
+                )}
+
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => setBookingStep(1)}>← Back</Button>
+                  <Button
+                    className="flex-1"
+                    disabled={!selectedSlot || addAppointment.isPending}
+                    onClick={() => addAppointment.mutate()}
+                  >
+                    {addAppointment.isPending ? "Scheduling…" : "Schedule Appointment"}
+                  </Button>
+                </div>
+              </div>
+            )}
           </DialogContent>
         </Dialog>
       </div>
