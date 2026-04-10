@@ -37,6 +37,20 @@ export default function Appointments() {
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>("");
   const queryClient = useQueryClient();
 
+  // Slot picker state
+  const [bookingStep, setBookingStep] = useState(0); // 0=patient/treatment, 1=provider, 2=date/slot
+  const [bookPatientId, setBookPatientId] = useState("");
+  const [bookTreatmentId, setBookTreatmentId] = useState("");
+  const [bookProviderId, setBookProviderId] = useState("");
+  const [bookDate, setBookDate] = useState<Date | undefined>(undefined);
+  const [availableSlots, setAvailableSlots] = useState<TimeSlot[]>([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
+  const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);
+  const [conflictResult, setConflictResult] = useState<any>(null);
+  const [bookNotes, setBookNotes] = useState("");
+  const [bookRoomId, setBookRoomId] = useState("");
+  const [bookDeviceId, setBookDeviceId] = useState("");
+
   const { data: appointments, isLoading } = useQuery({
     queryKey: ["appointments"],
     queryFn: async () => {
