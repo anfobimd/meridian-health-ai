@@ -105,28 +105,59 @@ export default function Appointments() {
   });
 
   const addAppointment = useMutation({
-    mutationFn: async (formData: FormData) => {
+    mutationFn: async () => {
+      if (!selectedSlot) throw new Error("No slot selected");
+      const duration = treatments?.find((t) => t.id === bookTreatmentId)?.duration_minutes ?? 30;
+
+      // Final conflict check
+      const result = await checkConflicts(
+        bookProviderId || null,
+        bookRoomId || null,
+        bookDeviceId || null,
+        selectedSlot.start,
+        addMinutes(selectedSlot.start, duration)
+      );
+      if (result.hasConflict) {
+        setConflictResult(result);
+        throw new Error("Conflict detected: " + result.conflicts.map((c) => c.label).join("; "));
+      }
+
       const apt = {
-        patient_id: formData.get("patient_id") as string,
-        provider_id: formData.get("provider_id") as string || null,
-        treatment_id: formData.get("treatment_id") as string || null,
-        scheduled_at: formData.get("scheduled_at") as string,
-        duration_minutes: parseInt(formData.get("duration") as string) || 30,
-        notes: formData.get("notes") as string || null,
-        room_id: formData.get("room_id") as string || null,
-        device_id: formData.get("device_id") as string || null,
+        patient_id: bookPatientId,
+        provider_id: bookProviderId || null,
+        treatment_id: bookTreatmentId || null,
+        scheduled_at: selectedSlot.start.toISOString(),
+        duration_minutes: duration,
+        notes: bookNotes || null,
+        room_id: bookRoomId || null,
+        device_id: bookDeviceId || null,
       };
       const { error } = await supabase.from("appointments").insert(apt);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["appointments"] });
-      setDialogOpen(false);
-      setAiSuggestion(null);
+      resetBookingForm();
       toast.success("Appointment scheduled");
     },
-    onError: () => toast.error("Failed to create appointment"),
+    onError: (e: any) => toast.error(e.message || "Failed to create appointment"),
   });
+
+  const resetBookingForm = () => {
+    setDialogOpen(false);
+    setBookingStep(0);
+    setBookPatientId("");
+    setBookTreatmentId("");
+    setBookProviderId("");
+    setBookDate(undefined);
+    setAvailableSlots([]);
+    setSelectedSlot(null);
+    setConflictResult(null);
+    setBookNotes("");
+    setBookRoomId("");
+    setBookDeviceId("");
+    setAiSuggestion(null);
+  };
 
   const updateStatus = useMutation({
     mutationFn: async ({ id, status, room_id, device_id, provider_id }: { id: string; status: string; room_id?: string; device_id?: string; provider_id?: string }) => {
