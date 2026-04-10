@@ -151,13 +151,16 @@ ${Object.entries(reviewerMap).map(([id, recs]) => {
 
     const aiData = await aiResponse.json();
     const content = aiData.choices?.[0]?.message?.content || "{}";
+    console.log("AI raw content:", content.slice(0, 500));
     let report;
     try {
       const cleaned = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
       report = JSON.parse(cleaned);
-    } catch {
+    } catch (parseErr) {
+      console.error("JSON parse error:", parseErr);
       report = { narrative: content, highlights: [], alerts: [], recommendations: [] };
     }
+    console.log("Parsed report keys:", Object.keys(report), "narrative length:", (report.narrative || "").length);
 
     // Store the report
     const { data: savedReport, error: insertError } = await supabase.from("ai_oversight_reports").insert({
