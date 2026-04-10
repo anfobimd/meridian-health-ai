@@ -22,7 +22,7 @@ serve(async (req) => {
     // 1. Fetch encounter + relations
     const { data: encounter, error: encErr } = await supabase
       .from("encounters")
-      .select("*, patients(*), providers(*)")
+      .select("*, patients(*), providers!encounters_provider_id_fkey(*)")
       .eq("id", encounter_id)
       .single();
     if (encErr) { console.error("Encounter fetch error:", encErr); throw new Error("Encounter not found: " + encErr.message); }
