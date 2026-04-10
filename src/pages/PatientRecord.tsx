@@ -491,6 +491,23 @@ export default function PatientRecord() {
             )}
           </div>
         </TabsContent>
+        {/* Photos Tab */}
+        <TabsContent value="photos">
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-sm">Clinical Photos</h3>
+              <Button size="sm" onClick={() => setPhotoUploadOpen(true)}>
+                <Camera className="h-4 w-4 mr-1" /> Upload Photos
+              </Button>
+            </div>
+            <PhotoGallery patientId={id!} />
+            <div>
+              <h3 className="font-semibold text-sm mb-3">Before / After Comparison</h3>
+              <ComparisonView patientId={id!} />
+            </div>
+          </div>
+          <PhotoUpload patientId={id!} open={photoUploadOpen} onOpenChange={setPhotoUploadOpen} />
+        </TabsContent>
       </Tabs>
     </div>
   );
