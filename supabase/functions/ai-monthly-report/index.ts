@@ -162,14 +162,20 @@ ${Object.entries(reviewerMap).map(([id, recs]) => {
     }
     console.log("Parsed report keys:", Object.keys(report), "narrative length:", (report.narrative || "").length);
 
+    // Normalize AI response keys (AI may use different field names)
+    const narrative = report.narrative || report.executive_summary || report.summary || "";
+    const highlights = report.highlights || report.positive_highlights || [];
+    const alerts = report.alerts || report.key_alerts || [];
+    const recommendations = report.recommendations || report.recommendations_for_improvement || [];
+
     // Store the report
     const { data: savedReport, error: insertError } = await supabase.from("ai_oversight_reports").insert({
       report_month: reportMonth,
       report_type: "monthly",
-      narrative: report.narrative || null,
-      highlights: report.highlights || [],
-      alerts: report.alerts || [],
-      recommendations: report.recommendations || [],
+      narrative: narrative || null,
+      highlights,
+      alerts,
+      recommendations,
       metrics,
       generated_by: "ai",
     }).select().single();
