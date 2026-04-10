@@ -359,22 +359,22 @@ export default function HormoneIntake() {
       </div>
 
       {/* Step indicator */}
-      <div className="flex items-center gap-1 overflow-x-auto">
+      <div className="flex items-center gap-0.5 sm:gap-1 overflow-x-auto pb-1 -mx-1 px-1">
         {STEPS.map((s, i) => (
-          <div key={i} className="flex items-center gap-1 flex-shrink-0">
+          <div key={i} className="flex items-center gap-0.5 sm:gap-1 min-w-0">
             <button
               onClick={() => i < step && setStep(i)}
-              className={`flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
+              className={`flex items-center gap-1 px-1.5 sm:px-2.5 py-1.5 sm:py-2 rounded-lg text-[10px] sm:text-xs font-medium transition-colors min-w-0 ${
                 i === step ? "bg-primary text-primary-foreground" :
                 i < step ? "bg-primary/10 text-primary cursor-pointer hover:bg-primary/20" :
                 "bg-muted text-muted-foreground"
               }`}
             >
-              <s.icon className="h-3.5 w-3.5 flex-shrink-0" />
-              <span className="hidden sm:inline">{s.title}</span>
+              <s.icon className="h-3 w-3 sm:h-3.5 sm:w-3.5 flex-shrink-0" />
+              <span className="hidden sm:inline truncate">{s.title}</span>
               <span className="sm:hidden">{i + 1}</span>
             </button>
-            {i < STEPS.length - 1 && <ArrowRight className="h-3 w-3 text-muted-foreground flex-shrink-0" />}
+            {i < STEPS.length - 1 && <ArrowRight className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-muted-foreground flex-shrink-0" />}
           </div>
         ))}
       </div>
