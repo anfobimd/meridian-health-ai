@@ -2,15 +2,22 @@ import { NavLink, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, Users, Calendar, Stethoscope, ClipboardList, UserCog,
   Activity, FlaskConical, FileText, Pill, DollarSign, ClipboardPlus, ShieldCheck, DoorOpen, Store, Package,
-  CreditCard, TrendingUp, Calculator,
+  CreditCard, TrendingUp, Calculator, MonitorCheck, Briefcase, Search,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navSections = [
   {
-    label: "CLINICAL",
+    label: "WORKFLOWS",
     items: [
       { to: "/", icon: LayoutDashboard, label: "Dashboard" },
+      { to: "/front-desk", icon: MonitorCheck, label: "Front Desk" },
+      { to: "/provider-day", icon: Briefcase, label: "My Day" },
+    ],
+  },
+  {
+    label: "CLINICAL",
+    items: [
       { to: "/patients", icon: Users, label: "Patients" },
       { to: "/appointments", icon: Calendar, label: "Appointments" },
       { to: "/encounters", icon: FileText, label: "Encounters" },
@@ -56,6 +63,16 @@ export function AppSidebar() {
         </div>
         <p className="text-[9px] font-bold tracking-[0.14em] uppercase text-sidebar-primary mt-0.5">WELLNESS EHR</p>
       </div>
+
+      {/* Cmd+K hint */}
+      <button
+        onClick={() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }))}
+        className="mx-3 mt-3 flex items-center gap-2 rounded-md border border-sidebar-border px-3 py-1.5 text-[11px] text-sidebar-foreground/40 hover:bg-white/5 transition-colors"
+      >
+        <Search className="h-3 w-3" />
+        <span className="flex-1 text-left">Search…</span>
+        <kbd className="text-[9px] bg-sidebar-muted px-1 py-0.5 rounded font-mono">⌘K</kbd>
+      </button>
 
       <nav className="flex-1 overflow-y-auto px-2 py-3">
         {navSections.map((section) => (

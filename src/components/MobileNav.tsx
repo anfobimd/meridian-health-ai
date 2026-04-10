@@ -3,13 +3,15 @@ import { NavLink, useLocation } from "react-router-dom";
 import {
   Menu, X, Activity, LayoutDashboard, Users, Calendar, Stethoscope,
   ClipboardList, UserCog, FlaskConical, FileText, Pill, DollarSign, ClipboardPlus, ShieldCheck, DoorOpen, Store, Package,
-  CreditCard, TrendingUp, Calculator,
+  CreditCard, TrendingUp, Calculator, MonitorCheck, Briefcase,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
 const navItems = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard" },
+  { to: "/front-desk", icon: MonitorCheck, label: "Front Desk" },
+  { to: "/provider-day", icon: Briefcase, label: "My Day" },
   { to: "/patients", icon: Users, label: "Patients" },
   { to: "/appointments", icon: Calendar, label: "Appointments" },
   { to: "/encounters", icon: FileText, label: "Encounters" },
@@ -47,7 +49,7 @@ export function MobileNav() {
         </Button>
       </div>
       {open && (
-        <nav className="border-b bg-card px-3 py-2 space-y-1">
+        <nav className="border-b bg-card px-3 py-2 space-y-1 max-h-[70vh] overflow-y-auto">
           {navItems.map((item) => {
             const isActive = item.to === "/" ? location.pathname === "/" : location.pathname.startsWith(item.to);
             return (

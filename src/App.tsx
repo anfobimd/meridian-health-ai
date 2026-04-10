@@ -3,6 +3,7 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { CommandPalette } from "@/components/CommandPalette";
 import { AppLayout } from "@/components/AppLayout";
 import Index from "./pages/Index";
 import Patients from "./pages/Patients";
@@ -26,6 +27,8 @@ import Packages from "./pages/Packages";
 import MembershipBilling from "./pages/MembershipBilling";
 import Earnings from "./pages/Earnings";
 import Proforma from "./pages/Proforma";
+import FrontDesk from "./pages/FrontDesk";
+import ProviderDay from "./pages/ProviderDay";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -36,9 +39,12 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <CommandPalette />
         <Routes>
           <Route element={<AppLayout />}>
             <Route path="/" element={<Index />} />
+            <Route path="/front-desk" element={<FrontDesk />} />
+            <Route path="/provider-day" element={<ProviderDay />} />
             <Route path="/patients" element={<Patients />} />
             <Route path="/patients/:id" element={<PatientRecord />} />
             <Route path="/appointments" element={<Appointments />} />
