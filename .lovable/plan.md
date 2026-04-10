@@ -1,84 +1,162 @@
 
 
-# Service Package Tracker — AI-Native Implementation Plan
+# Meridian EHR — Full UX Workflow Audit & AI-Native Optimization Plan
 
-## Overview
+## Summary
 
-A full package management system that lets clinics create, sell, and track pre-paid treatment bundles. AI drives four profit-maximizing functions: personalized re-engagement notifications, synergistic treatment recommendations, abandonment risk scoring, and dashboard insights. This is built in two batches to keep each implementation manageable.
+A systematic audit of every user persona's workflow through the Meridian EHR, identifying UX gaps, friction points, and opportunities to inject AI-native intelligence. We will work through 7 persona workflows in order, optimizing each before moving to the next.
 
-## Batch 1: Database + Package CRUD + Session Tracking + Patient Integration
+---
 
-### Database Migration (6 new tables, 2 functions, 1 trigger)
+## The 7 Persona Workflows
 
-| Table | Purpose |
-|-------|---------|
-| `service_packages` | Package templates (name, type, price, session count, valid_days, individual_price for savings display) |
-| `service_package_items` | Treatment breakdown per package (supports multi-treatment bundles) |
-| `patient_package_purchases` | Per-patient purchase record with session counters, deferred revenue tracking, status lifecycle |
-| `patient_package_sessions` | Individual session redemptions linked to appointments, with revenue recognition per session |
-| `package_notification_rules` | Configurable trigger rules (16 seeded defaults: purchase confirmation through win-back campaigns) |
-| `package_notification_log` | Audit trail of every notification sent per purchase |
+```text
+┌─────────────────────────────────────────────────────────┐
+│  1. PATIENT (self-service / remote)                     │
+│  2. INTAKE DESK (front desk staff)                      │
+│  3. CLINIC ADMIN (owner / operations)                   │
+│  4. PROVIDER (in-clinic clinical day)                   │
+│  5. PROVIDER (marketplace / business)                   │
+│  6. MEDICAL DIRECTOR (oversight + approvals)            │
+│  7. REMOTE / VIDEO INTAKE (out-of-clinic patient)       │
+└─────────────────────────────────────────────────────────┘
+```
 
-**Trigger**: `sync_package_session_count` — on INSERT/DELETE to `patient_package_sessions`, automatically updates `sessions_used`, `deferred_revenue_amount`, `revenue_recognized_amount`, and flips status to `completed` when all sessions used.
+---
 
-**Function**: `expire_stale_packages()` — marks active packages as expired when `expires_at` passes.
+## Workflow 1: Patient (Self-Service Portal)
 
-### New Page: `/packages` — Package Management (3 tabs)
+**Current state**: No patient-facing UI exists. All actions require staff.
 
-**Tab 1: Package Templates** — CRUD for creating packages (single-treatment, multi-treatment, unlimited). Set price, session count, expiry, treatment items. Shows savings % vs a-la-carte pricing.
+**What to build**:
+- Patient portal page (public route, no sidebar) with auth
+- Pre-visit intake form (reuses HormoneIntake logic but patient-facing, simplified)
+- Package dashboard: view active packages, session count, expiry
+- Appointment history and upcoming visits
+- AI: Pre-populate intake answers from prior visits, surface "what to expect" guidance
+- AI: Post-visit summary generator (plain-language version of SOAP note)
 
-**Tab 2: Active Purchases** — Table of all patient purchases with status badges, progress bars (sessions used/total), expiry countdown, deferred revenue. Filter by status/patient. Actions: redeem session, pause, cancel. At-risk highlight for packages with low utilization + approaching expiry.
+---
 
-**Tab 3: Notification Rules** — Manage the 16 default trigger rules. Toggle active/inactive, edit tone, preview AI-generated copy.
+## Workflow 2: Intake Desk (Front Desk)
 
-### Patient Record Integration
+**Current state**: Appointments page handles scheduling but lacks a front-desk-optimized view. No check-in flow, no queue management.
 
-Add a "Packages" tab to `PatientRecord.tsx` showing:
-- Active packages with punch-card progress bar (filled/empty dots)
-- Sessions remaining, expiry date, assigned provider
-- "Book Session" and "Redeem Session" buttons
-- Completed/expired package history
-- AI recommendation card: "Based on this patient's history, suggest Package X — they'd save $Y"
+**What to build**:
+- **Today View**: A dedicated front-desk dashboard showing today's schedule as a timeline/queue, not a list of all appointments
+- **Quick Check-In**: One-click check-in from the queue with auto-print/display of intake forms
+- **Walk-in Flow**: Rapid patient creation + appointment in a single form (currently 2 separate dialogs)
+- **Queue Board**: Real-time status board (Waiting → Roomed → In Progress → Complete) with color-coded cards and wait-time display
+- AI: Smart scheduling conflict detection on check-in (already partially built, surface it more prominently)
+- AI: Auto-suggest next available slot for rescheduling no-shows
+- AI: Predict wait times based on provider pace history
 
-### AI Edge Function: `ai-package-engine`
+---
 
-A single edge function with multiple modes:
+## Workflow 3: Clinic Admin (Operations)
 
-- **`recommend_package`**: Given a patient's appointment history and available packages, ranks best package matches with savings rationale and synergistic treatment suggestions (e.g., "Patients who do Laser Hair Removal often add Chemical Peels — consider the Glow Bundle")
-- **`generate_notification`**: Given patient context + trigger type + tone, generates personalized email/SMS copy (subject + body JSON)
-- **`risk_score`**: Given active purchases with usage patterns, returns ranked at-risk list with scores and suggested actions
-- **`dashboard_insights`**: Generates weekly narrative summary of package performance, revenue trends, and at-risk alerts
+**Current state**: Dashboard is basic (4 stat cards + 2 lists). Financial pages exist but are disconnected. No unified operational view.
 
-### Navigation
+**What to build**:
+- **Command Center Dashboard**: Replace current dashboard with role-aware home — admin sees revenue KPIs, at-risk packages, provider utilization, today's capacity %
+- **Unified Search**: Global command palette (Cmd+K) to find any patient, appointment, provider, package instantly
+- **Alerts Panel**: Aggregate all action items — pending approvals, at-risk packages, overdue invoices, unsigned notes — into a single notification center
+- AI: Daily briefing card — AI-generated morning summary of what needs attention
+- AI: Revenue anomaly alerts (already in ai-financial-advisor, surface in dashboard)
+- AI: Staff scheduling recommendations based on appointment volume patterns
 
-- Add "Packages" link to sidebar under ADMIN section (Package icon)
+---
 
-## Batch 2: Notification Engine + Dashboard + Checkout Integration (future)
+## Workflow 4: Provider (In-Clinic Clinical Day)
 
-- Notification job edge function (evaluates rules, generates AI copy, logs sends)
-- Full admin dashboard with KPI cards (active packages, deferred revenue, completion rate, at-risk count)
-- Revenue charts (deferred vs recognized per month)
-- Appointment checkout integration (prompt to redeem package session)
-- Booking upsell integration (AI suggests packages at booking confirmation)
+**Current state**: Encounter chart is well-built with templates, SOAP generation, and AI. Appointments page has status progression. But the provider has no "my day" view.
 
-## Files Changed (Batch 1)
+**What to build**:
+- **Provider Day View**: Filtered view showing only the logged-in provider's patients for today, in visit order, with one-click chart access
+- **Quick Charting Toolbar**: Sticky bottom bar during encounter with Save Draft / AI Generate / Sign shortcuts
+- **Between-Patient Summary**: When opening next patient, AI pre-loads a 30-second brief (last visit, active packages, any flags)
+- **Photo Documentation**: Before/after photo capture attached to encounters (important for aesthetics)
+- AI: Auto-complete encounter fields based on treatment type + patient history (partially exists, make more aggressive)
+- AI: Real-time clinical decision support alerts during charting (drug interactions, contraindication flags)
+- Improve encounter flow: reduce clicks from "open encounter → select template → fill fields → generate SOAP → sign" to a more linear, wizard-like experience
 
-| File | Change |
-|------|--------|
-| Migration SQL | 6 tables, 1 trigger function, 1 expiry function, seed 16 notification rules |
-| `src/pages/Packages.tsx` | New — 3-tab package management page |
-| `supabase/functions/ai-package-engine/index.ts` | New — multi-mode AI function for recommendations, notifications, risk scoring |
-| `src/pages/PatientRecord.tsx` | Add "Packages" tab with progress bars and AI recommendations |
-| `src/App.tsx` | Add `/packages` route |
-| `src/components/AppSidebar.tsx` | Add nav link |
-| `src/components/MobileNav.tsx` | Add nav link |
+---
 
-## AI Strategy — Profit Maximization
+## Workflow 5: Provider on Marketplace
 
-1. **Upsell at the right moment**: AI recommends packages when a patient's visit pattern shows they'd save money on a bundle — shown on patient record and at checkout
-2. **Synergistic cross-sell**: AI identifies treatment combinations that complement each other (e.g., "Botox patients often add HydraFacials") and suggests bundles
-3. **Prevent abandonment**: AI scores at-risk packages daily and auto-generates personalized re-engagement messages before sessions expire unused
-4. **Win-back expired patients**: Post-expiry notifications with AI-crafted offers to re-purchase
-5. **Supply tracking**: When sessions drop below threshold, AI crafts "running low" messages mentioning exact remaining count and suggesting renewal
-6. **Historical purchase intelligence**: AI analyzes past package buyers to identify patterns (who buys, what they buy next, optimal renewal timing) and surfaces these as admin insights
+**Current state**: Marketplace page exists with provider profiles, skills, availability, and AI bio generation. Functional but admin-focused.
+
+**What to build**:
+- **Provider Self-Service Profile**: Let providers edit their own bio, skills, availability from their view (currently admin-only)
+- **Booking Request Inbox**: Providers see incoming marketplace booking requests and accept/decline
+- **Earnings Summary Card**: Quick view of their membership tier, month-to-date earnings, and modality breakdown (data exists in Earnings page, surface in provider context)
+- AI: "Coach" mode — AI analyzes the provider's booking patterns and suggests how to increase utilization (ai-provider-coach exists, surface it)
+- AI: Auto-suggest skill certifications to add based on treatment volume trends
+
+---
+
+## Workflow 6: Medical Director (Oversight + Approvals)
+
+**Current state**: MD Oversight is well-built (risk-tiered queue, AI analysis, anti-rubber-stamp timer). Physician Approval handles hormone recs. But these are separate workflows.
+
+**What to build**:
+- **Unified Oversight Hub**: Merge chart reviews + hormone approvals into a single queue with smart filtering
+- **Batch Actions**: Allow MD to approve multiple low-risk items at once (with individual attestation)
+- **Delegation Rules**: MD can set auto-approve rules for specific providers or low-risk tiers
+- AI: Priority sorting with reasoning — "Review this first because..." explanations
+- AI: Trend analysis across providers — "Dr. X's chart quality has declined 15% this month"
+- Improve the review detail panel — show encounter data inline without needing to navigate away
+
+---
+
+## Workflow 7: Remote / Video Intake (Out-of-Clinic)
+
+**Current state**: No remote/telemedicine workflow exists.
+
+**What to build**:
+- **Remote Intake Link Generator**: Admin creates a unique intake URL, sends to patient
+- **Patient-Facing Intake Wizard**: Reuses HormoneIntake but runs standalone (no sidebar, branded, mobile-optimized)
+- **Lab Upload Flow**: Patient uploads lab PDF → AI extracts values (this logic exists in HormoneIntake, expose it standalone)
+- **Video Consult Integration**: Embed or link to video call, with encounter auto-created and pre-populated from remote intake
+- **Consent & E-Signature**: Digital consent forms with timestamp + IP logging
+- AI: Pre-visit triage — based on intake answers, AI categorizes urgency and routes to appropriate provider
+- AI: Auto-generate pre-visit summary for the provider reviewing the remote intake
+
+---
+
+## Cross-Cutting UX Improvements (Apply to All Workflows)
+
+| Improvement | Details |
+|---|---|
+| **Global Command Palette** | Cmd+K search across patients, appointments, encounters, packages |
+| **Breadcrumb Navigation** | Show context path (Patient → Encounter → Chart) for deep pages |
+| **Skeleton Loading States** | Replace blank states with proper shimmer loading (some pages already do this) |
+| **Toast → Action Toasts** | After save actions, offer "Undo" or "View" in the toast |
+| **Mobile Responsiveness Audit** | Several pages use desktop-only layouts (tables, multi-column grids) |
+| **Keyboard Shortcuts** | N for new, S for save, arrow keys for queue navigation |
+| **Dark Mode Polish** | Ensure all custom colors work in dark mode |
+
+---
+
+## Implementation Order
+
+We tackle these in batches, each batch is 1-2 implementation sessions:
+
+| Batch | Workflows | Key Deliverables |
+|---|---|---|
+| **A** | 2 (Intake Desk) + 4 (Provider Day) | Today View, Queue Board, Provider Day View, Quick Charting |
+| **B** | 3 (Admin) + Cross-cutting | Command Center Dashboard, Cmd+K palette, Alert Center |
+| **C** | 6 (MD unified) + 5 (Provider marketplace self-service) | Unified Oversight Hub, Provider Self-Service |
+| **D** | 7 (Remote Intake) + 1 (Patient Portal) | Remote intake wizard, patient portal, e-consent |
+
+---
+
+## Technical Approach
+
+- All AI features use existing Lovable AI Gateway edge functions or new modes added to existing functions
+- No new backend framework — everything stays Supabase + edge functions
+- New pages follow existing patterns (React Query, Supabase client, shadcn/ui components)
+- Auth-gated views will use Supabase Auth with role-based rendering (admin/provider/front_desk roles already exist in user_roles table)
+
+**Shall I begin with Batch A (Intake Desk Today View + Provider Day View)?**
 
