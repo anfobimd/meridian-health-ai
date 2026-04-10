@@ -317,6 +317,41 @@ export type Database = {
           },
         ]
       }
+      ai_treatment_recommendations: {
+        Row: {
+          created_at: string
+          goals_input: string[] | null
+          id: string
+          model_used: string | null
+          patient_id: string
+          recommendations: Json
+        }
+        Insert: {
+          created_at?: string
+          goals_input?: string[] | null
+          id?: string
+          model_used?: string | null
+          patient_id: string
+          recommendations?: Json
+        }
+        Update: {
+          created_at?: string
+          goals_input?: string[] | null
+          id?: string
+          model_used?: string | null
+          patient_id?: string
+          recommendations?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_treatment_recommendations_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       appointment_waitlist: {
         Row: {
           created_at: string
