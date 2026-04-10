@@ -29,6 +29,7 @@ import Earnings from "./pages/Earnings";
 import Proforma from "./pages/Proforma";
 import FrontDesk from "./pages/FrontDesk";
 import ProviderDay from "./pages/ProviderDay";
+import ProviderMarketplace from "./pages/ProviderMarketplace";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -66,6 +67,7 @@ const App = () => (
             <Route path="/membership-billing" element={<MembershipBilling />} />
             <Route path="/earnings" element={<Earnings />} />
             <Route path="/proforma" element={<Proforma />} />
+            <Route path="/my-marketplace" element={<ProviderMarketplace />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
