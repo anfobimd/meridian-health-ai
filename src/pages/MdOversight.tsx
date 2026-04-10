@@ -237,12 +237,12 @@ export default function MdOversight() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div>
-          <h1 className="text-2xl font-serif font-semibold flex items-center gap-2">
-            <Shield className="h-6 w-6 text-primary" /> Unified Oversight Hub
+          <h1 className="text-xl sm:text-2xl font-serif font-semibold flex items-center gap-2">
+            <Shield className="h-5 w-5 sm:h-6 sm:w-6 text-primary" /> Oversight Hub
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">Chart reviews + hormone approvals in one queue</p>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1">Chart reviews + hormone approvals</p>
         </div>
       </div>
 
@@ -297,22 +297,22 @@ export default function MdOversight() {
       {/* Unified Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="charts" className="gap-1">
-            <FileText className="h-3 w-3" /> Chart Reviews
+          <TabsTrigger value="charts" className="gap-1 text-xs sm:text-sm">
+            <FileText className="h-3 w-3" /> <span className="hidden xs:inline">Chart</span> Reviews
             {pendingCharts > 0 && <Badge variant="destructive" className="ml-1 text-[9px] px-1.5 py-0">{pendingCharts}</Badge>}
           </TabsTrigger>
-          <TabsTrigger value="hormones" className="gap-1">
-            <FlaskConical className="h-3 w-3" /> Hormone Approvals
+          <TabsTrigger value="hormones" className="gap-1 text-xs sm:text-sm">
+            <FlaskConical className="h-3 w-3" /> <span className="hidden xs:inline">Hormone</span> Approvals
             {pendingHormones > 0 && <Badge variant="destructive" className="ml-1 text-[9px] px-1.5 py-0">{pendingHormones}</Badge>}
           </TabsTrigger>
         </TabsList>
 
         {/* ═══════ CHART REVIEWS TAB ═══════ */}
         <TabsContent value="charts" className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:justify-between">
+            <div className="flex gap-2 flex-wrap">
               <Select value={filterTier} onValueChange={setFilterTier}>
-                <SelectTrigger className="w-[130px]"><SelectValue placeholder="Risk Tier" /></SelectTrigger>
+                <SelectTrigger className="w-[110px] sm:w-[130px] h-8 text-xs"><SelectValue placeholder="Risk Tier" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Tiers</SelectItem>
                   <SelectItem value="critical">Critical</SelectItem>
@@ -322,7 +322,7 @@ export default function MdOversight() {
                 </SelectContent>
               </Select>
               <Select value={filterStatus} onValueChange={setFilterStatus}>
-                <SelectTrigger className="w-[150px]"><SelectValue placeholder="Status" /></SelectTrigger>
+                <SelectTrigger className="w-[120px] sm:w-[150px] h-8 text-xs"><SelectValue placeholder="Status" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Status</SelectItem>
                   <SelectItem value="pending_ai">Pending AI</SelectItem>
@@ -336,14 +336,14 @@ export default function MdOversight() {
             {batchSelected.size > 0 && (
               <Button size="sm" onClick={() => batchApproveMutation.mutate()} disabled={batchApproveMutation.isPending}>
                 {batchApproveMutation.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <CheckCircle className="h-4 w-4 mr-1" />}
-                Batch Approve ({batchSelected.size})
+                Batch ({batchSelected.size})
               </Button>
             )}
           </div>
 
           <Card>
-            <CardContent className="p-0">
-              <Table>
+            <CardContent className="p-0 overflow-x-auto">
+              <Table className="min-w-[700px]">
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-[40px]"></TableHead>
@@ -486,18 +486,18 @@ export default function MdOversight() {
 
       {/* ═══════ CHART REVIEW DIALOG ═══════ */}
       <Dialog open={!!selectedReview} onOpenChange={(o) => { if (!o) { setSelectedReview(null); setReviewStartTime(null); setElapsed(0); } }}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto w-[95vw]">
           <DialogHeader>
-            <DialogTitle className="flex items-center justify-between">
-              <span className="flex items-center gap-2">
-                <Shield className="h-5 w-5 text-primary" />
-                Chart Review — {patient?.first_name} {patient?.last_name}
+            <DialogTitle className="flex flex-col sm:flex-row sm:items-center gap-2 sm:justify-between">
+              <span className="flex items-center gap-2 text-sm sm:text-base truncate">
+                <Shield className="h-4 w-4 sm:h-5 sm:w-5 text-primary flex-shrink-0" />
+                Review — {patient?.first_name} {patient?.last_name}
               </span>
-              <div className="flex items-center gap-3">
-                <div className={`flex items-center gap-1 text-sm font-mono ${elapsed >= threshold ? "text-green-600" : "text-orange-500"}`}>
-                  <Clock className="h-4 w-4" />{formatTime(elapsed)} / {formatTime(threshold)}
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <div className={`flex items-center gap-1 text-xs sm:text-sm font-mono ${elapsed >= threshold ? "text-green-600" : "text-orange-500"}`}>
+                  <Clock className="h-3 w-3 sm:h-4 sm:w-4" />{formatTime(elapsed)}/{formatTime(threshold)}
                 </div>
-                {elapsed < threshold && <span className="text-[10px] text-orange-500">Below threshold</span>}
+                {elapsed < threshold && <span className="text-[9px] sm:text-[10px] text-orange-500">Below min</span>}
               </div>
             </DialogTitle>
           </DialogHeader>
