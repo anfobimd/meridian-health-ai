@@ -674,18 +674,19 @@ export default function HormoneIntake() {
       </Card>
 
       {/* Navigation */}
-      <div className="flex justify-between">
-        <Button variant="outline" onClick={() => setStep(s => s - 1)} disabled={step === 0}>
-          <ArrowLeft className="h-4 w-4 mr-2" />Back
+      <div className="flex justify-between gap-2">
+        <Button variant="outline" size="sm" onClick={() => setStep(s => s - 1)} disabled={step === 0}>
+          <ArrowLeft className="h-4 w-4 mr-1" />Back
         </Button>
         {step < STEPS.length - 1 ? (
-          <Button onClick={() => setStep(s => s + 1)} disabled={!canProceed()}>
-            Next<ArrowRight className="h-4 w-4 ml-2" />
+          <Button size="sm" onClick={() => setStep(s => s + 1)} disabled={!canProceed()}>
+            Next<ArrowRight className="h-4 w-4 ml-1" />
           </Button>
         ) : (
-          <Button onClick={() => submitIntake.mutate()} disabled={!canProceed() || submitIntake.isPending} className="gap-2">
+          <Button size="sm" onClick={() => submitIntake.mutate()} disabled={!canProceed() || submitIntake.isPending} className="gap-1 text-xs sm:text-sm">
             {submitIntake.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-            Submit & Generate AI Recommendation
+            <span className="hidden sm:inline">Submit & Generate AI Recommendation</span>
+            <span className="sm:hidden">Submit & AI Rec</span>
           </Button>
         )}
       </div>
