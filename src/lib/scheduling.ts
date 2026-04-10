@@ -143,9 +143,10 @@ export async function getAvailableSlots(
     .eq("provider_id", providerId)
     .gte("scheduled_at", dayStart)
     .lt("scheduled_at", dayEnd)
-    .not("status", "in", '("cancelled","no_show")');
+      .neq("status", "cancelled" as any)
+      .neq("status", "no_show" as any);
 
-  if (!existing || existing.length === 0) return allSlots;
+    if (!existing || existing.length === 0) return allSlots;
 
   return allSlots.filter((slot) => {
     return !existing.some((apt) => {
