@@ -137,16 +137,16 @@ export async function getAvailableSlots(
   const dayStart = startOfDay(date).toISOString();
   const dayEnd = addMinutes(startOfDay(date), 24 * 60).toISOString();
 
-  const { data: existing } = await supabase
+  const { data: existing } = await (supabase
     .from("appointments")
-    .select("scheduled_at, duration_minutes")
+    .select("scheduled_at, duration_minutes") as any)
     .eq("provider_id", providerId)
     .gte("scheduled_at", dayStart)
     .lt("scheduled_at", dayEnd)
-      .neq("status", "cancelled" as any)
-      .neq("status", "no_show" as any);
+    .neq("status", "cancelled")
+    .neq("status", "no_show");
 
-    if (!existing || existing.length === 0) return allSlots;
+  if (!existing || existing.length === 0) return allSlots;
 
   return allSlots.filter((slot) => {
     return !existing.some((apt) => {
