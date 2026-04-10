@@ -1,31 +1,78 @@
 
 
-# Fix Mobile Responsiveness Issues
+# Security Overhaul: Authentication + RLS Lockdown
 
-## Issues Found
+## Current State
+- **236 RLS warnings**: Every table has `USING (true)` / `WITH CHECK (true)` for INSERT and UPDATE on both `anon` and `authenticated` roles. Any anonymous user can read, insert, and modify all patient records, billing data, clinical notes, and AI oversight data.
+- **No authentication**: Zero auth code exists in the frontend. No login page, no auth context, no route protection.
+- **`user_roles` table exists** with `has_role()` function already built — the infrastructure is ready, just unused.
 
-1. **MD Oversight stat cards** — Labels like "HORMONE APPROVALS PENDING" and "BATCH-ELIGIBLE (LOW/MED)" clip at 375px inside the `grid-cols-2` layout. The `text-[10px]` labels are too long for narrow cells.
+## Plan (3 batches)
 
-2. **Provider Day "Open Chart" button** — The button with icon + text overflows on small screens when alongside patient info in a `flex justify-between` layout.
+### Batch 1: Authentication System
+Build login/signup UI and auth context to gate all internal routes.
 
-3. **Routes** — Not actually broken. `/intake` and `/portal` already exist in `App.tsx` (lines 75-76). The audit tested wrong URLs (`/patient-portal`, `/remote-intake`). No code change needed.
+**Files to create:**
+- `src/pages/Auth.tsx` — Login/signup form (email + password, Google OAuth)
+- `src/pages/ResetPassword.tsx` — Password reset page
+- `src/contexts/AuthContext.tsx` — Auth provider with `onAuthStateChange`, session state, role loading from `user_roles`
+- `src/components/ProtectedRoute.tsx` — Wrapper that redirects unauthenticated users to `/auth`
 
-## Fixes
+**Files to modify:**
+- `src/App.tsx` — Wrap with `AuthProvider`, protect internal routes with `ProtectedRoute`, add `/auth` and `/reset-password` routes
+- `src/components/AppSidebar.tsx` — Add logout button, show current user
 
-### 1. MD Oversight Stat Cards (`src/pages/MdOversight.tsx`, ~line 250)
-- Shorten labels: "Chart Reviews Pending" → "Charts", "Hormone Approvals Pending" → "Hormones", "Batch-Eligible (Low/Med)" → "Batch Ready"
-- Add `truncate` to label `<p>` tags as a safety net
-- Add a subtle icon to each card for quick visual scanning (Shield, FlaskConical, Clock, CheckCircle)
+**Database migration:**
+- Create `profiles` table (id, user_id FK, display_name, avatar_url) with trigger to auto-create on signup
+- RLS: users can only read/update their own profile
 
-### 2. Provider Day Button (`src/pages/ProviderDay.tsx`, ~line 219)
-- Make the "Open Chart" button responsive: show icon-only on mobile (`sm:inline` on text, icon-only at small sizes)
-- Add `shrink-0` to prevent the button from being compressed
-- Wrap the top-level `flex justify-between` with `flex-wrap gap-3` so content stacks on narrow screens
+**Auth config:**
+- Enable Google OAuth via `configure_auth`
+- Do NOT enable auto-confirm (email verification required)
 
-### 3. No Router Changes Needed
-The routes `/portal` and `/intake` already work. The audit incorrectly tested `/patient-portal` and `/remote-intake`.
+### Batch 2: RLS Policy Lockdown
+Replace all `true` policies with role-scoped rules. Tables fall into 4 tiers:
 
-## Files Changed
-- `src/pages/MdOversight.tsx` — Shorten stat card labels, add icons
-- `src/pages/ProviderDay.tsx` — Responsive "Open Chart" button
+| Tier | Tables | Rule |
+|------|--------|------|
+| **Service-only** | `ai_api_calls`, `ai_chart_analysis`, `ai_md_consistency`, `ai_oversight_reports`, `ai_provider_intelligence`, `ai_prompts`, `ai_doc_checklists`, `coaching_actions` | Drop anon policies. Authenticated SELECT only. INSERT/UPDATE restricted to `service_role` (edge functions use service key, so client policies become deny-all for writes). |
+| **Staff (admin + provider + front_desk)** | `patients`, `appointments`, `encounters`, `clinical_notes`, `hormone_visits`, `lab_results`, `lab_orders`, `prescriptions`, `invoices`, `invoice_items`, `payments`, `providers`, `treatments`, `rooms`, `devices`, `chart_templates`, `chart_template_*`, `encounter_field_responses`, `protocol_*`, `provider_*`, `marketplace_*`, `package_*`, `service_packages`, `service_package_items`, `proforma_scenarios`, `quotes`, `quote_items`, `membership_invoices` | Drop anon policies. Authenticated users with any `app_role` can SELECT. INSERT/UPDATE scoped to `has_role(auth.uid(), 'admin')` OR `has_role(auth.uid(), 'provider')` OR `has_role(auth.uid(), 'front_desk')` as appropriate per table. |
+| **Audit** | `audit_logs` | Authenticated INSERT only (via `auth.uid() = user_id`). SELECT for admin only. No UPDATE/DELETE. |
+| **Public-read** | `treatments`, `treatment_categories`, `marketplace_config`, `oversight_config` | Keep SELECT for anon. INSERT/UPDATE admin-only. |
+
+**Single migration** with ~60 `DROP POLICY` + `CREATE POLICY` statements using the existing `has_role()` function.
+
+### Batch 3: Verify + Harden
+- Test that unauthenticated users are redirected to `/auth`
+- Test that logged-in users can still CRUD on their permitted tables
+- Test that edge functions (which use `service_role` key) still work
+- Run the security scanner again to confirm 0 warnings
+- Public routes (`/intake`, `/portal`) remain accessible without login
+
+## Technical Details
+
+**RLS pattern** (repeated per table):
+```sql
+DROP POLICY IF EXISTS "Anon insert tablename" ON public.tablename;
+DROP POLICY IF EXISTS "Anon update tablename" ON public.tablename;
+-- Keep or drop anon SELECT depending on tier
+CREATE POLICY "Staff can insert tablename" ON public.tablename
+  FOR INSERT TO authenticated
+  WITH CHECK (public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'provider') OR public.has_role(auth.uid(), 'front_desk'));
+```
+
+**Auth context pattern:**
+```typescript
+// Listen for auth changes, load role from user_roles
+const { data: { subscription } } = supabase.auth.onAuthStateChange(
+  async (event, session) => { /* set user, fetch role */ }
+);
+```
+
+**Edge functions are unaffected** — they use `SUPABASE_SERVICE_ROLE_KEY` which bypasses RLS entirely.
+
+## Estimated scope
+- 1 migration (~200 SQL statements)
+- 5 new files, 2 modified files
+- ~500 lines of new code
 
