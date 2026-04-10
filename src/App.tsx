@@ -30,6 +30,8 @@ import Proforma from "./pages/Proforma";
 import FrontDesk from "./pages/FrontDesk";
 import ProviderDay from "./pages/ProviderDay";
 import ProviderMarketplace from "./pages/ProviderMarketplace";
+import RemoteIntake from "./pages/RemoteIntake";
+import PatientPortal from "./pages/PatientPortal";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -69,6 +71,9 @@ const App = () => (
             <Route path="/proforma" element={<Proforma />} />
             <Route path="/my-marketplace" element={<ProviderMarketplace />} />
           </Route>
+          {/* Public routes — no sidebar */}
+          <Route path="/intake" element={<RemoteIntake />} />
+          <Route path="/portal" element={<PatientPortal />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
