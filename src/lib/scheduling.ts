@@ -177,8 +177,9 @@ export async function checkConflicts(
     let query = supabase
       .from("appointments")
       .select("id, scheduled_at, duration_minutes")
-      .eq(column, value)
-      .not("status", "in", '("cancelled","no_show")')
+      .eq(column as any, value)
+      .neq("status", "cancelled" as any)
+      .neq("status", "no_show" as any)
       .lt("scheduled_at", endIso);
 
     if (excludeAppointmentId) {
