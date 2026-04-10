@@ -159,6 +159,29 @@ export default function Appointments() {
     setAiSuggestion(null);
   };
 
+  // Load slots when provider + date + treatment are selected
+  const loadSlots = async () => {
+    if (!bookProviderId || !bookDate || !bookTreatmentId) return;
+    const duration = treatments?.find((t) => t.id === bookTreatmentId)?.duration_minutes ?? 30;
+    setLoadingSlots(true);
+    setSelectedSlot(null);
+    setConflictResult(null);
+    try {
+      const slots = await getAvailableSlots(bookProviderId, bookDate, duration);
+      setAvailableSlots(slots);
+    } catch {
+      toast.error("Failed to load available slots");
+    } finally {
+      setLoadingSlots(false);
+    }
+  };
+
+  useEffect(() => {
+    if (bookProviderId && bookDate && bookTreatmentId) {
+      loadSlots();
+    }
+  }, [bookProviderId, bookDate, bookTreatmentId]);
+
   const updateStatus = useMutation({
     mutationFn: async ({ id, status, room_id, device_id, provider_id }: { id: string; status: string; room_id?: string; device_id?: string; provider_id?: string }) => {
       const updates: any = { status };
