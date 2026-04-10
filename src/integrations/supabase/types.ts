@@ -2102,6 +2102,62 @@ export type Database = {
           },
         ]
       }
+      patient_churn_scores: {
+        Row: {
+          ai_summary: string | null
+          created_at: string
+          days_since_visit: number | null
+          factors: Json
+          has_active_package: boolean | null
+          id: string
+          last_visit_date: string | null
+          patient_id: string
+          risk_score: number
+          risk_tier: string
+          scored_at: string
+          updated_at: string
+          visit_count_90d: number | null
+        }
+        Insert: {
+          ai_summary?: string | null
+          created_at?: string
+          days_since_visit?: number | null
+          factors?: Json
+          has_active_package?: boolean | null
+          id?: string
+          last_visit_date?: string | null
+          patient_id: string
+          risk_score?: number
+          risk_tier?: string
+          scored_at?: string
+          updated_at?: string
+          visit_count_90d?: number | null
+        }
+        Update: {
+          ai_summary?: string | null
+          created_at?: string
+          days_since_visit?: number | null
+          factors?: Json
+          has_active_package?: boolean | null
+          id?: string
+          last_visit_date?: string | null
+          patient_id?: string
+          risk_score?: number
+          risk_tier?: string
+          scored_at?: string
+          updated_at?: string
+          visit_count_90d?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "patient_churn_scores_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: true
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       patient_contacts: {
         Row: {
           created_at: string
