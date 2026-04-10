@@ -6,7 +6,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, User, FlaskConical, CheckCircle, Clock, AlertTriangle, Package, Sparkles, Loader2 } from "lucide-react";
+import { ArrowLeft, User, FlaskConical, CheckCircle, Clock, AlertTriangle, Package, Sparkles, Loader2, Camera } from "lucide-react";
+import { PhotoGallery } from "@/components/clinical-photos/PhotoGallery";
+import { PhotoUpload } from "@/components/clinical-photos/PhotoUpload";
+import { ComparisonView } from "@/components/clinical-photos/ComparisonView";
 import { format, parseISO, differenceInDays } from "date-fns";
 import { useState } from "react";
 import { toast } from "@/hooks/use-toast";
@@ -116,6 +119,7 @@ export default function PatientRecord() {
 
   const [aiRec, setAiRec] = useState<any>(null);
   const [aiLoading, setAiLoading] = useState(false);
+  const [photoUploadOpen, setPhotoUploadOpen] = useState(false);
 
   const redeemSession = useMutation({
     mutationFn: async ({ purchaseId, treatmentName }: { purchaseId: string; treatmentName: string }) => {
@@ -174,6 +178,7 @@ export default function PatientRecord() {
           <TabsTrigger value="hormone">Hormone ({hormoneVisits?.length ?? 0})</TabsTrigger>
           <TabsTrigger value="intake">Intake ({intakeForms?.length ?? 0})</TabsTrigger>
           <TabsTrigger value="packages">Packages ({packagePurchases?.length ?? 0})</TabsTrigger>
+          <TabsTrigger value="photos">Photos</TabsTrigger>
         </TabsList>
 
         <TabsContent value="demographics">
@@ -485,6 +490,23 @@ export default function PatientRecord() {
               </Card>
             )}
           </div>
+        </TabsContent>
+        {/* Photos Tab */}
+        <TabsContent value="photos">
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-sm">Clinical Photos</h3>
+              <Button size="sm" onClick={() => setPhotoUploadOpen(true)}>
+                <Camera className="h-4 w-4 mr-1" /> Upload Photos
+              </Button>
+            </div>
+            <PhotoGallery patientId={id!} />
+            <div>
+              <h3 className="font-semibold text-sm mb-3">Before / After Comparison</h3>
+              <ComparisonView patientId={id!} />
+            </div>
+          </div>
+          <PhotoUpload patientId={id!} open={photoUploadOpen} onOpenChange={setPhotoUploadOpen} />
         </TabsContent>
       </Tabs>
     </div>
