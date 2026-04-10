@@ -242,6 +242,38 @@ Respond with a JSON object (no markdown) with these keys:
       recommendation = { error: "Failed to parse AI recommendation", raw: content };
     }
 
+    // Post-process: resolve AI-returned names back to real UUIDs
+    if (recommendation && !recommendation.error) {
+      // Resolve room ID
+      if (recommendation.recommended_room_id && rooms) {
+        const matchedRoom = (rooms as any[]).find((r: any) =>
+          r.id === recommendation.recommended_room_id ||
+          r.name?.toLowerCase() === String(recommendation.recommended_room_id).toLowerCase() ||
+          r.name?.toLowerCase() === String(recommendation.recommended_room_name).toLowerCase()
+        );
+        if (matchedRoom) {
+          recommendation.recommended_room_id = matchedRoom.id;
+          recommendation.recommended_room_name = matchedRoom.name;
+        } else {
+          recommendation.recommended_room_id = null;
+        }
+      }
+      // Resolve provider ID
+      if (recommendation.recommended_provider_id && providers) {
+        const matchedProvider = (providers as any[]).find((p: any) =>
+          p.id === recommendation.recommended_provider_id ||
+          `${p.first_name} ${p.last_name}`.toLowerCase() === String(recommendation.recommended_provider_id).toLowerCase() ||
+          `${p.first_name} ${p.last_name}`.toLowerCase() === String(recommendation.recommended_provider_name).toLowerCase()
+        );
+        if (matchedProvider) {
+          recommendation.recommended_provider_id = matchedProvider.id;
+          recommendation.recommended_provider_name = `${matchedProvider.first_name} ${matchedProvider.last_name}`;
+        } else {
+          recommendation.recommended_provider_id = null;
+        }
+      }
+    }
+
     return new Response(JSON.stringify(recommendation), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
