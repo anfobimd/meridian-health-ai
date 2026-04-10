@@ -78,7 +78,7 @@ Active Coaching Actions:
 ${(existingActions || []).map((a: any) => `- [${a.action_type}] ${a.title}: ${a.description || ""}`).join("\n") || "None"}`;
 
     // Call AI
-    const aiResponse = await fetch("https://ai.lovable.dev/chat/completions", {
+    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

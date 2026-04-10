@@ -20,11 +20,12 @@ serve(async (req) => {
     if (!encounter_id) throw new Error("encounter_id required");
 
     // 1. Fetch encounter + relations
-    const { data: encounter } = await supabase
+    const { data: encounter, error: encErr } = await supabase
       .from("encounters")
-      .select("*, patients(*), providers(*)")
+      .select("*, patients(*), providers!encounters_provider_id_fkey(*)")
       .eq("id", encounter_id)
       .single();
+    if (encErr) { console.error("Encounter fetch error:", encErr); throw new Error("Encounter not found: " + encErr.message); }
     if (!encounter) throw new Error("Encounter not found");
 
     // 2. Fetch clinical note
