@@ -1,91 +1,64 @@
 
 
-# Scheduling Engine: Slot Generation, Conflict Detection, Availability UI, Booking Calendar
+# Clinical Photos: Before/After Gallery with Tagging and Comparison
 
 ## What We're Building
 
-A deterministic, TypeScript-based scheduling engine that replaces manual date/time entry with a visual calendar showing only valid, bookable slots. No AI/LLM involved -- pure rules and math.
+A clinical photo management system integrated into the Patient Record page. Staff can upload photos tagged by treatment type and body area, then compare before/after images side-by-side. Photos stored in Lovable Cloud storage.
 
-## Existing Foundation
+## Database & Storage Changes
 
-Already in the database:
-- `provider_availability` — recurring weekly schedule (day_of_week, start_time, end_time, break_start/end, room_preference_id)
-- `provider_availability_overrides` — per-date overrides (PTO, special hours)
-- `appointments` — existing bookings with scheduled_at, duration_minutes, provider_id, room_id, device_id
-- `rooms` — with room_type and assigned_provider_id
-- `devices` — with device_type and room_id
-- `treatments` — with duration_minutes
+**New storage bucket**: `clinical-photos` (private, staff-only access via RLS)
 
-Currently: staff manually types a datetime into an `<input type="datetime-local">` with no validation. AI edge function gives soft suggestions but no hard conflict prevention.
+**New table**: `clinical_photos`
+- `id` uuid PK
+- `patient_id` uuid NOT NULL
+- `uploaded_by` uuid (auth.uid of staff)
+- `storage_path` text NOT NULL (path in bucket)
+- `treatment_id` uuid nullable (FK to treatments)
+- `body_area` text (e.g. "face", "abdomen", "arms", "neck", "legs", "back", "chest")
+- `photo_type` text NOT NULL default 'before' (before | after | progress)
+- `taken_at` date (date photo was taken)
+- `notes` text nullable
+- `encounter_id` uuid nullable (link to encounter)
+- `created_at` timestamptz default now()
 
----
+RLS: Staff can SELECT/INSERT/UPDATE. Patients can SELECT own photos.
 
-## 1. Slot Generation Engine (TypeScript utility)
+## UI Components
 
-Create `src/lib/scheduling.ts` with pure functions:
+**1. PhotoUpload component** (`src/components/clinical-photos/PhotoUpload.tsx`)
+- Drag-and-drop or click-to-upload (multiple files)
+- Tag each photo: treatment (dropdown from treatments table), body area (preset list), photo type (before/after/progress), date taken
+- Uploads to `clinical-photos` bucket, inserts metadata row
 
-- **`getProviderSlots(providerId, date, treatmentDuration)`** — Cross-references `provider_availability` (for that day_of_week) with `provider_availability_overrides` (for that specific date). Generates 15-minute interval slots within working hours, excluding breaks. Returns array of `{ start: Date, end: Date }`.
+**2. PhotoGallery component** (`src/components/clinical-photos/PhotoGallery.tsx`)
+- Grid of thumbnails filtered by body area and treatment
+- Filter bar: body area chips, treatment dropdown, date range
+- Click to enlarge in a lightbox dialog
 
-- **`getAvailableSlots(providerId, date, treatmentDuration)`** — Takes output of `getProviderSlots`, then filters out slots that overlap with existing `appointments` for that provider on that date. Returns only truly open slots.
+**3. ComparisonView component** (`src/components/clinical-photos/ComparisonView.tsx`)
+- Side-by-side layout: left = before, right = after
+- Dropdown to select which before/after pair (by body area + treatment)
+- Slider overlay option (drag divider left/right over stacked images)
 
-- **`checkConflicts(providerId, roomId, deviceId, start, end)`** — Hard validation: queries appointments table to check if provider, room, or device is already booked during the proposed window. Returns `{ hasConflict: boolean, conflicts: { type: 'provider'|'room'|'device', existingAppointment }[] }`.
-
-No database changes needed for this.
-
----
-
-## 2. Conflict Detection (booking-time validation)
-
-Modify the appointment creation flow in `Appointments.tsx`:
-
-- Before INSERT, call `checkConflicts()` — block submission if any conflict exists
-- Show inline conflict warnings: "Dr. Smith is already booked 2:00-2:30" or "Room 3 is in use"
-- Also validate on status transitions (rooming) to catch race conditions
-
----
-
-## 3. Availability Management UI
-
-New page: `src/pages/ProviderSchedule.tsx` (route: `/provider-schedule`)
-
-- **Weekly grid view** per provider: rows = providers, columns = Mon-Sun, cells show shift blocks
-- **Edit recurring availability**: click a cell to set start_time, end_time, break_start, break_end, room preference
-- **Override management**: add single-date overrides (PTO, half-days, extended hours) with a reason field
-- **Bulk actions**: copy one provider's schedule to another, set clinic-wide closures
-
-Uses existing `provider_availability` and `provider_availability_overrides` tables -- no schema changes.
-
----
-
-## 4. Booking Calendar UI
-
-Replace the datetime-local input in the New Appointment dialog with a visual slot picker:
-
-- **Step 1**: Select patient + treatment (determines duration)
-- **Step 2**: Select provider (or "any available")
-- **Step 3**: Pick a date from a calendar widget, then see available time slots as clickable chips/buttons
-- Slots are color-coded: green = open, gray = unavailable
-- If "any provider" selected, show slots across all providers grouped by provider name
-- Selecting a slot auto-fills the form; conflict check runs on confirmation
-
----
+**4. Integration into PatientRecord.tsx**
+- New "Photos" tab alongside existing tabs (Appointments, Notes, Labs, etc.)
+- Shows PhotoGallery + ComparisonView + upload button
 
 ## Files Changed
 
 | Action | File | Purpose |
 |--------|------|---------|
-| Create | `src/lib/scheduling.ts` | Slot generation + conflict detection logic |
-| Create | `src/pages/ProviderSchedule.tsx` | Availability management UI |
-| Modify | `src/pages/Appointments.tsx` | Replace datetime input with slot picker, add conflict blocking |
-| Modify | `src/App.tsx` | Add `/provider-schedule` route |
-| Modify | `src/components/AppSidebar.tsx` | Add Provider Schedule nav link |
-
-No database migrations needed -- all tables already exist.
+| Migration | `clinical_photos` table + storage bucket + RLS | Schema and storage |
+| Create | `src/components/clinical-photos/PhotoUpload.tsx` | Upload with tagging |
+| Create | `src/components/clinical-photos/PhotoGallery.tsx` | Filterable grid gallery |
+| Create | `src/components/clinical-photos/ComparisonView.tsx` | Side-by-side comparison |
+| Modify | `src/pages/PatientRecord.tsx` | Add Photos tab |
 
 ## Estimated Scope
-- 1 new utility file (~150 lines)
-- 1 new page (~300 lines)
-- 1 major page modification
-- 2 minor file edits
-- ~550 lines total
+- 1 migration (table + bucket + RLS)
+- 3 new components (~400 lines total)
+- 1 page modification
+- ~500 lines new/changed code
 
