@@ -1,4 +1,5 @@
 import { NavLink, useLocation } from "react-router-dom";
+import { useEffect, useState } from "react";
 import {
   LayoutDashboard, Users, Calendar, Stethoscope, ClipboardList, UserCog,
   Activity, FlaskConical, FileText, Pill, DollarSign, ClipboardPlus, ShieldCheck, DoorOpen, Store, Package,
@@ -8,17 +9,19 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 type NavItem = {
   to: string;
   icon: any;
   label: string;
-  roles?: string[]; // if set, only these roles see it; if absent, all roles see it
+  roles?: string[];
+  badgeKey?: string; // key for dynamic badge count
 };
 
 type NavSection = {
   label: string;
-  roles?: string[]; // if set, entire section only for these roles
+  roles?: string[];
   items: NavItem[];
 };
 
@@ -31,8 +34,8 @@ const navSections: NavSection[] = [
       { to: "/front-desk", icon: MonitorCheck, label: "Front Desk", roles: ["admin", "front_desk"] },
       { to: "/check-in", icon: ClipboardCheck, label: "Check-In", roles: ["admin", "front_desk"] },
       { to: "/encounters", icon: FileText, label: "Encounters" },
-      { to: "/md-feedback", icon: MessageSquare, label: "MD Feedback", roles: ["provider"] },
-      { to: "/messages", icon: Mail, label: "Messages" },
+      { to: "/md-feedback", icon: MessageSquare, label: "MD Feedback", roles: ["provider"], badgeKey: "md_corrections" },
+      { to: "/messages", icon: Mail, label: "Messages", badgeKey: "unread_messages" },
       { to: "/patient-inbox", icon: Inbox, label: "Patient Inbox", roles: ["admin", "front_desk"] },
       { to: "/notifications", icon: Bell, label: "Notifications" },
     ],
@@ -125,8 +128,56 @@ function filterNav(sections: NavSection[], role: string | null): NavSection[] {
 export function AppSidebar() {
   const location = useLocation();
   const { user, role, signOut } = useAuth();
+  const [badges, setBadges] = useState<Record<string, number>>({});
 
   const visibleSections = filterNav(navSections, role);
+
+  // Fetch badge counts
+  useEffect(() => {
+    if (!user) return;
+    const fetchBadges = async () => {
+      const counts: Record<string, number> = {};
+
+      // Unread messages
+      const { count: msgCount } = await supabase
+        .from("messages")
+        .select("*", { count: "exact", head: true })
+        .eq("recipient_id", user.id)
+        .eq("is_read", false)
+        .is("parent_id", null);
+      if (msgCount) counts.unread_messages = msgCount;
+
+      // MD corrections (for providers)
+      if (role === "provider") {
+        const { data: prov } = await supabase
+          .from("providers")
+          .select("id")
+          .eq("user_id", user.id)
+          .maybeSingle();
+        if (prov) {
+          const { count: corrCount } = await supabase
+            .from("chart_review_records")
+            .select("*", { count: "exact", head: true })
+            .eq("provider_id", prov.id)
+            .eq("status", "corrected");
+          if (corrCount) counts.md_corrections = corrCount;
+        }
+      }
+
+      setBadges(counts);
+    };
+
+    fetchBadges();
+
+    // Refresh badges on messages changes
+    const channel = supabase
+      .channel("sidebar-badges")
+      .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, () => fetchBadges())
+      .on("postgres_changes", { event: "*", schema: "public", table: "chart_review_records" }, () => fetchBadges())
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [user, role]);
 
   const initials = user?.email
     ? user.email.substring(0, 2).toUpperCase()
@@ -164,6 +215,7 @@ export function AppSidebar() {
             <p className="px-3 pt-4 pb-1 text-[9px] font-bold tracking-[0.14em] uppercase text-sidebar-foreground/25">{section.label}</p>
             {section.items.map((item) => {
               const isActive = item.to === "/" ? location.pathname === "/" : location.pathname.startsWith(item.to);
+              const badgeCount = item.badgeKey ? badges[item.badgeKey] || 0 : 0;
               return (
                 <NavLink
                   key={item.to}
@@ -176,7 +228,12 @@ export function AppSidebar() {
                   )}
                 >
                   <item.icon className="h-[14px] w-[14px] flex-shrink-0" />
-                  {item.label}
+                  <span className="flex-1">{item.label}</span>
+                  {badgeCount > 0 && (
+                    <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-destructive text-[10px] font-semibold text-destructive-foreground px-1">
+                      {badgeCount > 9 ? "9+" : badgeCount}
+                    </span>
+                  )}
                 </NavLink>
               );
             })}

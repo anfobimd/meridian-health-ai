@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
@@ -8,10 +9,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Send, Loader2, Mail, MailOpen, Plus, Inbox } from "lucide-react";
+import { Send, Loader2, Mail, MailOpen, Plus, Inbox, Sparkles } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
@@ -19,6 +20,7 @@ export default function Messages() {
   const { user } = useAuth();
   const { toast } = useToast();
   const qc = useQueryClient();
+  const [searchParams] = useSearchParams();
   const [composeOpen, setComposeOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [recipientId, setRecipientId] = useState("");
@@ -26,6 +28,43 @@ export default function Messages() {
   const [body, setBody] = useState("");
   const [replyBody, setReplyBody] = useState("");
   const [tab, setTab] = useState<"inbox" | "sent">("inbox");
+  const [aiDrafting, setAiDrafting] = useState(false);
+
+  // Pre-fill compose from query params (e.g., from encounter context)
+  useEffect(() => {
+    const encId = searchParams.get("encounter_id");
+    const toId = searchParams.get("to");
+    const subj = searchParams.get("subject");
+    if (encId || toId) {
+      if (toId) setRecipientId(toId);
+      if (subj) setSubject(subj);
+      setComposeOpen(true);
+      // Auto-draft if encounter context provided
+      if (encId) draftFromEncounter(encId);
+    }
+  }, [searchParams]);
+
+  const draftFromEncounter = async (encounterId: string) => {
+    setAiDrafting(true);
+    try {
+      const { data: enc } = await supabase
+        .from("encounters")
+        .select("*, patients(first_name, last_name), providers:provider_id(first_name, last_name)")
+        .eq("id", encounterId)
+        .single();
+
+      if (enc) {
+        const patientName = `${enc.patients?.first_name} ${enc.patients?.last_name}`;
+        const draft = `Regarding patient ${patientName} (Encounter ${encounterId.slice(0, 8)}):\n\nChief complaint: ${enc.chief_complaint || "N/A"}\nEncounter type: ${enc.encounter_type || "N/A"}\n\n[Please describe your question or concern here]`;
+        setBody(draft);
+        if (!subject) setSubject(`Re: ${patientName} — ${enc.encounter_type || "Encounter"}`);
+      }
+    } catch {
+      // Silent — just don't pre-fill
+    } finally {
+      setAiDrafting(false);
+    }
+  };
 
   // Fetch staff users for recipient picker
   const { data: staffUsers } = useQuery({
@@ -66,7 +105,6 @@ export default function Messages() {
     queryKey: ["message-thread", selectedId],
     enabled: !!selectedId,
     queryFn: async () => {
-      // Get the selected message + replies
       const { data: parent } = await supabase
         .from("messages")
         .select("*")
@@ -135,6 +173,33 @@ export default function Messages() {
     return found?.display_name || id.substring(0, 8);
   };
 
+  // AI draft for compose
+  const aiDraftMessage = async () => {
+    if (!recipientId) {
+      toast({ title: "Select a recipient first", variant: "destructive" });
+      return;
+    }
+    setAiDrafting(true);
+    try {
+      const recipientName = staffUsers?.find(s => s.user_id === recipientId)?.display_name || "Colleague";
+      const { data } = await supabase.functions.invoke("ai-provider-coach", {
+        body: {
+          mode: "message_draft",
+          provider_id: recipientId,
+          context: { subject, recipient_name: recipientName, existing_body: body },
+        },
+      });
+      if (data?.draft) {
+        setBody(data.draft);
+        toast({ title: "AI draft generated" });
+      }
+    } catch {
+      toast({ title: "AI draft failed", variant: "destructive" });
+    } finally {
+      setAiDrafting(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -149,7 +214,10 @@ export default function Messages() {
             <Button><Plus className="mr-2 h-4 w-4" /> Compose</Button>
           </DialogTrigger>
           <DialogContent>
-            <DialogHeader><DialogTitle>New Message</DialogTitle></DialogHeader>
+            <DialogHeader>
+              <DialogTitle>New Message</DialogTitle>
+              <DialogDescription>Send a secure message to a team member.</DialogDescription>
+            </DialogHeader>
             <div className="space-y-3">
               <div className="space-y-1.5">
                 <Label>To</Label>
@@ -167,7 +235,19 @@ export default function Messages() {
                 <Input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Optional subject" />
               </div>
               <div className="space-y-1.5">
-                <Label>Message</Label>
+                <div className="flex items-center justify-between">
+                  <Label>Message</Label>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-[10px] text-primary"
+                    onClick={aiDraftMessage}
+                    disabled={aiDrafting}
+                  >
+                    {aiDrafting ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Sparkles className="h-3 w-3 mr-1" />}
+                    AI Draft
+                  </Button>
+                </div>
                 <Textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder="Type your message…" rows={4} />
               </div>
               <Button
@@ -187,6 +267,7 @@ export default function Messages() {
       <div className="flex gap-2">
         <Button variant={tab === "inbox" ? "default" : "outline"} size="sm" onClick={() => { setTab("inbox"); setSelectedId(null); }}>
           <Inbox className="mr-1 h-4 w-4" /> Inbox
+          {unreadCount > 0 && <Badge variant="secondary" className="ml-1.5 text-[10px] h-4 px-1.5">{unreadCount}</Badge>}
         </Button>
         <Button variant={tab === "sent" ? "default" : "outline"} size="sm" onClick={() => { setTab("sent"); setSelectedId(null); }}>
           <Send className="mr-1 h-4 w-4" /> Sent
@@ -237,7 +318,6 @@ export default function Messages() {
                 {thread.parent?.subject && (
                   <h2 className="text-lg font-medium">{thread.parent.subject}</h2>
                 )}
-                {/* Parent message */}
                 <div className="space-y-3">
                   <div className="rounded-md bg-muted p-3">
                     <div className="flex justify-between text-xs text-muted-foreground mb-1">
@@ -246,7 +326,6 @@ export default function Messages() {
                     </div>
                     <p className="text-sm whitespace-pre-wrap">{thread.parent.body}</p>
                   </div>
-                  {/* Replies */}
                   {thread.replies.map((r: any) => (
                     <div key={r.id} className={cn("rounded-md p-3", r.sender_id === user?.id ? "bg-primary/5 ml-4" : "bg-muted mr-4")}>
                       <div className="flex justify-between text-xs text-muted-foreground mb-1">
@@ -257,7 +336,6 @@ export default function Messages() {
                     </div>
                   ))}
                 </div>
-                {/* Reply box */}
                 <div className="flex gap-2">
                   <Textarea
                     value={replyBody}
