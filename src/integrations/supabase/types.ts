@@ -866,6 +866,41 @@ export type Database = {
         }
         Relationships: []
       }
+      clinical_note_addenda: {
+        Row: {
+          author_id: string
+          content: string
+          created_at: string
+          id: string
+          note_id: string
+          reason: string | null
+        }
+        Insert: {
+          author_id: string
+          content: string
+          created_at?: string
+          id?: string
+          note_id: string
+          reason?: string | null
+        }
+        Update: {
+          author_id?: string
+          content?: string
+          created_at?: string
+          id?: string
+          note_id?: string
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clinical_note_addenda_note_id_fkey"
+            columns: ["note_id"]
+            isOneToOne: false
+            referencedRelation: "clinical_notes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clinical_notes: {
         Row: {
           ai_generated: boolean
@@ -3666,6 +3701,78 @@ export type Database = {
         }
         Relationships: []
       }
+      vitals: {
+        Row: {
+          bmi: number | null
+          bp_diastolic: number | null
+          bp_systolic: number | null
+          created_at: string
+          encounter_id: string | null
+          heart_rate: number | null
+          height_in: number | null
+          id: string
+          o2_sat: number | null
+          pain_scale: number | null
+          patient_id: string
+          recorded_at: string
+          recorded_by: string | null
+          temperature: number | null
+          updated_at: string
+          weight_lbs: number | null
+        }
+        Insert: {
+          bmi?: number | null
+          bp_diastolic?: number | null
+          bp_systolic?: number | null
+          created_at?: string
+          encounter_id?: string | null
+          heart_rate?: number | null
+          height_in?: number | null
+          id?: string
+          o2_sat?: number | null
+          pain_scale?: number | null
+          patient_id: string
+          recorded_at?: string
+          recorded_by?: string | null
+          temperature?: number | null
+          updated_at?: string
+          weight_lbs?: number | null
+        }
+        Update: {
+          bmi?: number | null
+          bp_diastolic?: number | null
+          bp_systolic?: number | null
+          created_at?: string
+          encounter_id?: string | null
+          heart_rate?: number | null
+          height_in?: number | null
+          id?: string
+          o2_sat?: number | null
+          pain_scale?: number | null
+          patient_id?: string
+          recorded_at?: string
+          recorded_by?: string | null
+          temperature?: number | null
+          updated_at?: string
+          weight_lbs?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vitals_encounter_id_fkey"
+            columns: ["encounter_id"]
+            isOneToOne: false
+            referencedRelation: "encounters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vitals_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -3695,7 +3802,7 @@ export type Database = {
         | "completed"
         | "no_show"
         | "cancelled"
-      consent_type: "general" | "telehealth" | "hipaa"
+      consent_type: "general" | "telehealth" | "hipaa" | "photo_release"
       encounter_status:
         | "open"
         | "in_progress"
@@ -3857,7 +3964,7 @@ export const Constants = {
         "no_show",
         "cancelled",
       ],
-      consent_type: ["general", "telehealth", "hipaa"],
+      consent_type: ["general", "telehealth", "hipaa", "photo_release"],
       encounter_status: [
         "open",
         "in_progress",
