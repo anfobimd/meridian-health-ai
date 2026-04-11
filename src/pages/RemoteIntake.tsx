@@ -192,67 +192,24 @@ export default function RemoteIntake() {
     finally { setExtracting(false); }
   }, []);
 
-  // Submit
+  // Submit via secure edge function
   const handleSubmit = async () => {
     setSubmitting(true);
     try {
-      // Create patient
-      const { data: patient, error: pErr } = await supabase.from("patients").insert({
-        first_name: firstName, last_name: lastName, email, phone, date_of_birth: dob || null,
-        gender: sex || null, is_active: true,
-      } as any).select("id").single();
-      if (pErr) throw pErr;
-
-      // Build lab data
-      const labData: Record<string, any> = {};
-      CORE_LAB_FIELDS.forEach(f => { const v = labValues[f.key]; labData[f.key] = v ? parseFloat(v) : null; });
-
-      // Create intake form
-      await supabase.from("intake_forms").insert({
-        patient_id: patient.id,
-        form_type: "remote_hormone",
-        responses: {
-          focus, symptoms, goals, medications, priorTherapy, contraindications, allergies,
-          sex, weightLbs, heightIn, menoStatus,
-          consent: { general: !!generalSig, telehealth: !!telehealthSig, timestamp: new Date().toISOString() },
+      const { data, error } = await supabase.functions.invoke("submit-remote-intake", {
+        body: {
+          firstName, lastName, email, phone, dob, sex,
+          weightLbs, heightIn, menoStatus,
+          focus, symptoms, goals, medications, priorTherapy,
+          contraindications, allergies, labValues,
+          generalSig, telehealthSig,
+          generalConsentText: GENERAL_CONSENT_TEXT,
+          telehealthConsentText: TELEHEALTH_CONSENT_TEXT,
+          userAgent: navigator.userAgent,
         },
-        submitted_at: new Date().toISOString(),
       });
-
-      // Create hormone visit with labs
-      await supabase.from("hormone_visits").insert({
-        patient_id: patient.id,
-        ...labData,
-        intake_symptoms: symptoms, intake_goals: goals, intake_focus: focus,
-        peptide_categories: focus.filter(f => f.startsWith("peptide_")),
-        peptide_contraindications: contraindications,
-      } as any);
-
-      // Save e-consents
-      const consents = [];
-      if (generalSig) {
-        consents.push({
-          patient_id: patient.id,
-          consent_type: "general" as const,
-          consent_text: GENERAL_CONSENT_TEXT,
-          signature_data: generalSig,
-          ip_address: null,
-          user_agent: navigator.userAgent,
-        });
-      }
-      if (telehealthSig) {
-        consents.push({
-          patient_id: patient.id,
-          consent_type: "telehealth" as const,
-          consent_text: TELEHEALTH_CONSENT_TEXT,
-          signature_data: telehealthSig,
-          ip_address: null,
-          user_agent: navigator.userAgent,
-        });
-      }
-      if (consents.length > 0) {
-        await supabase.from("e_consents").insert(consents);
-      }
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
 
       localStorage.removeItem(SAVE_KEY);
       setSubmitted(true);
