@@ -2434,6 +2434,48 @@ export type Database = {
           },
         ]
       }
+      notifications: {
+        Row: {
+          body: string | null
+          channel: string
+          created_at: string
+          id: string
+          read_at: string | null
+          related_id: string | null
+          related_type: string | null
+          sent_at: string | null
+          status: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          body?: string | null
+          channel?: string
+          created_at?: string
+          id?: string
+          read_at?: string | null
+          related_id?: string | null
+          related_type?: string | null
+          sent_at?: string | null
+          status?: string
+          title: string
+          user_id: string
+        }
+        Update: {
+          body?: string | null
+          channel?: string
+          created_at?: string
+          id?: string
+          read_at?: string | null
+          related_id?: string | null
+          related_type?: string | null
+          sent_at?: string | null
+          status?: string
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       oversight_config: {
         Row: {
           config_key: string
@@ -3699,6 +3741,44 @@ export type Database = {
             foreignKeyName: "provider_memberships_provider_id_fkey"
             columns: ["provider_id"]
             isOneToOne: false
+            referencedRelation: "providers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      provider_notification_prefs: {
+        Row: {
+          created_at: string
+          daily_sms_enabled: boolean
+          daily_sms_time: string | null
+          id: string
+          phone_number: string | null
+          provider_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          daily_sms_enabled?: boolean
+          daily_sms_time?: string | null
+          id?: string
+          phone_number?: string | null
+          provider_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          daily_sms_enabled?: boolean
+          daily_sms_time?: string | null
+          id?: string
+          phone_number?: string | null
+          provider_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "provider_notification_prefs_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: true
             referencedRelation: "providers"
             referencedColumns: ["id"]
           },
