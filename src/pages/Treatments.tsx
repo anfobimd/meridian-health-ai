@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Stethoscope, ShieldCheck, FileCheck, Eye, EyeOff, DollarSign, History } from "lucide-react";
+import { Plus, Stethoscope, ShieldCheck, FileCheck, Eye, EyeOff, DollarSign, History, Sparkles, Loader2, AlertTriangle, CheckCircle2, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
 
@@ -19,6 +19,13 @@ export default function Treatments() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [showInactive, setShowInactive] = useState(false);
   const [editingPrice, setEditingPrice] = useState<any>(null);
+  const [aiTemplate, setAiTemplate] = useState<any>(null);
+  const [aiTemplateLoading, setAiTemplateLoading] = useState(false);
+  const [aiDeactivation, setAiDeactivation] = useState<any>(null);
+  const [aiDeactivationLoading, setAiDeactivationLoading] = useState(false);
+  const [deactivatingId, setDeactivatingId] = useState<string | null>(null);
+  const [aiRevImpact, setAiRevImpact] = useState<any>(null);
+  const [aiRevImpactLoading, setAiRevImpactLoading] = useState(false);
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
@@ -36,11 +43,7 @@ export default function Treatments() {
   const { data: priceHistory } = useQuery({
     queryKey: ["price-history"],
     queryFn: async () => {
-      const { data } = await supabase
-        .from("treatment_price_history")
-        .select("*, treatments:treatment_id(name)")
-        .order("created_at", { ascending: false })
-        .limit(50);
+      const { data } = await supabase.from("treatment_price_history").select("*, treatments:treatment_id(name)").order("created_at", { ascending: false }).limit(50);
       return data ?? [];
     },
   });
@@ -65,6 +68,7 @@ export default function Treatments() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["treatments"] });
       setDialogOpen(false);
+      setAiTemplate(null);
       toast.success("Treatment added");
     },
     onError: () => toast.error("Failed to add treatment"),
@@ -92,15 +96,10 @@ export default function Treatments() {
   const updatePrice = useMutation({
     mutationFn: async ({ id, price, member_price, is_member_pricing_enabled, reason }: any) => {
       const treatment = treatments?.find((t: any) => t.id === id);
-      // Log price history
       await supabase.from("treatment_price_history").insert({
-        treatment_id: id,
-        old_price: treatment?.price ?? 0,
-        new_price: price,
-        old_member_price: treatment?.member_price ?? 0,
-        new_member_price: member_price,
-        changed_by: user?.id,
-        change_reason: reason || null,
+        treatment_id: id, old_price: treatment?.price ?? 0, new_price: price,
+        old_member_price: treatment?.member_price ?? 0, new_member_price: member_price,
+        changed_by: user?.id, change_reason: reason || null,
       });
       const { error } = await supabase.from("treatments").update({ price, member_price, is_member_pricing_enabled }).eq("id", id);
       if (error) throw error;
@@ -109,10 +108,55 @@ export default function Treatments() {
       queryClient.invalidateQueries({ queryKey: ["treatments"] });
       queryClient.invalidateQueries({ queryKey: ["price-history"] });
       setEditingPrice(null);
+      setAiRevImpact(null);
       toast.success("Pricing updated");
     },
     onError: () => toast.error("Failed to update pricing"),
   });
+
+  // ─── AI: Template Match ───
+  const checkTemplate = async (name: string, category: string) => {
+    if (!name) return;
+    setAiTemplateLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("ai-catalog-advisor", {
+        body: { mode: "template_match", data: { treatment_name: name, category } },
+      });
+      if (error) throw error;
+      setAiTemplate(data);
+    } catch { toast.error("AI template check failed"); }
+    setAiTemplateLoading(false);
+  };
+
+  // ─── AI: Deactivation Impact ───
+  const checkDeactivation = async (id: string, name: string) => {
+    setDeactivatingId(id);
+    setAiDeactivationLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("ai-catalog-advisor", {
+        body: { mode: "deactivation_impact", data: { treatment_id: id, treatment_name: name } },
+      });
+      if (error) throw error;
+      setAiDeactivation(data);
+    } catch { toast.error("Impact check failed"); }
+    setAiDeactivationLoading(false);
+  };
+
+  // ─── AI: Revenue Impact ───
+  const checkRevImpact = async (treatment: any, newPrice: number, newMemberPrice: number) => {
+    setAiRevImpactLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("ai-catalog-advisor", {
+        body: { mode: "revenue_impact", data: {
+          treatment_name: treatment.name, old_price: treatment.price || 0, new_price: newPrice,
+          old_member_price: treatment.member_price || 0, new_member_price: newMemberPrice,
+        }},
+      });
+      if (error) throw error;
+      setAiRevImpact(data);
+    } catch { toast.error("Revenue impact check failed"); }
+    setAiRevImpactLoading(false);
+  };
 
   return (
     <div className="space-y-6">
@@ -126,14 +170,18 @@ export default function Treatments() {
             {showInactive ? <EyeOff className="h-4 w-4 mr-1.5" /> : <Eye className="h-4 w-4 mr-1.5" />}
             {showInactive ? "Hide Inactive" : "Show Inactive"}
           </Button>
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <Dialog open={dialogOpen} onOpenChange={(o) => { setDialogOpen(o); if (!o) setAiTemplate(null); }}>
             <DialogTrigger asChild>
               <Button><Plus className="h-4 w-4 mr-2" />Add Treatment</Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-lg">
               <DialogHeader><DialogTitle>Add Treatment</DialogTitle></DialogHeader>
               <form onSubmit={(e) => { e.preventDefault(); addTreatment.mutate(new FormData(e.currentTarget)); }} className="space-y-4">
-                <div className="space-y-2"><Label>Name *</Label><Input name="name" required /></div>
+                <div className="space-y-2"><Label>Name *</Label><Input name="name" required onBlur={(e) => {
+                  const form = e.target.closest("form");
+                  const cat = form?.querySelector<HTMLInputElement>('[name="category"]')?.value || "";
+                  checkTemplate(e.target.value, cat);
+                }} /></div>
                 <div className="space-y-2"><Label>Description</Label><Input name="description" /></div>
                 <div className="space-y-2"><Label>Category</Label><Input name="category" placeholder="e.g. Injectables, Laser" /></div>
                 <div className="grid grid-cols-2 gap-4">
@@ -143,20 +191,40 @@ export default function Treatments() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2"><Label>Member Price ($)</Label><Input name="member_price" type="number" step="0.01" /></div>
                   <label className="flex items-center gap-2 text-sm cursor-pointer self-end pb-2">
-                    <input type="checkbox" name="member_pricing" className="rounded border-input" />
-                    Enable member pricing
+                    <input type="checkbox" name="member_pricing" className="rounded border-input" />Enable member pricing
                   </label>
                 </div>
                 <div className="flex items-center gap-6 pt-2">
                   <label className="flex items-center gap-2 text-sm cursor-pointer">
-                    <input type="checkbox" name="requires_gfe" className="rounded border-input" />
+                    <input type="checkbox" name="requires_gfe" className="rounded border-input" defaultChecked={aiTemplate?.should_require_gfe} />
                     <ShieldCheck className="h-4 w-4 text-amber-500" /> Requires GFE
                   </label>
                   <label className="flex items-center gap-2 text-sm cursor-pointer">
-                    <input type="checkbox" name="requires_md_review" className="rounded border-input" />
+                    <input type="checkbox" name="requires_md_review" className="rounded border-input" defaultChecked={aiTemplate?.should_require_md_review} />
                     <FileCheck className="h-4 w-4 text-blue-500" /> Requires MD Review
                   </label>
                 </div>
+                {/* AI Template Recommendation */}
+                {aiTemplateLoading && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground p-2 bg-primary/5 rounded">
+                    <Loader2 className="h-3 w-3 animate-spin" />Analyzing template match…
+                  </div>
+                )}
+                {aiTemplate && !aiTemplateLoading && (
+                  <Card className="border-primary/20 bg-primary/5">
+                    <CardContent className="p-3 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="h-3.5 w-3.5 text-primary" />
+                        <span className="text-xs font-semibold">AI Recommendation</span>
+                        <Badge variant="outline" className="text-[9px]">{aiTemplate.match_confidence} match</Badge>
+                      </div>
+                      <p className="text-xs"><strong>Template:</strong> {aiTemplate.recommended_template_name}</p>
+                      <p className="text-xs text-muted-foreground">{aiTemplate.match_reason}</p>
+                      {aiTemplate.gfe_reason && <p className="text-xs"><strong>GFE:</strong> {aiTemplate.gfe_reason}</p>}
+                      {aiTemplate.md_review_reason && <p className="text-xs"><strong>MD Review:</strong> {aiTemplate.md_review_reason}</p>}
+                    </CardContent>
+                  </Card>
+                )}
                 <Button type="submit" className="w-full" disabled={addTreatment.isPending}>
                   {addTreatment.isPending ? "Adding..." : "Add Treatment"}
                 </Button>
@@ -173,7 +241,6 @@ export default function Treatments() {
           <TabsTrigger value="history"><History className="h-3.5 w-3.5 mr-1" /> Price History</TabsTrigger>
         </TabsList>
 
-        {/* Catalog Tab */}
         <TabsContent value="catalog">
           {isLoading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -204,10 +271,17 @@ export default function Treatments() {
                             <Switch checked={t.requires_md_review} onCheckedChange={(v) => toggleFlag.mutate({ id: t.id, field: "requires_md_review", value: v })} className="scale-75" />
                             <FileCheck className="h-3.5 w-3.5 text-blue-500" /> MD
                           </label>
-                          <label className="flex items-center gap-1.5 text-xs cursor-pointer ml-auto">
-                            <Switch checked={t.is_active} onCheckedChange={(v) => toggleActive.mutate({ id: t.id, is_active: v })} className="scale-75" />
-                            Active
-                          </label>
+                          <div className="ml-auto flex items-center gap-1">
+                            {t.is_active && (
+                              <Button variant="ghost" size="sm" className="h-6 text-[10px] text-warning" onClick={() => checkDeactivation(t.id, t.name)}>
+                                {aiDeactivationLoading && deactivatingId === t.id ? <Loader2 className="h-3 w-3 animate-spin" /> : "Impact?"}
+                              </Button>
+                            )}
+                            <label className="flex items-center gap-1.5 text-xs cursor-pointer">
+                              <Switch checked={t.is_active} onCheckedChange={(v) => toggleActive.mutate({ id: t.id, is_active: v })} className="scale-75" />
+                              Active
+                            </label>
+                          </div>
                         </div>
                       </div>
                       <div className="text-right ml-2">
@@ -224,21 +298,40 @@ export default function Treatments() {
           ) : (
             <Card><CardContent className="py-12 text-center"><Stethoscope className="h-12 w-12 mx-auto text-muted-foreground/50" /><p className="mt-4 text-muted-foreground">No treatments yet</p></CardContent></Card>
           )}
+
+          {/* AI Deactivation Impact Panel */}
+          {aiDeactivation && (
+            <Card className={`mt-4 border-${aiDeactivation.risk_level === "critical" ? "destructive" : aiDeactivation.risk_level === "warning" ? "warning" : "primary"}/20`}>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertTriangle className={`h-4 w-4 ${aiDeactivation.risk_level === "critical" ? "text-destructive" : aiDeactivation.risk_level === "warning" ? "text-warning" : "text-primary"}`} />
+                  <span className="text-sm font-semibold">Deactivation Impact Analysis</span>
+                  <Badge variant="outline" className="text-[10px]">{aiDeactivation.risk_level}</Badge>
+                  <Button variant="ghost" size="sm" className="ml-auto h-6 text-xs" onClick={() => setAiDeactivation(null)}>Dismiss</Button>
+                </div>
+                <p className="text-xs mb-2">{aiDeactivation.summary}</p>
+                <p className="text-xs text-muted-foreground">Affected appointments: {aiDeactivation.affected_appointments}</p>
+                {aiDeactivation.recommended_actions?.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    {aiDeactivation.recommended_actions.map((a: string, i: number) => (
+                      <p key={i} className="text-xs flex items-start gap-1.5"><ChevronRight className="h-3 w-3 text-primary mt-0.5 shrink-0" />{a}</p>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
-        {/* Pricing Tab */}
         <TabsContent value="pricing">
           <Card>
             <CardContent className="p-0">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Treatment</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Standard Price</TableHead>
-                    <TableHead>Member Price</TableHead>
-                    <TableHead>Member Pricing</TableHead>
-                    <TableHead className="w-[80px]">Edit</TableHead>
+                    <TableHead>Treatment</TableHead><TableHead>Category</TableHead>
+                    <TableHead>Standard Price</TableHead><TableHead>Member Price</TableHead>
+                    <TableHead>Member Pricing</TableHead><TableHead className="w-[80px]">Edit</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -254,7 +347,7 @@ export default function Treatments() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Button size="sm" variant="ghost" onClick={() => setEditingPrice(t)}>
+                        <Button size="sm" variant="ghost" onClick={() => { setEditingPrice(t); setAiRevImpact(null); }}>
                           <DollarSign className="h-3.5 w-3.5" />
                         </Button>
                       </TableCell>
@@ -266,20 +359,15 @@ export default function Treatments() {
           </Card>
         </TabsContent>
 
-        {/* Price History Tab */}
         <TabsContent value="history">
           <Card>
             <CardContent className="p-0">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Treatment</TableHead>
-                    <TableHead>Old Price</TableHead>
-                    <TableHead>New Price</TableHead>
-                    <TableHead>Old Member</TableHead>
-                    <TableHead>New Member</TableHead>
-                    <TableHead>Reason</TableHead>
-                    <TableHead>Date</TableHead>
+                    <TableHead>Treatment</TableHead><TableHead>Old Price</TableHead><TableHead>New Price</TableHead>
+                    <TableHead>Old Member</TableHead><TableHead>New Member</TableHead>
+                    <TableHead>Reason</TableHead><TableHead>Date</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -303,8 +391,8 @@ export default function Treatments() {
         </TabsContent>
       </Tabs>
 
-      {/* Edit Pricing Dialog */}
-      <Dialog open={!!editingPrice} onOpenChange={(o) => !o && setEditingPrice(null)}>
+      {/* Edit Pricing Dialog with AI Revenue Impact */}
+      <Dialog open={!!editingPrice} onOpenChange={(o) => { if (!o) { setEditingPrice(null); setAiRevImpact(null); } }}>
         <DialogContent>
           <DialogHeader><DialogTitle>Edit Pricing — {editingPrice?.name}</DialogTitle></DialogHeader>
           <form
@@ -322,23 +410,45 @@ export default function Treatments() {
             className="space-y-4"
           >
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Standard Price ($)</Label>
-                <Input name="price" type="number" step="0.01" defaultValue={editingPrice?.price || 0} />
-              </div>
-              <div className="space-y-2">
-                <Label>Member Price ($)</Label>
-                <Input name="member_price" type="number" step="0.01" defaultValue={editingPrice?.member_price || 0} />
-              </div>
+              <div className="space-y-2"><Label>Standard Price ($)</Label><Input name="price" type="number" step="0.01" defaultValue={editingPrice?.price || 0} /></div>
+              <div className="space-y-2"><Label>Member Price ($)</Label><Input name="member_price" type="number" step="0.01" defaultValue={editingPrice?.member_price || 0} /></div>
             </div>
             <label className="flex items-center gap-2 text-sm cursor-pointer">
-              <input type="checkbox" name="member_enabled" className="rounded border-input" defaultChecked={editingPrice?.is_member_pricing_enabled} />
-              Enable member pricing
+              <input type="checkbox" name="member_enabled" className="rounded border-input" defaultChecked={editingPrice?.is_member_pricing_enabled} />Enable member pricing
             </label>
-            <div className="space-y-2">
-              <Label>Change Reason</Label>
-              <Input name="reason" placeholder="e.g. Annual price adjustment" />
-            </div>
+            <div className="space-y-2"><Label>Change Reason</Label><Input name="reason" placeholder="e.g. Annual price adjustment" /></div>
+
+            {/* AI Revenue Impact Button */}
+            <Button type="button" variant="outline" size="sm" className="w-full" disabled={aiRevImpactLoading}
+              onClick={() => {
+                const form = document.querySelector<HTMLFormElement>('form');
+                const fd = form ? new FormData(form) : null;
+                checkRevImpact(editingPrice, parseFloat(fd?.get("price") as string || "0"), parseFloat(fd?.get("member_price") as string || "0"));
+              }}>
+              {aiRevImpactLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Sparkles className="h-3.5 w-3.5 mr-1.5" />}
+              {aiRevImpact ? "Refresh Impact Analysis" : "Analyze Revenue Impact"}
+            </Button>
+
+            {aiRevImpact && (
+              <Card className={`border-${aiRevImpact.risk_level === "critical" ? "destructive" : aiRevImpact.risk_level === "negative" ? "warning" : "success"}/20 bg-${aiRevImpact.risk_level === "critical" ? "destructive" : aiRevImpact.risk_level === "negative" ? "warning" : "success"}/5`}>
+                <CardContent className="p-3 space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-3.5 w-3.5 text-primary" />
+                    <span className="text-xs font-semibold">Revenue Impact</span>
+                    <Badge variant="outline" className="text-[9px]">{aiRevImpact.risk_level}</Badge>
+                  </div>
+                  <p className="text-xs font-medium">Est. Monthly Impact: {aiRevImpact.estimated_monthly_impact}</p>
+                  <p className="text-xs text-muted-foreground">{aiRevImpact.commentary}</p>
+                  {aiRevImpact.below_cost_warning && (
+                    <div className="flex items-center gap-1.5 text-xs text-destructive font-medium">
+                      <AlertTriangle className="h-3 w-3" />Below-cost warning!
+                    </div>
+                  )}
+                  {aiRevImpact.recommendation && <p className="text-xs text-primary">→ {aiRevImpact.recommendation}</p>}
+                </CardContent>
+              </Card>
+            )}
+
             <Button type="submit" className="w-full" disabled={updatePrice.isPending}>
               {updatePrice.isPending ? "Saving..." : "Update Pricing"}
             </Button>
