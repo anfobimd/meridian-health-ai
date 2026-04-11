@@ -52,7 +52,7 @@ export default function ProviderProfile() {
         setNpi(data.npi || "");
         setMarketplaceBio(data.marketplace_bio || "");
         setModalities(data.modalities || []);
-        setAvatarUrl(data.avatar_url || null);
+        setAvatarUrl(data.headshot_url || null);
       }
       setLoading(false);
     };
@@ -97,7 +97,7 @@ export default function ProviderProfile() {
       if (uploadErr) throw uploadErr;
       const { data: urlData } = supabase.storage.from("clinical-photos").getPublicUrl(path);
       const url = urlData.publicUrl;
-      await supabase.from("providers").update({ avatar_url: url }).eq("id", provider.id);
+      await supabase.from("providers").update({ headshot_url: url }).eq("id", provider.id);
       setAvatarUrl(url);
       toast({ title: "Photo uploaded" });
     } catch (err: any) {

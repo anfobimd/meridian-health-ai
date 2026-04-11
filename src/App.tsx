@@ -51,6 +51,7 @@ import Waitlist from "./pages/Waitlist";
 import OutstandingCharts from "./pages/OutstandingCharts";
 import ChartCompleteness from "./pages/ChartCompleteness";
 import ProviderDrillDown from "./pages/ProviderDrillDown";
+import ProviderPerformanceDashboard from "./pages/ProviderPerformanceDashboard";
 import Reports from "./pages/Reports";
 import ContractsAdmin from "./pages/ContractsAdmin";
 import MdCoverage from "./pages/MdCoverage";
@@ -116,6 +117,7 @@ const App = () => (
                 <Route path="/outstanding-charts" element={<OutstandingCharts />} />
                 <Route path="/chart-completeness" element={<ChartCompleteness />} />
                 <Route path="/provider-performance" element={<ProviderDrillDown />} />
+                <Route path="/my-performance" element={<ProviderPerformanceDashboard />} />
                 <Route path="/reports" element={<Reports />} />
                 <Route path="/contracts" element={<ContractsAdmin />} />
                 <Route path="/md-coverage" element={<MdCoverage />} />
