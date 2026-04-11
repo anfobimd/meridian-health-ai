@@ -12,7 +12,7 @@ import {
   FileText, ShieldCheck, Package, Sparkles, Loader2, ChevronRight,
   Activity, Stethoscope, ArrowRight, Bell, BarChart3, Zap,
 } from "lucide-react";
-import { format, parseISO, isToday, startOfMonth, endOfMonth, subMonths } from "date-fns";
+import { format, parseISO, isToday, startOfMonth, endOfMonth, subMonths, getISOWeek } from "date-fns";
 import { toast } from "sonner";
 
 export default function Dashboard() {
