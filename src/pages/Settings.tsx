@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
-import { Shield, ShieldCheck, Loader2, QrCode, Trash2, KeyRound, Check, X } from "lucide-react";
+import { Shield, ShieldCheck, Loader2, QrCode, Trash2, KeyRound, Check, X, UserCog } from "lucide-react";
 
 function getPasswordStrength(pw: string): { score: number; label: string; color: string } {
   let score = 0;
@@ -25,7 +25,7 @@ function getPasswordStrength(pw: string): { score: number; label: string; color:
 }
 
 export default function Settings() {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const { toast } = useToast();
   const [mfaFactors, setMfaFactors] = useState<any[]>([]);
   const [enrolling, setEnrolling] = useState(false);
@@ -293,6 +293,81 @@ export default function Settings() {
           )}
         </CardContent>
       </Card>
+
+      {/* Admin: Reset User Password */}
+      {role === "admin" && <AdminPasswordReset />}
     </div>
+  );
+}
+
+function AdminPasswordReset() {
+  const { toast } = useToast();
+  const [email, setEmail] = useState("");
+  const [newPw, setNewPw] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [users, setUsers] = useState<{id: string; email: string}[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState("");
+
+  useEffect(() => {
+    supabase.from("profiles").select("user_id, display_name").then(({ data }) => {
+      if (data) setUsers(data.map(p => ({ id: p.user_id, email: p.display_name || p.user_id })));
+    });
+  }, []);
+
+  const handleReset = async () => {
+    if (!selectedUserId || !newPw) return;
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("admin-reset-password", {
+        body: { target_user_id: selectedUserId, new_password: newPw },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast({ title: "Password reset", description: "User password has been updated" });
+      setNewPw("");
+      setSelectedUserId("");
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const strength = getPasswordStrength(newPw);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2"><UserCog className="h-5 w-5" />Admin: Reset User Password</CardTitle>
+        <CardDescription>Reset any user's password (admin only)</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div>
+          <Label>Select User</Label>
+          <select
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            value={selectedUserId}
+            onChange={e => setSelectedUserId(e.target.value)}
+          >
+            <option value="">Choose a user…</option>
+            {users.map(u => <option key={u.id} value={u.id}>{u.email}</option>)}
+          </select>
+        </div>
+        <div>
+          <Label>New Password</Label>
+          <Input type="password" value={newPw} onChange={e => setNewPw(e.target.value)} placeholder="Min 8 characters" />
+          {newPw && (
+            <div className="mt-2 space-y-1">
+              <Progress value={strength.score} className="h-1.5" />
+              <p className="text-xs text-muted-foreground">{strength.label}</p>
+            </div>
+          )}
+        </div>
+        <Button onClick={handleReset} disabled={!selectedUserId || newPw.length < 8 || loading}>
+          {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          Reset Password
+        </Button>
+      </CardContent>
+    </Card>
   );
 }

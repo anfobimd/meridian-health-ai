@@ -4,7 +4,7 @@ import {
   Activity, FlaskConical, FileText, Pill, DollarSign, ClipboardPlus, ShieldCheck, DoorOpen, Store, Package,
   CreditCard, TrendingUp, Calculator, MonitorCheck, Briefcase, Search, LogOut, CalendarClock, TrendingDown,
   Settings, UserCircle, CalendarOff, MessageSquare, ClipboardCheck, Mail, Clock, ListChecks,
-  Building2, BarChart3, Zap, BookOpen,
+  Building2, BarChart3, Zap, BookOpen, Bell, CalendarDays,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -22,6 +22,7 @@ const navSections = [
       { to: "/messages", icon: Mail, label: "Messages" },
       { to: "/time-off", icon: CalendarOff, label: "Time Off" },
       { to: "/my-profile", icon: UserCircle, label: "My Profile" },
+      { to: "/notifications", icon: Bell, label: "Notifications" },
       { to: "/settings", icon: Settings, label: "Settings" },
     ],
   },
@@ -55,6 +56,7 @@ const navSections = [
       { to: "/medications", icon: Pill, label: "Medications" },
       { to: "/rooms-devices", icon: DoorOpen, label: "Rooms & Devices" },
       { to: "/provider-schedule", icon: CalendarClock, label: "Schedules" },
+      { to: "/calendar-grid", icon: CalendarDays, label: "Calendar Grid" },
       { to: "/clinic-hours", icon: Clock, label: "Clinic Hours" },
       { to: "/waitlist", icon: ListChecks, label: "Waitlist" },
       { to: "/providers", icon: UserCog, label: "Providers" },
