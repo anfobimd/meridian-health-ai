@@ -369,7 +369,81 @@ export default function Dashboard() {
         </CardContent>
       </Card>
 
-      {/* Main Grid: Alerts + Today's Schedule */}
+      {/* AI Weekly Insights */}
+      <Card className="border-accent/20 bg-gradient-to-r from-accent/5 to-transparent">
+        <CardContent className="p-5">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <div className="h-8 w-8 rounded-lg bg-accent/10 flex items-center justify-center">
+                <BarChart3 className="h-4 w-4 text-accent-foreground" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold">AI Weekly Insights</p>
+                <p className="text-[10px] text-muted-foreground">7-day performance summary with week-over-week trends</p>
+              </div>
+            </div>
+            <Button size="sm" variant="outline" onClick={loadWeeklyInsights} disabled={weeklyLoading}>
+              {weeklyLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <TrendingUp className="h-3.5 w-3.5 mr-1" />}
+              {weeklyInsights ? "Refresh" : "Generate Insights"}
+            </Button>
+          </div>
+          {weeklyInsights ? (
+            <div className="space-y-4">
+              <p className="text-sm leading-relaxed">{weeklyInsights.narrative}</p>
+
+              {/* KPI Highlights */}
+              {weeklyInsights.kpi_highlights && weeklyInsights.kpi_highlights.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {weeklyInsights.kpi_highlights.map((kpi: any, i: number) => (
+                    <Badge key={i} variant="secondary" className="text-xs py-1 px-2.5 gap-1">
+                      {kpi.trend === "up" ? "↑" : kpi.trend === "down" ? "↓" : "→"} {kpi.label}: {kpi.value}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+
+              {/* Weekly Action */}
+              {weeklyInsights.weekly_action && (
+                <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
+                  <p className="text-xs font-semibold text-primary uppercase tracking-wider mb-1">⚡ This Week's Action</p>
+                  <p className="text-sm">{weeklyInsights.weekly_action}</p>
+                </div>
+              )}
+
+              {/* Trends Table */}
+              {weeklyInsights.trends && weeklyInsights.trends.length > 0 && (
+                <div className="rounded border overflow-hidden">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="bg-muted/50">
+                        <th className="text-left p-2 font-medium text-muted-foreground">Metric</th>
+                        <th className="text-right p-2 font-medium text-muted-foreground">This Week</th>
+                        <th className="text-right p-2 font-medium text-muted-foreground">Last Week</th>
+                        <th className="text-right p-2 font-medium text-muted-foreground">Change</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {weeklyInsights.trends.map((t: any, i: number) => (
+                        <tr key={i} className="border-t border-border/50">
+                          <td className="p-2">{t.metric}</td>
+                          <td className="p-2 text-right font-mono">{t.this_week}</td>
+                          <td className="p-2 text-right font-mono text-muted-foreground">{t.last_week}</td>
+                          <td className={`p-2 text-right font-mono ${String(t.change_pct).startsWith("+") ? "text-success" : String(t.change_pct).startsWith("-") ? "text-destructive" : ""}`}>
+                            {t.change_pct}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">Click "Generate Insights" for an AI-powered weekly performance summary with trends and recommendations.</p>
+          )}
+        </CardContent>
+      </Card>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Alerts Panel (2 cols) */}
         <div className="lg:col-span-2 space-y-4">
