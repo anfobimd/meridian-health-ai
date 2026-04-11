@@ -3266,6 +3266,7 @@ export type Database = {
           credentials: string | null
           email: string | null
           first_name: string
+          headshot_url: string | null
           hourly_rate_override: number | null
           id: string
           is_active: boolean
@@ -3286,6 +3287,7 @@ export type Database = {
           credentials?: string | null
           email?: string | null
           first_name: string
+          headshot_url?: string | null
           hourly_rate_override?: number | null
           id?: string
           is_active?: boolean
@@ -3306,6 +3308,7 @@ export type Database = {
           credentials?: string | null
           email?: string | null
           first_name?: string
+          headshot_url?: string | null
           hourly_rate_override?: number | null
           id?: string
           is_active?: boolean

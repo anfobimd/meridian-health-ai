@@ -38,6 +38,9 @@ import RemoteIntake from "./pages/RemoteIntake";
 import PatientPortal from "./pages/PatientPortal";
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
+import Settings from "./pages/Settings";
+import ProviderProfile from "./pages/ProviderProfile";
+import TemplateManager from "./pages/TemplateManager";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -81,6 +84,9 @@ const App = () => (
                 <Route path="/churn-risk" element={<ChurnRisk />} />
                 <Route path="/my-marketplace" element={<ProviderMarketplace />} />
                 <Route path="/provider-schedule" element={<ProviderSchedule />} />
+                <Route path="/settings" element={<Settings />} />
+                <Route path="/my-profile" element={<ProviderProfile />} />
+                <Route path="/templates" element={<TemplateManager />} />
               </Route>
             </Route>
             {/* Public routes — no auth required */}
