@@ -19,6 +19,19 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [aiBriefing, setAiBriefing] = useState<any>(null);
   const [briefingLoading, setBriefingLoading] = useState(false);
+  const [weeklyInsights, setWeeklyInsights] = useState<any>(() => {
+    try {
+      const cached = localStorage.getItem("weekly_insights_cache");
+      if (cached) {
+        const { data, week, ts } = JSON.parse(cached);
+        const now = Date.now();
+        const currentWeek = getISOWeek(new Date());
+        if (week === currentWeek && now - ts < 4 * 3600 * 1000) return data;
+      }
+    } catch {}
+    return null;
+  });
+  const [weeklyLoading, setWeeklyLoading] = useState(false);
 
   // --- Data Queries ---
 
