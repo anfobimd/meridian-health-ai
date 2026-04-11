@@ -16,7 +16,7 @@ type NavItem = {
   icon: any;
   label: string;
   roles?: string[];
-  badgeKey?: string; // key for dynamic badge count
+  badgeKey?: string;
 };
 
 type NavSection = {
@@ -27,24 +27,30 @@ type NavSection = {
 
 const navSections: NavSection[] = [
   {
-    label: "MY WORK",
+    label: "COMMAND",
     items: [
       { to: "/", icon: LayoutDashboard, label: "Dashboard", roles: ["admin", "front_desk"] },
       { to: "/provider-day", icon: Briefcase, label: "My Day", roles: ["provider"] },
       { to: "/front-desk", icon: MonitorCheck, label: "Front Desk", roles: ["admin", "front_desk"] },
       { to: "/check-in", icon: ClipboardCheck, label: "Check-In", roles: ["admin", "front_desk"] },
-      { to: "/encounters", icon: FileText, label: "Encounters" },
-      { to: "/md-feedback", icon: MessageSquare, label: "MD Feedback", roles: ["provider"], badgeKey: "md_corrections" },
-      { to: "/messages", icon: Mail, label: "Messages", badgeKey: "unread_messages" },
-      { to: "/patient-inbox", icon: Inbox, label: "Patient Inbox", roles: ["admin", "front_desk"] },
-      { to: "/notifications", icon: Bell, label: "Notifications" },
+    ],
+  },
+  {
+    label: "SCHEDULE",
+    items: [
+      { to: "/appointments", icon: Calendar, label: "Appointments" },
+      { to: "/calendar-grid", icon: CalendarDays, label: "Calendar Grid", roles: ["admin"] },
+      { to: "/waitlist", icon: ListChecks, label: "Waitlist", roles: ["admin"] },
     ],
   },
   {
     label: "PATIENTS",
     items: [
       { to: "/patients", icon: Users, label: "Patients" },
-      { to: "/appointments", icon: Calendar, label: "Appointments" },
+      { to: "/encounters", icon: FileText, label: "Encounters" },
+      { to: "/messages", icon: Mail, label: "Messages", badgeKey: "unread_messages" },
+      { to: "/patient-inbox", icon: Inbox, label: "Patient Inbox", roles: ["admin", "front_desk"] },
+      { to: "/notifications", icon: Bell, label: "Notifications" },
     ],
   },
   {
@@ -56,49 +62,48 @@ const navSections: NavSection[] = [
       { to: "/hormone-intake", icon: ClipboardPlus, label: "Hormone Intake" },
       { to: "/physician-approval", icon: ShieldCheck, label: "Approvals" },
       { to: "/protocols", icon: Pill, label: "Protocols" },
+      { to: "/md-feedback", icon: MessageSquare, label: "MD Feedback", roles: ["provider"], badgeKey: "md_corrections" },
     ],
   },
   {
-    label: "ME",
+    label: "CLINIC CONFIG",
+    roles: ["admin"],
     items: [
-      { to: "/my-profile", icon: UserCircle, label: "My Profile" },
-      { to: "/my-performance", icon: BarChart3, label: "Performance", roles: ["provider"] },
-      { to: "/time-off", icon: CalendarOff, label: "Time Off" },
-      { to: "/settings", icon: Settings, label: "Settings" },
+      { to: "/treatments", icon: Stethoscope, label: "Treatments" },
+      { to: "/medications", icon: Pill, label: "Medications" },
+      { to: "/packages", icon: Package, label: "Packages" },
+      { to: "/membership-billing", icon: CreditCard, label: "Memberships" },
+      { to: "/templates", icon: FileText, label: "Templates" },
+    ],
+  },
+  {
+    label: "OPERATIONS",
+    roles: ["admin"],
+    items: [
+      { to: "/provider-schedule", icon: CalendarClock, label: "Schedules" },
+      { to: "/clinic-hours", icon: Clock, label: "Clinic Hours" },
+      { to: "/rooms-devices", icon: DoorOpen, label: "Rooms & Devices" },
+      { to: "/providers", icon: UserCog, label: "Providers" },
+      { to: "/automation-rules", icon: Zap, label: "Automations" },
     ],
   },
   {
     label: "OVERSIGHT",
     roles: ["admin"],
     items: [
-      { to: "/md-oversight", icon: ShieldCheck, label: "Oversight Hub" },
-      { to: "/md-oversight/dashboard", icon: Activity, label: "Oversight Dashboard" },
-      { to: "/outstanding-charts", icon: FileText, label: "Outstanding Charts" },
-      { to: "/chart-completeness", icon: ClipboardCheck, label: "Completeness" },
+      { to: "/md-oversight", icon: ShieldCheck, label: "Chart Review" },
+      { to: "/md-oversight/dashboard", icon: Activity, label: "MD Status" },
       { to: "/churn-risk", icon: TrendingDown, label: "Churn Risk" },
     ],
   },
   {
-    label: "ADMIN",
+    label: "FINANCIALS",
     roles: ["admin"],
     items: [
-      { to: "/treatments", icon: Stethoscope, label: "Treatments" },
-      { to: "/medications", icon: Pill, label: "Medications" },
-      { to: "/rooms-devices", icon: DoorOpen, label: "Rooms & Devices" },
-      { to: "/provider-schedule", icon: CalendarClock, label: "Schedules" },
-      { to: "/calendar-grid", icon: CalendarDays, label: "Calendar Grid" },
-      { to: "/clinic-hours", icon: Clock, label: "Clinic Hours" },
-      { to: "/waitlist", icon: ListChecks, label: "Waitlist" },
-      { to: "/providers", icon: UserCog, label: "Providers" },
       { to: "/billing", icon: DollarSign, label: "Billing" },
-      { to: "/marketplace", icon: Store, label: "Marketplace" },
-      { to: "/my-marketplace", icon: Store, label: "My Marketplace" },
-      { to: "/packages", icon: Package, label: "Packages" },
-      { to: "/membership-billing", icon: CreditCard, label: "Memberships" },
       { to: "/earnings", icon: TrendingUp, label: "Earnings" },
       { to: "/proforma", icon: Calculator, label: "Proforma" },
-      { to: "/reports", icon: FileText, label: "Reports" },
-      { to: "/templates", icon: FileText, label: "Templates" },
+      { to: "/reports", icon: BarChart3, label: "Reports" },
     ],
   },
   {
@@ -109,7 +114,15 @@ const navSections: NavSection[] = [
       { to: "/md-coverage", icon: ShieldCheck, label: "MD Coverage" },
       { to: "/master-catalog", icon: BookOpen, label: "Master Catalog" },
       { to: "/benchmarks", icon: BarChart3, label: "Benchmarks" },
-      { to: "/automation-rules", icon: Zap, label: "Automations" },
+    ],
+  },
+  {
+    label: "ME",
+    items: [
+      { to: "/my-profile", icon: UserCircle, label: "My Profile" },
+      { to: "/my-performance", icon: BarChart3, label: "Performance", roles: ["provider"] },
+      { to: "/time-off", icon: CalendarOff, label: "Time Off" },
+      { to: "/settings", icon: Settings, label: "Settings" },
     ],
   },
 ];
@@ -132,13 +145,10 @@ export function AppSidebar() {
 
   const visibleSections = filterNav(navSections, role);
 
-  // Fetch badge counts
   useEffect(() => {
     if (!user) return;
     const fetchBadges = async () => {
       const counts: Record<string, number> = {};
-
-      // Unread messages
       const { count: msgCount } = await supabase
         .from("messages")
         .select("*", { count: "exact", head: true })
@@ -147,7 +157,6 @@ export function AppSidebar() {
         .is("parent_id", null);
       if (msgCount) counts.unread_messages = msgCount;
 
-      // MD corrections (for providers)
       if (role === "provider") {
         const { data: prov } = await supabase
           .from("providers")
@@ -163,31 +172,20 @@ export function AppSidebar() {
           if (corrCount) counts.md_corrections = corrCount;
         }
       }
-
       setBadges(counts);
     };
 
     fetchBadges();
-
-    // Refresh badges on messages changes
     const channel = supabase
       .channel("sidebar-badges")
       .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, () => fetchBadges())
       .on("postgres_changes", { event: "*", schema: "public", table: "chart_review_records" }, () => fetchBadges())
       .subscribe();
-
     return () => { supabase.removeChannel(channel); };
   }, [user, role]);
 
-  const initials = user?.email
-    ? user.email.substring(0, 2).toUpperCase()
-    : "??";
-
-  const displayName =
-    user?.user_metadata?.full_name ||
-    user?.user_metadata?.name ||
-    user?.email?.split("@")[0] ||
-    "User";
+  const initials = user?.email ? user.email.substring(0, 2).toUpperCase() : "??";
+  const displayName = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split("@")[0] || "User";
 
   return (
     <aside className="hidden md:flex w-56 flex-col bg-sidebar text-sidebar-foreground min-h-screen flex-shrink-0">
@@ -199,7 +197,6 @@ export function AppSidebar() {
         <p className="text-[9px] font-bold tracking-[0.14em] uppercase text-sidebar-primary mt-0.5">WELLNESS EHR</p>
       </div>
 
-      {/* Cmd+K hint */}
       <button
         onClick={() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }))}
         className="mx-3 mt-3 flex items-center gap-2 rounded-md border border-sidebar-border px-3 py-1.5 text-[11px] text-sidebar-foreground/40 hover:bg-white/5 transition-colors"
