@@ -28,6 +28,8 @@ export default function Appointments() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [soapDialogOpen, setSoapDialogOpen] = useState(false);
   const [roomingDialogOpen, setRoomingDialogOpen] = useState(false);
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
   const [selectedApt, setSelectedApt] = useState<any>(null);
   const [soapNote, setSoapNote] = useState<any>(null);
   const [generatingNote, setGeneratingNote] = useState(false);
