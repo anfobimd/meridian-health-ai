@@ -1939,6 +1939,57 @@ export type Database = {
         }
         Relationships: []
       }
+      medications: {
+        Row: {
+          category: string | null
+          created_at: string
+          default_dose: string | null
+          default_unit: string | null
+          generic_name: string | null
+          id: string
+          is_active: boolean
+          is_controlled: boolean
+          name: string
+          notes: string | null
+          requires_credentials: string[] | null
+          route: string | null
+          schedule_class: string | null
+          updated_at: string
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          default_dose?: string | null
+          default_unit?: string | null
+          generic_name?: string | null
+          id?: string
+          is_active?: boolean
+          is_controlled?: boolean
+          name: string
+          notes?: string | null
+          requires_credentials?: string[] | null
+          route?: string | null
+          schedule_class?: string | null
+          updated_at?: string
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          default_dose?: string | null
+          default_unit?: string | null
+          generic_name?: string | null
+          id?: string
+          is_active?: boolean
+          is_controlled?: boolean
+          name?: string
+          notes?: string | null
+          requires_credentials?: string[] | null
+          route?: string | null
+          schedule_class?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       membership_invoices: {
         Row: {
           amount: number
@@ -3126,6 +3177,60 @@ export type Database = {
           },
         ]
       }
+      provider_clearances: {
+        Row: {
+          cleared_at: string
+          cleared_by: string | null
+          created_at: string
+          expires_at: string | null
+          id: string
+          is_active: boolean
+          notes: string | null
+          provider_id: string
+          treatment_id: string
+          updated_at: string
+        }
+        Insert: {
+          cleared_at?: string
+          cleared_by?: string | null
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          provider_id: string
+          treatment_id: string
+          updated_at?: string
+        }
+        Update: {
+          cleared_at?: string
+          cleared_by?: string | null
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          provider_id?: string
+          treatment_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "provider_clearances_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "providers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "provider_clearances_treatment_id_fkey"
+            columns: ["treatment_id"]
+            isOneToOne: false
+            referencedRelation: "treatments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       provider_earnings: {
         Row: {
           appointment_id: string | null
@@ -3745,6 +3850,8 @@ export type Database = {
           is_active: boolean
           name: string
           price: number | null
+          requires_gfe: boolean
+          requires_md_review: boolean
           updated_at: string
         }
         Insert: {
@@ -3757,6 +3864,8 @@ export type Database = {
           is_active?: boolean
           name: string
           price?: number | null
+          requires_gfe?: boolean
+          requires_md_review?: boolean
           updated_at?: string
         }
         Update: {
@@ -3769,6 +3878,8 @@ export type Database = {
           is_active?: boolean
           name?: string
           price?: number | null
+          requires_gfe?: boolean
+          requires_md_review?: boolean
           updated_at?: string
         }
         Relationships: [

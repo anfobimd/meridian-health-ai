@@ -49,6 +49,7 @@ const navSections = [
     label: "ADMIN",
     items: [
       { to: "/treatments", icon: Stethoscope, label: "Treatments" },
+      { to: "/medications", icon: Pill, label: "Medications" },
       { to: "/rooms-devices", icon: DoorOpen, label: "Rooms & Devices" },
       { to: "/provider-schedule", icon: CalendarClock, label: "Schedules" },
       { to: "/providers", icon: UserCog, label: "Providers" },

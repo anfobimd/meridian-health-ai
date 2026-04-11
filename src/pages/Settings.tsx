@@ -6,8 +6,23 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
-import { Shield, ShieldCheck, Loader2, QrCode, Trash2 } from "lucide-react";
+import { Shield, ShieldCheck, Loader2, QrCode, Trash2, KeyRound, Check, X } from "lucide-react";
+
+function getPasswordStrength(pw: string): { score: number; label: string; color: string } {
+  let score = 0;
+  if (pw.length >= 8) score++;
+  if (pw.length >= 12) score++;
+  if (/[A-Z]/.test(pw)) score++;
+  if (/[0-9]/.test(pw)) score++;
+  if (/[^A-Za-z0-9]/.test(pw)) score++;
+  if (score <= 1) return { score: 20, label: "Weak", color: "bg-destructive" };
+  if (score === 2) return { score: 40, label: "Fair", color: "bg-orange-500" };
+  if (score === 3) return { score: 60, label: "Good", color: "bg-yellow-500" };
+  if (score === 4) return { score: 80, label: "Strong", color: "bg-primary" };
+  return { score: 100, label: "Excellent", color: "bg-green-500" };
+}
 
 export default function Settings() {
   const { user } = useAuth();
@@ -19,6 +34,31 @@ export default function Settings() {
   const [verifyCode, setVerifyCode] = useState("");
   const [loading, setLoading] = useState(true);
   const [verifying, setVerifying] = useState(false);
+
+  // Password change state
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
+
+  const strength = getPasswordStrength(newPassword);
+  const passwordsMatch = newPassword === confirmPassword && confirmPassword.length > 0;
+  const canSubmitPassword = newPassword.length >= 8 && passwordsMatch && strength.score >= 60;
+
+  const handlePasswordChange = async () => {
+    if (!canSubmitPassword) return;
+    setChangingPassword(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+      toast({ title: "Password Updated", description: "Your password has been changed successfully." });
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setChangingPassword(false);
+    }
+  };
 
   const fetchFactors = async () => {
     setLoading(true);
@@ -56,14 +96,12 @@ export default function Settings() {
     try {
       const challenge = await supabase.auth.mfa.challenge({ factorId });
       if (challenge.error) throw challenge.error;
-
       const verify = await supabase.auth.mfa.verify({
         factorId,
         challengeId: challenge.data.id,
         code: verifyCode,
       });
       if (verify.error) throw verify.error;
-
       toast({ title: "MFA Enabled", description: "Two-factor authentication is now active." });
       setQrUri(null);
       setFactorId(null);
@@ -96,6 +134,74 @@ export default function Settings() {
         <p className="text-sm text-muted-foreground">Manage your account security</p>
       </div>
 
+      {/* Password Change */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <KeyRound className="h-5 w-5" />
+            Change Password
+          </CardTitle>
+          <CardDescription>
+            Update your password. Must be at least 8 characters with good strength.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="new-password">New Password</Label>
+            <Input
+              id="new-password"
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="Enter new password"
+            />
+            {newPassword.length > 0 && (
+              <div className="space-y-1.5">
+                <Progress value={strength.score} className="h-1.5" />
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">Strength: <span className="font-medium">{strength.label}</span></span>
+                  <div className="flex gap-2">
+                    <span className={`flex items-center gap-0.5 ${newPassword.length >= 8 ? "text-primary" : "text-muted-foreground"}`}>
+                      {newPassword.length >= 8 ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />} 8+ chars
+                    </span>
+                    <span className={`flex items-center gap-0.5 ${/[A-Z]/.test(newPassword) ? "text-primary" : "text-muted-foreground"}`}>
+                      {/[A-Z]/.test(newPassword) ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />} Uppercase
+                    </span>
+                    <span className={`flex items-center gap-0.5 ${/[0-9]/.test(newPassword) ? "text-primary" : "text-muted-foreground"}`}>
+                      {/[0-9]/.test(newPassword) ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />} Number
+                    </span>
+                    <span className={`flex items-center gap-0.5 ${/[^A-Za-z0-9]/.test(newPassword) ? "text-primary" : "text-muted-foreground"}`}>
+                      {/[^A-Za-z0-9]/.test(newPassword) ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />} Symbol
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="confirm-password">Confirm Password</Label>
+            <Input
+              id="confirm-password"
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="Confirm new password"
+            />
+            {confirmPassword.length > 0 && (
+              <p className={`text-xs flex items-center gap-1 ${passwordsMatch ? "text-primary" : "text-destructive"}`}>
+                {passwordsMatch ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
+                {passwordsMatch ? "Passwords match" : "Passwords do not match"}
+              </p>
+            )}
+          </div>
+          <Button onClick={handlePasswordChange} disabled={!canSubmitPassword || changingPassword}>
+            {changingPassword && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Update Password
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* MFA Card */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -113,7 +219,6 @@ export default function Settings() {
             </div>
           ) : (
             <>
-              {/* Current factors */}
               {verifiedFactors.length > 0 ? (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
@@ -141,7 +246,6 @@ export default function Settings() {
                 </p>
               )}
 
-              {/* Enrollment flow */}
               {qrUri ? (
                 <div className="space-y-4 rounded-md border p-4">
                   <div className="flex flex-col items-center gap-3">
