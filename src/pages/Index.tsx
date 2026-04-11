@@ -7,12 +7,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   Users, Calendar, DollarSign, TrendingUp, Clock, AlertTriangle, CheckCircle2,
   FileText, ShieldCheck, Package, Sparkles, Loader2, ChevronRight,
-  Activity, Stethoscope, ArrowRight, Bell, BarChart3, Zap,
+  Activity, Stethoscope, ArrowRight, Bell, BarChart3, Zap, UserCheck,
 } from "lucide-react";
-import { format, parseISO, isToday, startOfMonth, endOfMonth, subMonths, getISOWeek } from "date-fns";
+import { format, parseISO, isToday, startOfMonth, endOfMonth, subMonths, subDays, getISOWeek } from "date-fns";
 import { toast } from "sonner";
 
 export default function Dashboard() {
