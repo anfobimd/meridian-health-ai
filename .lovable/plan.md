@@ -1,68 +1,57 @@
 
 
-# Provider User Stories: Memory Save + Implementation Workflow
+# AI Dashboard Insights — Weekly Narrative Summaries
 
-## Step 1: Save Audit to Project Memory
+## What We're Building
 
-Write the gap analysis (28 stories, 6 epics — 6 built, 10 partial, 12 missing) to `mem://features/provider-stories-audit` and update `mem://index.md` with a reference.
+A new "AI Weekly Insights" section on the Command Center dashboard that generates rich, narrative summaries of clinic performance covering the past 7 days. It will analyze appointments, revenue, provider utilization, package health, clinical compliance, and patient trends — then surface actionable recommendations.
 
-## Step 2: Implementation Workflow (4 Batches)
+## Architecture
 
-### Batch A — Clinical Must-Haves (Legal/HIPAA)
-Priority: highest. These are compliance requirements.
+**Backend**: New `weekly_insights` mode added to the existing `ai-financial-advisor` edge function. It will query the last 7 days of data across multiple tables and feed it to the AI for narrative generation.
 
-1. **Vitals table + UI** (US-012)
-   - Migration: `vitals` table (patient_id, encounter_id, bp, hr, temp, weight, height, o2sat, recorded_by, recorded_at)
-   - Staff-only RLS policies
-   - Vitals capture panel in EncounterChart.tsx
+**Frontend**: New collapsible card on `Index.tsx` below the existing AI Daily Briefing, with:
+- Executive narrative paragraph
+- KPI highlight chips (with up/down/stable trend indicators)
+- "This Week's Action" — one specific recommendation
+- Trend comparison vs prior week
+- Auto-cache: store the last generated insight in localStorage with a TTL so it persists across page loads without re-calling AI every time
 
-2. **Addendum model** (US-014)
-   - Migration: `clinical_note_addenda` table (note_id, author_id, content, created_at)
-   - RLS: author can insert, staff can read
-   - Addendum UI below signed notes in ClinicalNotes
+## Technical Details
 
-3. **Photo consent type** (US-019)
-   - Add `photo_release` to consent types enum
-   - Wire into PhotoUpload flow — require consent before upload
+### 1. Edge Function Update (`ai-financial-advisor/index.ts`)
 
-### Batch B — Security & Profile
-4. **MFA UI** (US-004)
-   - Settings page with TOTP enrollment using Supabase MFA API
-   - QR code display, verification step
+Add a `weekly_insights` mode that:
+- Accepts no client-side data (queries everything server-side for accuracy)
+- Queries last 7 days of: appointments (count, completion rate, no-shows), invoices (revenue), clinical_notes (unsigned count), chart_review_records (corrections), patient_package_purchases (new sales, expirations), patients (new registrations)
+- Also queries the prior 7 days for week-over-week comparison
+- Sends all metrics to AI with a prompt requesting:
+  ```json
+  {
+    "narrative": "2-3 paragraph executive summary",
+    "kpi_highlights": [{ "label": "", "value": "", "trend": "up|down|stable" }],
+    "weekly_action": "One specific thing to do this week",
+    "trends": [{ "metric": "", "this_week": "", "last_week": "", "change_pct": "" }]
+  }
+  ```
 
-5. **Provider profile self-edit** (US-002)
-   - Profile page for providers to update bio, specialties, credentials, headshot
-   - RLS: users can only edit own profile
+### 2. Dashboard UI (`Index.tsx`)
 
-6. **Template CRUD UI** (US-015)
-   - Management page for clinical_note_templates
-   - Create, edit, delete, preview templates
+New `WeeklyInsights` card with:
+- "Generate Weekly Insights" button (similar pattern to existing AI briefing)
+- Narrative display with formatted text
+- KPI chips using Badge components with trend arrows
+- Weekly action highlighted in a distinct callout
+- Trend table showing week-over-week comparisons
+- Loading state with skeleton/spinner
+- Cache in localStorage keyed by ISO week number, TTL 4 hours
 
-### Batch C — Scheduling & Workflow
-7. **Time-off blocking** (US-008)
-   - Migration: `provider_time_off` table
-   - Calendar UI to request/manage blocked dates
-   - Conflict detection in scheduling logic
+### 3. Files Changed
 
-8. **MD feedback inbox** (US-021)
-   - Leverage existing `chart_review_items` with status tracking
-   - Inbox view filtered to provider's charts with MD comments
+| File | Change |
+|------|--------|
+| `supabase/functions/ai-financial-advisor/index.ts` | Add `weekly_insights` mode with server-side data gathering |
+| `src/pages/Index.tsx` | Add Weekly Insights card below Daily Briefing |
 
-9. **Provider check-in view** (US-009)
-   - Provider-side panel showing today's patients with check-in status
-
-### Batch D — Communication & Analytics
-10. **Secure messaging** (US-020)
-    - `messages` table with realtime subscriptions
-    - Simple inbox UI between providers and MD
-
-11. **Revenue breakdown** (US-025)
-    - Procedure-level earnings in Earnings.tsx
-
-12. **Remaining nice-to-haves** — Photo annotation, waitlist, patient satisfaction, goal tracking (can be scoped later)
-
-## Recommended Approach
-Build **Batch A first** (3 items, all clinical compliance), then proceed through B → C → D. Each batch is independently shippable.
-
-Shall I proceed with Batch A?
+No database migrations needed — this reads existing tables only.
 
