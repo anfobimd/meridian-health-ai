@@ -191,6 +191,11 @@ export default function Packages() {
   });
 
   // ─── AI calls ─────────────────────────────────────────────────────
+  const [bundleRecs, setBundleRecs] = useState<any>(null);
+  const [bundleLoading, setBundleLoading] = useState(false);
+  const [expirationAlerts, setExpirationAlerts] = useState<any>(null);
+  const [expirationLoading, setExpirationLoading] = useState(false);
+
   const fetchInsights = async () => {
     setInsightsLoading(true);
     try {
@@ -203,6 +208,26 @@ export default function Packages() {
       toast({ title: "Failed to generate insights", variant: "destructive" });
     }
     setInsightsLoading(false);
+  };
+
+  const fetchBundleRecs = async () => {
+    setBundleLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("ai-catalog-advisor", { body: { mode: "bundle_recommend" } });
+      if (error) throw error;
+      setBundleRecs(data);
+    } catch { toast({ title: "Failed to generate bundle recommendations", variant: "destructive" }); }
+    setBundleLoading(false);
+  };
+
+  const fetchExpirationAlerts = async () => {
+    setExpirationLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("ai-catalog-advisor", { body: { mode: "expiration_alerts" } });
+      if (error) throw error;
+      setExpirationAlerts(data);
+    } catch { toast({ title: "Failed to generate expiration alerts", variant: "destructive" }); }
+    setExpirationLoading(false);
   };
 
   const fetchRiskScores = async () => {
@@ -272,6 +297,14 @@ export default function Packages() {
           <Button size="sm" variant="outline" onClick={fetchRiskScores} disabled={riskLoading}>
             {riskLoading ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <AlertTriangle className="h-3 w-3 mr-1" />}
             Risk Scan
+          </Button>
+          <Button size="sm" variant="outline" onClick={fetchBundleRecs} disabled={bundleLoading}>
+            {bundleLoading ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Sparkles className="h-3 w-3 mr-1" />}
+            AI Bundles
+          </Button>
+          <Button size="sm" variant="outline" onClick={fetchExpirationAlerts} disabled={expirationLoading}>
+            {expirationLoading ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Clock className="h-3 w-3 mr-1" />}
+            Expiration Alerts
           </Button>
         </div>
       </div>
