@@ -4,17 +4,21 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Stethoscope, ShieldCheck, FileCheck, Eye, EyeOff } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Plus, Stethoscope, ShieldCheck, FileCheck, Eye, EyeOff, DollarSign, History } from "lucide-react";
 import { toast } from "sonner";
+import { format, parseISO } from "date-fns";
 
 export default function Treatments() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [showInactive, setShowInactive] = useState(false);
+  const [editingPrice, setEditingPrice] = useState<any>(null);
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
@@ -29,6 +33,18 @@ export default function Treatments() {
     },
   });
 
+  const { data: priceHistory } = useQuery({
+    queryKey: ["price-history"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("treatment_price_history")
+        .select("*, treatments:treatment_id(name)")
+        .order("created_at", { ascending: false })
+        .limit(50);
+      return data ?? [];
+    },
+  });
+
   const addTreatment = useMutation({
     mutationFn: async (formData: FormData) => {
       const treatment = {
@@ -37,18 +53,14 @@ export default function Treatments() {
         category: formData.get("category") as string || null,
         duration_minutes: parseInt(formData.get("duration") as string) || 30,
         price: parseFloat(formData.get("price") as string) || null,
+        member_price: parseFloat(formData.get("member_price") as string) || 0,
+        is_member_pricing_enabled: !!formData.get("member_pricing"),
         requires_gfe: formData.get("requires_gfe") === "on",
         requires_md_review: formData.get("requires_md_review") === "on",
       };
       const { error } = await supabase.from("treatments").insert(treatment);
       if (error) throw error;
-      // Audit log
-      await supabase.from("audit_logs").insert({
-        user_id: user?.id,
-        action: "create",
-        table_name: "treatments",
-        new_values: treatment,
-      });
+      await supabase.from("audit_logs").insert({ user_id: user?.id, action: "create", table_name: "treatments", new_values: treatment });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["treatments"] });
@@ -62,18 +74,9 @@ export default function Treatments() {
     mutationFn: async ({ id, is_active }: { id: string; is_active: boolean }) => {
       const { error } = await supabase.from("treatments").update({ is_active }).eq("id", id);
       if (error) throw error;
-      await supabase.from("audit_logs").insert({
-        user_id: user?.id,
-        action: "update",
-        table_name: "treatments",
-        record_id: id,
-        new_values: { is_active },
-      });
+      await supabase.from("audit_logs").insert({ user_id: user?.id, action: "update", table_name: "treatments", record_id: id, new_values: { is_active } });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["treatments"] });
-      toast.success("Treatment updated");
-    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["treatments"] }); toast.success("Treatment updated"); },
   });
 
   const toggleFlag = useMutation({
@@ -81,17 +84,34 @@ export default function Treatments() {
       const updateData = field === "requires_gfe" ? { requires_gfe: value } : { requires_md_review: value };
       const { error } = await supabase.from("treatments").update(updateData).eq("id", id);
       if (error) throw error;
-      await supabase.from("audit_logs").insert({
-        user_id: user?.id,
-        action: "update",
-        table_name: "treatments",
-        record_id: id,
-        new_values: { [field]: value },
+      await supabase.from("audit_logs").insert({ user_id: user?.id, action: "update", table_name: "treatments", record_id: id, new_values: { [field]: value } });
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["treatments"] }),
+  });
+
+  const updatePrice = useMutation({
+    mutationFn: async ({ id, price, member_price, is_member_pricing_enabled, reason }: any) => {
+      const treatment = treatments?.find((t: any) => t.id === id);
+      // Log price history
+      await supabase.from("treatment_price_history").insert({
+        treatment_id: id,
+        old_price: treatment?.price ?? 0,
+        new_price: price,
+        old_member_price: treatment?.member_price ?? 0,
+        new_member_price: member_price,
+        changed_by: user?.id,
+        change_reason: reason || null,
       });
+      const { error } = await supabase.from("treatments").update({ price, member_price, is_member_pricing_enabled }).eq("id", id);
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["treatments"] });
+      queryClient.invalidateQueries({ queryKey: ["price-history"] });
+      setEditingPrice(null);
+      toast.success("Pricing updated");
     },
+    onError: () => toast.error("Failed to update pricing"),
   });
 
   return (
@@ -99,7 +119,7 @@ export default function Treatments() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold">Treatments</h1>
-          <p className="text-muted-foreground">Service catalog with compliance flags</p>
+          <p className="text-muted-foreground">Service catalog with compliance flags & pricing</p>
         </div>
         <div className="flex items-center gap-3">
           <Button variant="outline" size="sm" onClick={() => setShowInactive(!showInactive)}>
@@ -113,38 +133,28 @@ export default function Treatments() {
             <DialogContent>
               <DialogHeader><DialogTitle>Add Treatment</DialogTitle></DialogHeader>
               <form onSubmit={(e) => { e.preventDefault(); addTreatment.mutate(new FormData(e.currentTarget)); }} className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Name *</Label>
-                  <Input name="name" required />
-                </div>
-                <div className="space-y-2">
-                  <Label>Description</Label>
-                  <Input name="description" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Category</Label>
-                  <Input name="category" placeholder="e.g. Injectables, Laser, Hormone Therapy" />
+                <div className="space-y-2"><Label>Name *</Label><Input name="name" required /></div>
+                <div className="space-y-2"><Label>Description</Label><Input name="description" /></div>
+                <div className="space-y-2"><Label>Category</Label><Input name="category" placeholder="e.g. Injectables, Laser" /></div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2"><Label>Duration (min)</Label><Input name="duration" type="number" defaultValue={30} /></div>
+                  <div className="space-y-2"><Label>Price ($)</Label><Input name="price" type="number" step="0.01" /></div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Duration (min)</Label>
-                    <Input name="duration" type="number" defaultValue={30} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Price ($)</Label>
-                    <Input name="price" type="number" step="0.01" />
-                  </div>
+                  <div className="space-y-2"><Label>Member Price ($)</Label><Input name="member_price" type="number" step="0.01" /></div>
+                  <label className="flex items-center gap-2 text-sm cursor-pointer self-end pb-2">
+                    <input type="checkbox" name="member_pricing" className="rounded border-input" />
+                    Enable member pricing
+                  </label>
                 </div>
                 <div className="flex items-center gap-6 pt-2">
                   <label className="flex items-center gap-2 text-sm cursor-pointer">
                     <input type="checkbox" name="requires_gfe" className="rounded border-input" />
-                    <ShieldCheck className="h-4 w-4 text-amber-500" />
-                    Requires GFE
+                    <ShieldCheck className="h-4 w-4 text-amber-500" /> Requires GFE
                   </label>
                   <label className="flex items-center gap-2 text-sm cursor-pointer">
                     <input type="checkbox" name="requires_md_review" className="rounded border-input" />
-                    <FileCheck className="h-4 w-4 text-blue-500" />
-                    Requires MD Review
+                    <FileCheck className="h-4 w-4 text-blue-500" /> Requires MD Review
                   </label>
                 </div>
                 <Button type="submit" className="w-full" disabled={addTreatment.isPending}>
@@ -156,69 +166,185 @@ export default function Treatments() {
         </div>
       </div>
 
-      {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1,2,3].map(i => <Card key={i} className="animate-pulse"><CardContent className="p-6 h-32" /></Card>)}
-        </div>
-      ) : treatments && treatments.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {treatments.map((t: any) => (
-            <Card key={t.id} className={!t.is_active ? "opacity-60" : ""}>
-              <CardContent className="p-5">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium truncate">{t.name}</p>
-                      {!t.is_active && <Badge variant="outline" className="text-xs">Inactive</Badge>}
+      <Tabs defaultValue="catalog">
+        <TabsList>
+          <TabsTrigger value="catalog"><Stethoscope className="h-3.5 w-3.5 mr-1" /> Catalog</TabsTrigger>
+          <TabsTrigger value="pricing"><DollarSign className="h-3.5 w-3.5 mr-1" /> Pricing</TabsTrigger>
+          <TabsTrigger value="history"><History className="h-3.5 w-3.5 mr-1" /> Price History</TabsTrigger>
+        </TabsList>
+
+        {/* Catalog Tab */}
+        <TabsContent value="catalog">
+          {isLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[1,2,3].map(i => <Card key={i} className="animate-pulse"><CardContent className="p-6 h-32" /></Card>)}
+            </div>
+          ) : treatments && treatments.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {treatments.map((t: any) => (
+                <Card key={t.id} className={!t.is_active ? "opacity-60" : ""}>
+                  <CardContent className="p-5">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium truncate">{t.name}</p>
+                          {!t.is_active && <Badge variant="outline" className="text-xs">Inactive</Badge>}
+                        </div>
+                        {t.description && <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{t.description}</p>}
+                        <div className="flex items-center gap-2 mt-2 flex-wrap">
+                          {t.category && <Badge variant="outline">{t.category}</Badge>}
+                          <span className="text-xs text-muted-foreground">{t.duration_minutes} min</span>
+                        </div>
+                        <div className="flex items-center gap-3 mt-3">
+                          <label className="flex items-center gap-1.5 text-xs cursor-pointer">
+                            <Switch checked={t.requires_gfe} onCheckedChange={(v) => toggleFlag.mutate({ id: t.id, field: "requires_gfe", value: v })} className="scale-75" />
+                            <ShieldCheck className="h-3.5 w-3.5 text-amber-500" /> GFE
+                          </label>
+                          <label className="flex items-center gap-1.5 text-xs cursor-pointer">
+                            <Switch checked={t.requires_md_review} onCheckedChange={(v) => toggleFlag.mutate({ id: t.id, field: "requires_md_review", value: v })} className="scale-75" />
+                            <FileCheck className="h-3.5 w-3.5 text-blue-500" /> MD
+                          </label>
+                          <label className="flex items-center gap-1.5 text-xs cursor-pointer ml-auto">
+                            <Switch checked={t.is_active} onCheckedChange={(v) => toggleActive.mutate({ id: t.id, is_active: v })} className="scale-75" />
+                            Active
+                          </label>
+                        </div>
+                      </div>
+                      <div className="text-right ml-2">
+                        {t.price && <span className="text-sm font-semibold">${Number(t.price).toFixed(2)}</span>}
+                        {t.is_member_pricing_enabled && t.member_price > 0 && (
+                          <p className="text-[10px] text-primary">Member: ${Number(t.member_price).toFixed(2)}</p>
+                        )}
+                      </div>
                     </div>
-                    {t.description && <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{t.description}</p>}
-                    <div className="flex items-center gap-2 mt-2 flex-wrap">
-                      {t.category && <Badge variant="outline">{t.category}</Badge>}
-                      <span className="text-xs text-muted-foreground">{t.duration_minutes} min</span>
-                    </div>
-                    <div className="flex items-center gap-3 mt-3">
-                      <label className="flex items-center gap-1.5 text-xs cursor-pointer">
-                        <Switch
-                          checked={t.requires_gfe}
-                          onCheckedChange={(v) => toggleFlag.mutate({ id: t.id, field: "requires_gfe", value: v })}
-                          className="scale-75"
-                        />
-                        <ShieldCheck className="h-3.5 w-3.5 text-amber-500" />
-                        GFE
-                      </label>
-                      <label className="flex items-center gap-1.5 text-xs cursor-pointer">
-                        <Switch
-                          checked={t.requires_md_review}
-                          onCheckedChange={(v) => toggleFlag.mutate({ id: t.id, field: "requires_md_review", value: v })}
-                          className="scale-75"
-                        />
-                        <FileCheck className="h-3.5 w-3.5 text-blue-500" />
-                        MD
-                      </label>
-                      <label className="flex items-center gap-1.5 text-xs cursor-pointer ml-auto">
-                        <Switch
-                          checked={t.is_active}
-                          onCheckedChange={(v) => toggleActive.mutate({ id: t.id, is_active: v })}
-                          className="scale-75"
-                        />
-                        Active
-                      </label>
-                    </div>
-                  </div>
-                  {t.price && <span className="text-sm font-semibold ml-2">${Number(t.price).toFixed(2)}</span>}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      ) : (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <Stethoscope className="h-12 w-12 mx-auto text-muted-foreground/50" />
-            <p className="mt-4 text-muted-foreground">No treatments yet</p>
-          </CardContent>
-        </Card>
-      )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <Card><CardContent className="py-12 text-center"><Stethoscope className="h-12 w-12 mx-auto text-muted-foreground/50" /><p className="mt-4 text-muted-foreground">No treatments yet</p></CardContent></Card>
+          )}
+        </TabsContent>
+
+        {/* Pricing Tab */}
+        <TabsContent value="pricing">
+          <Card>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Treatment</TableHead>
+                    <TableHead>Category</TableHead>
+                    <TableHead>Standard Price</TableHead>
+                    <TableHead>Member Price</TableHead>
+                    <TableHead>Member Pricing</TableHead>
+                    <TableHead className="w-[80px]">Edit</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {treatments?.map((t: any) => (
+                    <TableRow key={t.id}>
+                      <TableCell className="font-medium">{t.name}</TableCell>
+                      <TableCell><Badge variant="outline" className="text-[10px]">{t.category || "—"}</Badge></TableCell>
+                      <TableCell className="font-mono">${Number(t.price || 0).toFixed(2)}</TableCell>
+                      <TableCell className="font-mono">{t.is_member_pricing_enabled ? `$${Number(t.member_price || 0).toFixed(2)}` : "—"}</TableCell>
+                      <TableCell>
+                        <Badge variant={t.is_member_pricing_enabled ? "default" : "secondary"} className="text-[10px]">
+                          {t.is_member_pricing_enabled ? "Enabled" : "Off"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Button size="sm" variant="ghost" onClick={() => setEditingPrice(t)}>
+                          <DollarSign className="h-3.5 w-3.5" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Price History Tab */}
+        <TabsContent value="history">
+          <Card>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Treatment</TableHead>
+                    <TableHead>Old Price</TableHead>
+                    <TableHead>New Price</TableHead>
+                    <TableHead>Old Member</TableHead>
+                    <TableHead>New Member</TableHead>
+                    <TableHead>Reason</TableHead>
+                    <TableHead>Date</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {priceHistory && priceHistory.length > 0 ? priceHistory.map((h: any) => (
+                    <TableRow key={h.id}>
+                      <TableCell className="font-medium">{(h as any).treatments?.name || "—"}</TableCell>
+                      <TableCell className="font-mono text-muted-foreground">${Number(h.old_price || 0).toFixed(2)}</TableCell>
+                      <TableCell className="font-mono">${Number(h.new_price || 0).toFixed(2)}</TableCell>
+                      <TableCell className="font-mono text-muted-foreground">${Number(h.old_member_price || 0).toFixed(2)}</TableCell>
+                      <TableCell className="font-mono">${Number(h.new_member_price || 0).toFixed(2)}</TableCell>
+                      <TableCell className="text-xs">{h.change_reason || "—"}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{format(parseISO(h.created_at), "MMM d, yyyy")}</TableCell>
+                    </TableRow>
+                  )) : (
+                    <TableRow><TableCell colSpan={7} className="text-center py-12 text-muted-foreground">No price changes recorded</TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Edit Pricing Dialog */}
+      <Dialog open={!!editingPrice} onOpenChange={(o) => !o && setEditingPrice(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Edit Pricing — {editingPrice?.name}</DialogTitle></DialogHeader>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const fd = new FormData(e.currentTarget);
+              updatePrice.mutate({
+                id: editingPrice.id,
+                price: parseFloat(fd.get("price") as string) || 0,
+                member_price: parseFloat(fd.get("member_price") as string) || 0,
+                is_member_pricing_enabled: fd.get("member_enabled") === "on",
+                reason: fd.get("reason") as string,
+              });
+            }}
+            className="space-y-4"
+          >
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Standard Price ($)</Label>
+                <Input name="price" type="number" step="0.01" defaultValue={editingPrice?.price || 0} />
+              </div>
+              <div className="space-y-2">
+                <Label>Member Price ($)</Label>
+                <Input name="member_price" type="number" step="0.01" defaultValue={editingPrice?.member_price || 0} />
+              </div>
+            </div>
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input type="checkbox" name="member_enabled" className="rounded border-input" defaultChecked={editingPrice?.is_member_pricing_enabled} />
+              Enable member pricing
+            </label>
+            <div className="space-y-2">
+              <Label>Change Reason</Label>
+              <Input name="reason" placeholder="e.g. Annual price adjustment" />
+            </div>
+            <Button type="submit" className="w-full" disabled={updatePrice.isPending}>
+              {updatePrice.isPending ? "Saving..." : "Update Pricing"}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

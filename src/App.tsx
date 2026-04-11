@@ -48,6 +48,8 @@ import ProviderCheckIn from "./pages/ProviderCheckIn";
 import Messages from "./pages/Messages";
 import ClinicHours from "./pages/ClinicHours";
 import Waitlist from "./pages/Waitlist";
+import OutstandingCharts from "./pages/OutstandingCharts";
+import ChartCompleteness from "./pages/ChartCompleteness";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
