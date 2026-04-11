@@ -1,148 +1,152 @@
 
 
-# Front Desk & Scheduler User Stories — Implementation Plan
+# Provider UX/UI Redesign — Layout, Button Placement & AI-Native Workflow
 
-## Gap Analysis: 23 Stories, 6 Epics
+## Current UX Problems
 
-### EP-FD01: Account & Security (3 stories)
-| Story | Title | Status | Gap |
-|-------|-------|--------|-----|
-| US-FD001 | Change My Password | **PARTIAL** | Settings has basic form; needs AI password strength scoring, lockout, session invalidation |
-| US-FD002 | Set Up Two-Factor Authentication | **PARTIAL** | Settings has MFA toggle; needs TOTP QR, backup codes, trusted devices |
-| US-FD003 | Configure Notification Preferences | **MISSING** | No per-user notification preference UI with channel/type toggles + AI suggestions |
+1. **Sidebar overload**: All 40+ nav items visible to every role. A provider sees Admin, Platform, Oversight sections they cannot use. This creates cognitive load and hides the 6-8 items they actually need.
 
-### EP-FD02: Patient Registration & Identity (4 stories)
-| Story | Title | Status | Gap |
-|-------|-------|--------|-----|
-| US-FD004 | Register a New Patient | **PARTIAL** | Basic add form exists; needs AI duplicate detection, email/phone validation, referral source, emergency contact, shell records |
-| US-FD005 | Verify Patient Identity at Arrival | **MISSING** | No identity verification flow with photo ID check |
-| US-FD006 | Collect Digital Consent Forms | **MISSING** | No consent_templates / patient_consents tables, no digital signature flow |
-| US-FD007 | Verify Insurance Eligibility | **PARTIAL** | patient_insurance table exists; no eligibility check UI or AI cost estimation |
+2. **No command center**: Provider Day (`/provider-day`) is a flat list of appointments. Missing: stats sidebar, AI Day Brief, overdue chart alerts, MD correction badges. The user story spec (US-008) calls for a rich dashboard with a sidebar of today's KPIs.
 
-### EP-FD03: Check-In & Check-Out (4 stories)
-| Story | Title | Status | Gap |
-|-------|-------|--------|-----|
-| US-FD008 | Check Patient In | **PARTIAL** | FrontDesk.tsx has basic check-in button; needs pre-check validation, AI Patient Brief, room assignment, consent gating |
-| US-FD009 | Handle Walk-In Patients | **PARTIAL** | Walk-in dialog exists; needs AI provider recommendation, capacity check, walk-in badge |
-| US-FD010 | Check Patient Out | **MISSING** | No checkout flow — checklist, follow-up booking, package credit, AI open-items check |
-| US-FD011 | Process Payment at Checkout | **PARTIAL** | Invoices/payments tables exist; no checkout payment UI with package credits, discounts, payment plans |
+3. **Fragmented pages**: Check-In (`/check-in`), My Day (`/provider-day`), MD Feedback (`/md-feedback`), and Profile (`/my-profile`) are separate pages with no contextual links. The provider must navigate 4+ pages for a single patient encounter flow.
 
-### EP-FD04: Scheduling (5 stories — shared with admin)
-| Story | Title | Status | Gap |
-|-------|-------|--------|-----|
-| US-FD012 | Book Appointment | **BUILT** | Appointments.tsx has full booking with AI |
-| US-FD013 | View Full Clinic Schedule | **BUILT** | MultiProviderCalendar.tsx exists |
-| US-FD014 | Handle Cancellations & Reschedules | **PARTIAL** | Cancel exists; needs AI waitlist match, no-show counter, re-engagement draft |
-| US-FD015 | Manage Patient Waitlist | **PARTIAL** | Waitlist.tsx exists; needs AI ranking, slot-available SMS, auto-cancel |
-| US-FD016 | Send Appointment Reminders | **PARTIAL** | NotificationCenter exists; needs per-appointment reminder send, AI no-show risk badge |
+4. **Buried AI**: AI Patient Brief requires a manual click per patient. The spec asks for an auto-generated "Day Brief" summary at the top. SOAP AI is good but drug interaction alerts and safety field warnings are missing.
 
-### EP-FD05: Patient Communication (3 stories)
-| Story | Title | Status | Gap |
-|-------|-------|--------|-----|
-| US-FD017 | Handle Inbound Patient Inquiries | **MISSING** | No patient-facing unified inbox with AI intent classification and draft replies |
-| US-FD018 | View Patient Communication History | **MISSING** | No communication timeline in patient record |
-| US-FD019 | Send Aftercare/Follow-Up Messages | **MISSING** | No aftercare message templates or post-visit automation |
+5. **Missing performance dashboard**: US-028 asks for a single-page KPI summary (appointments today, procedures this month, hours, revenue, NPS, overdue charts). Currently no such page exists.
 
-### EP-FD06: Packages, Pricing & Point of Sale (4 stories)
-| Story | Title | Status | Gap |
-|-------|-------|--------|-----|
-| US-FD020 | Present & Sell a Package | **PARTIAL** | Packages page exists; needs patient-facing sale flow, AI recommendation, savings display |
-| US-FD021 | Apply Package Credits at Checkout | **MISSING** | No credit application in checkout |
-| US-FD022 | Answer Patient Pricing Questions | **MISSING** | No pricing reference/quoting tool with AI package suggestion |
-| US-FD023 | Enroll Patient in Membership | **PARTIAL** | MembershipBilling page exists; needs front-desk enrollment flow, AI tier recommendation |
-
-### Summary: 2 Built | 10 Partial | 11 Missing
+6. **No contextual actions on encounter flow**: From schedule, the provider should: (1) see patient brief, (2) open chart, (3) chart with template, (4) sign, (5) send aftercare. Steps 1, 4-5 lack guided flow.
 
 ---
 
-## Implementation Batches
+## Redesigned Provider Layout
 
-### Batch A — Check-In/Check-Out Core + AI (Highest value)
-**Stories:** US-FD008, US-FD009, US-FD010, US-FD011
-
-**Database:**
-- `consent_templates` table (name, body, procedure_types, is_active)
-- `patient_consents` table (patient_id, template_id, encounter_id, signed_at, signature_data, status)
-- `patient_communication_log` table (patient_id, channel, direction, content, template_used, delivery_status, staff_user_id)
-- Add `no_show_count`, `late_cancel_count` to patients table
-
-**Edge Functions:**
-- `ai-patient-brief` — Lovable AI generates a one-paragraph patient brief at check-in (last visit, protocol status, churn risk, key notes)
-- `ai-checkout-review` — AI checks for open items (unsigned notes, missing consent) before checkout closes
-
-**UI Changes:**
-- Enhance FrontDesk.tsx check-in flow: pre-check validation panel (consent status, clearance), room assignment dropdown, AI Patient Brief card, check-in notes
-- Walk-in enhancement: AI provider recommendation based on capacity/expertise, walk-in badge on cards
-- New checkout panel: checklist (payment, follow-up, package credits), AI follow-up date suggestion, "Complete Checkout" action
-- Checkout payment: invoice display, apply package credit, apply discount code, record payment method, receipt send
-
-### Batch B — Patient Registration & Consent (EP-FD02)
-**Stories:** US-FD004, US-FD005, US-FD006, US-FD007
-
-**Database:**
-- Add `emergency_contact_name`, `emergency_contact_phone`, `emergency_contact_relationship`, `referral_source`, `preferred_contact_channel`, `preferred_name`, `sex_at_birth`, `gender_identity` to patients table
-
-**Edge Functions:**
-- `ai-patient-registration` — AI validates input (email typo detection, phone formatting, DOB plausibility), checks duplicates, suggests intake forms based on booked procedure
-
-**UI Changes:**
-- Enhanced patient registration dialog: full fields per spec, duplicate detection before save, shell record option, referral source picker
-- Identity verification panel at check-in: photo ID match confirmation, DOB verification
-- Consent form workflow: template list by procedure, one-click send (SMS/email via Twilio), digital signature pad, consent status badges on appointment cards
-- Insurance eligibility panel: trigger check, display results, AI cost estimation, manual notes
-
-### Batch C — Communication & Messaging (EP-FD05)
-**Stories:** US-FD017, US-FD018, US-FD019, US-FD003
-
-**Edge Functions:**
-- `ai-message-classifier` — Lovable AI classifies inbound messages by intent (Appointment Request, Pricing, Complaint, Cancellation, General) and drafts responses
-- `ai-aftercare-message` — AI generates personalized aftercare instructions based on procedure type
-
-**Database:**
-- `staff_notification_preferences` table (user_id, notification_type, channel, is_enabled, quiet_hours_start, quiet_hours_end)
-
-**UI Changes:**
-- Patient Inbox: unified view of SMS/email/portal messages, AI intent badges, AI draft replies, escalation to manager, resolve/archive
-- Patient Communication History tab on PatientRecord: timeline of all messages with delivery status
-- Aftercare message templates: post-visit auto-send config, manual send with AI personalization
-- Notification preferences panel in Settings: per-type channel toggles, quiet hours, AI role-based suggestions
-
-### Batch D — Scheduling Enhancements + POS (EP-FD04 gaps + EP-FD06)
-**Stories:** US-FD014, US-FD015, US-FD016, US-FD020, US-FD021, US-FD022, US-FD023
-
-**Edge Functions:**
-- `ai-waitlist-rank` — AI ranks waitlisted patients by fill probability
-- `ai-package-recommend` — AI recommends packages based on patient history and calculates savings vs. a la carte
-
-**UI Changes:**
-- Cancel/reschedule enhancements: AI waitlist match on cancellation, no-show counter display, AI re-engagement message draft
-- Waitlist enhancements: AI ranking, slot-available SMS send, auto-expire stale entries
-- Per-appointment reminder send button with AI no-show risk badge and personalized message
-- Package sale flow from patient record: AI recommendation, savings display, one-click sell
-- Pricing reference/quoting tool: search treatments, build multi-item quote, member vs. non-member pricing, email/SMS quote
-- Membership enrollment from front desk: tier comparison, AI optimal tier recommendation, projected savings
-
-### Batch E — Security Hardening (EP-FD01 remaining)
-**Stories:** US-FD001, US-FD002
-
-**Edge Functions:**
-- `ai-password-strength` — AI scores password and flags name/clinic patterns
-
-**UI Changes:**
-- Enhanced password change: AI real-time strength scoring, lockout after 3 failures, session invalidation
-- MFA setup: TOTP QR code enrollment, backup codes display, trusted devices list
+```text
++------------------+---------------------------------------------------+
+|  SIDEBAR (slim)  |  MAIN CONTENT                                     |
+|                  |                                                   |
+|  [Meridian logo] |  HEADER: "Good morning, Dr. Smith" + date         |
+|  [Search ⌘K]     |  ┌─────────────┐  ┌──────────┐  ┌──────────┐     |
+|                  |  │ 8 patients  │  │ 3 done   │  │ 2 charts │     |
+|  MY WORK         |  │ today       │  │ so far   │  │ overdue  │     |
+|  · My Day        |  └─────────────┘  └──────────┘  └──────────┘     |
+|  · Schedule      |                                                   |
+|  · Encounters    |  ┌─ AI DAY BRIEF ─────────────────────────────┐   |
+|  · MD Feedback   |  │ "8 patients today. Patient 3 (Kim) is on   │   |
+|                  |  │  aspirin—confirm before filler. Patient 6   │   |
+|  PATIENTS        |  │  returning after 120-day lapse. 2 charts    │   |
+|  · Patient List  |  │  from yesterday still unsigned."            │   |
+|  · Messages      |  └────────────────────────────────────────────┘   |
+|                  |                                                   |
+|  ME              |  ── CURRENT PATIENT (highlighted) ──              |
+|  · My Profile    |  [avatar] Jane D. | Botox | Room 3 | 10:30a     |
+|  · Performance   |  [AI Brief inline]  [Open Chart →]               |
+|  · Time Off      |                                                   |
+|  · Settings      |  ── UP NEXT (3) ──                               |
+|                  |  [compact cards with status, allergies, pkgs]     |
+|                  |  [sparkle icon = hover for brief] [→ = chart]    |
+|                  |                                                   |
+|  [User avatar]   |  ── COMPLETED (5) ── collapsed by default        |
+|  [Sign out]      |  [compact list with "View Chart" links]          |
++------------------+---------------------------------------------------+
+```
 
 ---
 
-## Technical Notes
+## Implementation Plan — 4 Batches
 
-- All AI features use Lovable AI Gateway (`google/gemini-3-flash-preview` default) via edge functions
-- AI degrades gracefully — all workflows function without AI if gateway is unavailable
-- Twilio (already connected) used for SMS consent links, reminders, and patient communication
-- All patient-facing actions logged to `patient_communication_log` and audit trail
-- Role enforcement: front_desk role cannot access clinical chart content, pricing config, or provider analytics
+### Batch 1: Role-Filtered Sidebar + Provider Command Center
+**Stories:** US-008, US-028 (partial)
 
-## Batch Order Rationale
+**Changes:**
+- **AppSidebar.tsx**: Add role-based filtering. Provider role sees only: My Day, Schedule, Encounters, MD Feedback, Patients, Messages, My Profile, Performance, Time Off, Settings. Hide Admin, Platform, Oversight, Front Desk sections.
+- **ProviderDay.tsx** (full rewrite as command center):
+  - Top: greeting + date + 4 stat cards (patients today, completed, overdue charts, MD corrections pending)
+  - AI Day Brief card: auto-generates on page load via `ai-provider-coach` edge function (new `mode: "day_brief"`). Shows patient complexity summary, prep notes, alerts.
+  - Current Patient section: larger card with inline AI brief (auto-loaded), prominent "Open Chart" button, allergy/medication alerts, room + time display
+  - Up Next: compact cards with status badges, allergy warnings, "Returning after lapse" badge (90+ days), hover/click for AI brief, one-click chart open
+  - Completed: collapsible section, "View Chart" + "Send Aftercare" buttons
+  - Right sidebar (lg screens): today's stats panel (total appointments, procedures completed, estimated revenue, overdue charts count) per US-008 AC#49
 
-Batch A first because check-in/check-out is the front desk's most time-critical workflow and delivers the AI Patient Brief — the most impactful AI feature. Batch B follows with registration (the patient's first touchpoint). Batch C adds communication tools. Batch D enhances existing scheduling and adds POS. Batch E hardens security last since basic auth already works.
+**New edge function mode:** Extend `ai-provider-coach` with `day_brief` mode that summarizes the day's schedule, flags drug interactions, lapse patients, and overdue charts.
+
+### Batch 2: Enhanced Encounter Flow + AI Safety
+**Stories:** US-010, US-011, US-013, US-014, US-015, US-012
+
+**Changes:**
+- **EncounterChart.tsx** enhancements:
+  - Add completeness percentage bar at top (% of required fields filled), disable Sign button until 100%
+  - Add "Drug Interaction Alert" banner: AI checks patient medications vs procedure at chart open, shows dismissible warning
+  - Add "Safety Field Check" on sign attempt: AI scans for blank lot numbers, missing injection sites, etc. and surfaces specific prompts
+  - Post-sign flow: after signing, show modal: "Send aftercare to patient?" with pre-filled template, channel selector (SMS/Email), and send button via `ai-aftercare-message`
+  - Add photo attach button per template section (not just top-level)
+  - Addendum support: on signed encounters, show "Add Addendum" button that opens timestamped text area below locked original (AddendumSection component already exists)
+- **VitalsPanel.tsx** improvements:
+  - Show prior visit values in grey below each input
+  - Auto-calculate BMI with color coding (red >30, amber 25-30, green <25)
+  - Weight change delta display
+  - For GLP-1 patients: show % total body weight lost since protocol start
+  - AI contraindication check (BP >160/100 before filler warns)
+
+### Batch 3: Communication + MD Feedback
+**Stories:** US-015 (MD feedback acknowledgment), US-020, US-021, US-022, US-023
+
+**Changes:**
+- **MdFeedbackInbox.tsx** (enhance):
+  - "Correction Required" items: red banner with "Action Required", "Acknowledge" button that clears flag and notifies MD
+  - Reply capability within feedback thread
+  - Link directly to encounter chart from each feedback item
+  - AI thread summarization for long conversations
+  - Unread count badge in sidebar
+- **Messages.tsx** (provider-to-MD messaging):
+  - When initiated from an encounter, AI pre-drafts the message with patient context
+  - AI suggests similar past questions before sending
+- **Aftercare integration**: from Completed section in My Day, one-click "Send Aftercare" opens pre-filled message with procedure-specific template, AI personalization based on encounter notes
+
+### Batch 4: Performance Dashboard + Profile
+**Stories:** US-024, US-025, US-026, US-027, US-028, US-002, US-005
+
+**Changes:**
+- **New ProviderPerformanceDashboard.tsx** (replaces generic ProviderDrillDown for self-view):
+  - Hours Worked section: appointment duration sums by day/week/month, manual hour logging, admin vs clinical split, PDF export
+  - Procedures section: bar chart by type, drill into encounters, YTD totals, AI highlights top 3 + declining procedures
+  - Revenue section: total + by procedure type, trend line, AI run rate vs target projection
+  - Product Usage section: lot number log, filter by product/date, CSV export, AI expiration alerts
+  - Summary card at top: appointments today, procedures this month, hours, revenue, NPS, trend arrows
+- **ProviderProfile.tsx** (enhance):
+  - Photo upload with AI headshot detection
+  - AI bio draft from credentials/specialty
+  - % complete indicator
+  - "Request Change" workflow for admin-gated fields (credentials, NPI, procedure clearances)
+  - Change history audit trail
+
+---
+
+## Button Placement Philosophy
+
+| Context | Action | Placement | Rationale |
+|---------|--------|-----------|-----------|
+| My Day - current patient | Open Chart | Primary button, right side of card | Most critical action, always visible |
+| My Day - upcoming patient | View Brief / Open Chart | Icon buttons, right of row | Quick access without expanding |
+| My Day - completed | View Chart / Send Aftercare | Text buttons, right of row | Secondary actions, compact |
+| Encounter - charting | Save Draft | Outline button, header right | Always accessible, non-destructive |
+| Encounter - charting | Sign & Lock | Primary button, header right | Gated by completeness %, most important |
+| Encounter - post-sign | Send Aftercare | Modal prompt, auto-shown | Natural next step in workflow |
+| Encounter - signed | Add Addendum | Ghost button, below locked note | Available but not prominent |
+| MD Feedback | Acknowledge | Destructive-styled button, inline | Urgency indicator |
+| MD Feedback | Reply | Text button, inline | Quick response |
+| Sidebar | Unread badges | Red dot on MD Feedback, Messages | Passive notification |
+| Day Brief | Dismiss / Refresh | Ghost button, card corner | Non-blocking |
+
+## AI Integration Points (All Native, No User API Keys)
+
+1. **Day Brief** (auto on page load): summarizes schedule, flags risks
+2. **Drug Interaction Alert** (auto on chart open): checks meds vs procedure
+3. **Safety Field Check** (on sign attempt): validates required safety fields
+4. **SOAP Drafting** (existing, enhanced): pre-fills subjective from intake
+5. **Aftercare Personalization** (post-sign prompt): adapts template to encounter notes
+6. **Bio Drafting** (profile page): generates professional bio
+7. **Performance Insights** (dashboard): trend analysis, run rate projections
+8. **MD Message Drafting** (from encounter): pre-fills context
+
+All use `google/gemini-3-flash-preview` via existing Lovable AI Gateway edge functions.
 
