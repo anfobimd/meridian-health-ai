@@ -41,6 +41,9 @@ import ResetPassword from "./pages/ResetPassword";
 import Settings from "./pages/Settings";
 import ProviderProfile from "./pages/ProviderProfile";
 import TemplateManager from "./pages/TemplateManager";
+import TimeOff from "./pages/TimeOff";
+import MdFeedbackInbox from "./pages/MdFeedbackInbox";
+import ProviderCheckIn from "./pages/ProviderCheckIn";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -87,6 +90,9 @@ const App = () => (
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/my-profile" element={<ProviderProfile />} />
                 <Route path="/templates" element={<TemplateManager />} />
+                <Route path="/time-off" element={<TimeOff />} />
+                <Route path="/md-feedback" element={<MdFeedbackInbox />} />
+                <Route path="/check-in" element={<ProviderCheckIn />} />
               </Route>
             </Route>
             {/* Public routes — no auth required */}
