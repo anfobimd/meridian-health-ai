@@ -16,10 +16,109 @@ serve(async (req) => {
   const supabase = createClient(supabaseUrl, supabaseKey);
 
   try {
-    const { provider_id } = await req.json();
+    const body = await req.json();
+    const mode = body.mode || "coaching";
+    const provider_id = body.provider_id;
     if (!provider_id) throw new Error("provider_id required");
 
-    // Fetch provider info
+    // ─── DAY BRIEF MODE ───
+    if (mode === "day_brief") {
+      const today = new Date();
+      const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString();
+      const todayEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1).toISOString();
+
+      // Fetch today's appointments with patient data
+      const { data: apts } = await supabase
+        .from("appointments")
+        .select("*, patients(first_name, last_name, allergies, medications, date_of_birth, last_visit_at), treatments(name, category)")
+        .eq("provider_id", provider_id)
+        .gte("scheduled_at", todayStart)
+        .lt("scheduled_at", todayEnd)
+        .not("status", "in", '("cancelled","no_show")')
+        .order("scheduled_at", { ascending: true });
+
+      // Fetch overdue charts
+      const { data: overdue } = await supabase
+        .from("encounters")
+        .select("id, chief_complaint, created_at")
+        .eq("provider_id", provider_id)
+        .eq("status", "in_progress")
+        .lt("created_at", todayStart);
+
+      // Fetch pending MD corrections
+      const { data: corrections } = await supabase
+        .from("chart_review_records")
+        .select("id, md_comment")
+        .eq("provider_id", provider_id)
+        .eq("status", "corrected");
+
+      const schedule = (apts || []).map((a: any, i: number) => {
+        const p = a.patients;
+        const allergyNote = p?.allergies?.length ? `ALLERGIES: ${p.allergies.join(", ")}` : "";
+        const medNote = p?.medications?.length ? `MEDS: ${p.medications.join(", ")}` : "";
+        const lastVisit = p?.last_visit_at || null;
+        const daysSince = lastVisit ? Math.round((Date.now() - new Date(lastVisit).getTime()) / 86400000) : null;
+        const lapseNote = daysSince && daysSince > 90 ? `LAPSED (${daysSince} days since last visit)` : "";
+        return `${i + 1}. ${p?.first_name} ${p?.last_name} — ${a.treatments?.name || "General"}. ${allergyNote} ${medNote} ${lapseNote}`.trim();
+      }).join("\n");
+
+      const overdueNote = overdue?.length ? `\n\nOVERDUE CHARTS (${overdue.length}): ${overdue.map((o: any) => o.chief_complaint || "Unnamed").join(", ")}` : "";
+      const correctionNote = corrections?.length ? `\n\nMD CORRECTIONS PENDING (${corrections.length}): ${corrections.map((c: any) => c.md_comment?.slice(0, 80) || "Review needed").join("; ")}` : "";
+
+      const prompt = `You are an AI clinical assistant for a medical spa. Generate a concise day brief for a provider.
+
+Today's schedule (${(apts || []).length} patients):
+${schedule || "No patients scheduled."}
+${overdueNote}${correctionNote}
+
+Write 3-5 sentences summarizing key things the provider should know: total patients, any drug interaction risks (aspirin/blood thinners before fillers, etc.), lapsed patients returning, overdue charts, pending MD corrections. Be specific about patient names and concerns. Keep it professional and actionable.`;
+
+      const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${lovableKey}`,
+        },
+        body: JSON.stringify({
+          model: "google/gemini-3-flash-preview",
+          messages: [
+            { role: "system", content: "You are a concise clinical briefing assistant. No markdown formatting. Plain text only." },
+            { role: "user", content: prompt },
+          ],
+        }),
+      });
+
+      if (!aiResponse.ok) {
+        const errText = await aiResponse.text();
+        console.error("AI gateway error:", aiResponse.status, errText);
+        if (aiResponse.status === 429) {
+          return new Response(JSON.stringify({ error: "Rate limited, please try again shortly." }), {
+            status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        throw new Error("AI gateway error");
+      }
+
+      const aiData = await aiResponse.json();
+      const brief = aiData.choices?.[0]?.message?.content || "No summary available.";
+
+      // Log the call
+      const latency = Date.now() - startTime;
+      await supabase.from("ai_api_calls").insert({
+        function_name: "ai-provider-coach",
+        model_used: "google/gemini-3-flash-preview",
+        status: "success",
+        latency_ms: latency,
+        input_tokens: aiData.usage?.prompt_tokens || 0,
+        output_tokens: aiData.usage?.completion_tokens || 0,
+      });
+
+      return new Response(JSON.stringify({ success: true, brief }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ─── COACHING MODE (original) ───
     const { data: provider } = await supabase
       .from("providers")
       .select("*")
@@ -27,14 +126,12 @@ serve(async (req) => {
       .single();
     if (!provider) throw new Error("Provider not found");
 
-    // Fetch provider intelligence
     const { data: intel } = await supabase
       .from("ai_provider_intelligence")
       .select("*")
       .eq("provider_id", provider_id)
       .single();
 
-    // Fetch recent corrections
     const { data: corrections } = await supabase
       .from("chart_review_records")
       .select("*, encounters(chief_complaint, encounter_type)")
@@ -43,7 +140,6 @@ serve(async (req) => {
       .order("created_at", { ascending: false })
       .limit(20);
 
-    // Fetch existing coaching actions
     const { data: existingActions } = await supabase
       .from("coaching_actions")
       .select("*")
@@ -51,7 +147,6 @@ serve(async (req) => {
       .eq("is_resolved", false)
       .order("created_at", { ascending: false });
 
-    // Get AI prompt
     const { data: promptRow } = await supabase
       .from("ai_prompts")
       .select("system_prompt")
@@ -77,7 +172,6 @@ ${(corrections || []).map((c: any) => `- Encounter type: ${c.encounters?.encount
 Active Coaching Actions:
 ${(existingActions || []).map((a: any) => `- [${a.action_type}] ${a.title}: ${a.description || ""}`).join("\n") || "None"}`;
 
-    // Call AI
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -98,7 +192,6 @@ ${(existingActions || []).map((a: any) => `- [${a.action_type}] ${a.title}: ${a.
     const content = aiData.choices?.[0]?.message?.content || "{}";
     const coaching = JSON.parse(content);
 
-    // Update provider intelligence with recurring issues
     if (coaching.recurring_issues?.length > 0) {
       await supabase
         .from("ai_provider_intelligence")
@@ -110,7 +203,6 @@ ${(existingActions || []).map((a: any) => `- [${a.action_type}] ${a.title}: ${a.
         .eq("provider_id", provider_id);
     }
 
-    // Create coaching actions
     if (coaching.recommended_actions?.length > 0) {
       const actions = coaching.recommended_actions.map((a: any) => ({
         provider_id,
@@ -122,7 +214,6 @@ ${(existingActions || []).map((a: any) => `- [${a.action_type}] ${a.title}: ${a.
       await supabase.from("coaching_actions").insert(actions);
     }
 
-    // Log the API call
     const latency = Date.now() - startTime;
     await supabase.from("ai_api_calls").insert({
       function_name: "ai-provider-coach",

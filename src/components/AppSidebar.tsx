@@ -9,30 +9,45 @@ import {
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 
-const navSections = [
+type NavItem = {
+  to: string;
+  icon: any;
+  label: string;
+  roles?: string[]; // if set, only these roles see it; if absent, all roles see it
+};
+
+type NavSection = {
+  label: string;
+  roles?: string[]; // if set, entire section only for these roles
+  items: NavItem[];
+};
+
+const navSections: NavSection[] = [
   {
-    label: "WORKFLOWS",
+    label: "MY WORK",
     items: [
-      { to: "/", icon: LayoutDashboard, label: "Dashboard" },
-      { to: "/front-desk", icon: MonitorCheck, label: "Front Desk" },
-      { to: "/provider-day", icon: Briefcase, label: "My Day" },
-      { to: "/check-in", icon: ClipboardCheck, label: "Check-In" },
-      { to: "/my-marketplace", icon: Store, label: "My Marketplace" },
-      { to: "/md-feedback", icon: MessageSquare, label: "MD Feedback" },
+      { to: "/", icon: LayoutDashboard, label: "Dashboard", roles: ["admin", "front_desk"] },
+      { to: "/provider-day", icon: Briefcase, label: "My Day", roles: ["provider"] },
+      { to: "/front-desk", icon: MonitorCheck, label: "Front Desk", roles: ["admin", "front_desk"] },
+      { to: "/check-in", icon: ClipboardCheck, label: "Check-In", roles: ["admin", "front_desk"] },
+      { to: "/encounters", icon: FileText, label: "Encounters" },
+      { to: "/md-feedback", icon: MessageSquare, label: "MD Feedback", roles: ["provider"] },
       { to: "/messages", icon: Mail, label: "Messages" },
-      { to: "/patient-inbox", icon: Inbox, label: "Patient Inbox" },
-      { to: "/time-off", icon: CalendarOff, label: "Time Off" },
-      { to: "/my-profile", icon: UserCircle, label: "My Profile" },
+      { to: "/patient-inbox", icon: Inbox, label: "Patient Inbox", roles: ["admin", "front_desk"] },
       { to: "/notifications", icon: Bell, label: "Notifications" },
-      { to: "/settings", icon: Settings, label: "Settings" },
+    ],
+  },
+  {
+    label: "PATIENTS",
+    items: [
+      { to: "/patients", icon: Users, label: "Patients" },
+      { to: "/appointments", icon: Calendar, label: "Appointments" },
     ],
   },
   {
     label: "CLINICAL",
+    roles: ["admin", "provider"],
     items: [
-      { to: "/patients", icon: Users, label: "Patients" },
-      { to: "/appointments", icon: Calendar, label: "Appointments" },
-      { to: "/encounters", icon: FileText, label: "Encounters" },
       { to: "/clinical-notes", icon: ClipboardList, label: "Clinical Notes" },
       { to: "/hormone-visits", icon: FlaskConical, label: "Hormone Labs" },
       { to: "/hormone-intake", icon: ClipboardPlus, label: "Hormone Intake" },
@@ -41,7 +56,17 @@ const navSections = [
     ],
   },
   {
+    label: "ME",
+    items: [
+      { to: "/my-profile", icon: UserCircle, label: "My Profile" },
+      { to: "/provider-performance", icon: BarChart3, label: "Performance", roles: ["provider"] },
+      { to: "/time-off", icon: CalendarOff, label: "Time Off" },
+      { to: "/settings", icon: Settings, label: "Settings" },
+    ],
+  },
+  {
     label: "OVERSIGHT",
+    roles: ["admin"],
     items: [
       { to: "/md-oversight", icon: ShieldCheck, label: "Oversight Hub" },
       { to: "/md-oversight/dashboard", icon: Activity, label: "Oversight Dashboard" },
@@ -52,6 +77,7 @@ const navSections = [
   },
   {
     label: "ADMIN",
+    roles: ["admin"],
     items: [
       { to: "/treatments", icon: Stethoscope, label: "Treatments" },
       { to: "/medications", icon: Pill, label: "Medications" },
@@ -63,10 +89,10 @@ const navSections = [
       { to: "/providers", icon: UserCog, label: "Providers" },
       { to: "/billing", icon: DollarSign, label: "Billing" },
       { to: "/marketplace", icon: Store, label: "Marketplace" },
+      { to: "/my-marketplace", icon: Store, label: "My Marketplace" },
       { to: "/packages", icon: Package, label: "Packages" },
       { to: "/membership-billing", icon: CreditCard, label: "Memberships" },
       { to: "/earnings", icon: TrendingUp, label: "Earnings" },
-      { to: "/provider-performance", icon: UserCog, label: "Provider Perf." },
       { to: "/proforma", icon: Calculator, label: "Proforma" },
       { to: "/reports", icon: FileText, label: "Reports" },
       { to: "/templates", icon: FileText, label: "Templates" },
@@ -74,6 +100,7 @@ const navSections = [
   },
   {
     label: "PLATFORM",
+    roles: ["admin"],
     items: [
       { to: "/contracts", icon: Building2, label: "Contracts" },
       { to: "/md-coverage", icon: ShieldCheck, label: "MD Coverage" },
@@ -84,9 +111,22 @@ const navSections = [
   },
 ];
 
+function filterNav(sections: NavSection[], role: string | null): NavSection[] {
+  const r = role || "user";
+  return sections
+    .filter((s) => !s.roles || s.roles.includes(r))
+    .map((s) => ({
+      ...s,
+      items: s.items.filter((i) => !i.roles || i.roles.includes(r)),
+    }))
+    .filter((s) => s.items.length > 0);
+}
+
 export function AppSidebar() {
   const location = useLocation();
-  const { user, signOut } = useAuth();
+  const { user, role, signOut } = useAuth();
+
+  const visibleSections = filterNav(navSections, role);
 
   const initials = user?.email
     ? user.email.substring(0, 2).toUpperCase()
@@ -119,7 +159,7 @@ export function AppSidebar() {
       </button>
 
       <nav className="flex-1 overflow-y-auto px-2 py-3">
-        {navSections.map((section) => (
+        {visibleSections.map((section) => (
           <div key={section.label}>
             <p className="px-3 pt-4 pb-1 text-[9px] font-bold tracking-[0.14em] uppercase text-sidebar-foreground/25">{section.label}</p>
             {section.items.map((item) => {
