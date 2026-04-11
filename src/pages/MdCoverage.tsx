@@ -25,7 +25,7 @@ export default function MdCoverage() {
   const { data: providers = [] } = useQuery({
     queryKey: ["providers-md"],
     queryFn: async () => {
-      const { data } = await supabase.from("providers").select("id, name, credential").eq("is_active", true);
+      const { data } = await supabase.from("providers").select("id, name, credentials").eq("is_active", true);
       return data || [];
     },
   });
@@ -41,12 +41,12 @@ export default function MdCoverage() {
   const { data: assignments = [] } = useQuery({
     queryKey: ["md-coverage"],
     queryFn: async () => {
-      const { data } = await supabase.from("md_coverage_assignments").select("*, providers(name, credential), clinics(name)").order("created_at", { ascending: false });
+      const { data } = await supabase.from("md_coverage_assignments").select("*, providers(name, credentials), clinics(name)").order("created_at", { ascending: false });
       return data || [];
     },
   });
 
-  const mdProviders = providers.filter(p => p.credential && /md|do/i.test(p.credential));
+  const mdProviders = providers.filter(p => p.credentials && /md|do/i.test(p.credentials));
 
   const addAssignment = useMutation({
     mutationFn: async () => {
@@ -112,7 +112,7 @@ export default function MdCoverage() {
         <CardHeader><CardTitle className="flex items-center gap-2"><ShieldCheck className="h-5 w-5" />Coverage Matrix</CardTitle></CardHeader>
         <CardContent className="overflow-x-auto">
           {clinics.length === 0 || mdProviders.length === 0 ? (
-            <p className="text-center text-muted-foreground py-8">Add clinics and MD-credentialed providers to view the coverage matrix.</p>
+            <p className="text-center text-muted-foreground py-8">Add clinics and MD-credentialsed providers to view the coverage matrix.</p>
           ) : (
             <Table>
               <TableHeader>
@@ -124,7 +124,7 @@ export default function MdCoverage() {
               <TableBody>
                 {matrix.map(row => (
                   <TableRow key={row.md.id}>
-                    <TableCell className="font-medium whitespace-nowrap">{row.md.name} <span className="text-xs text-muted-foreground">({row.md.credential})</span></TableCell>
+                    <TableCell className="font-medium whitespace-nowrap">{row.md.name} <span className="text-xs text-muted-foreground">({row.md.credentials})</span></TableCell>
                     {row.cells.map(cell => (
                       <TableCell key={cell.clinic.id} className="text-center">
                         {cell.assignment ? (
@@ -152,7 +152,7 @@ export default function MdCoverage() {
               <Label>Medical Director</Label>
               <Select value={selectedMd} onValueChange={setSelectedMd}>
                 <SelectTrigger><SelectValue placeholder="Select MD" /></SelectTrigger>
-                <SelectContent>{mdProviders.map(p => <SelectItem key={p.id} value={p.id}>{p.name} ({p.credential})</SelectItem>)}</SelectContent>
+                <SelectContent>{mdProviders.map(p => <SelectItem key={p.id} value={p.id}>{p.name} ({p.credentials})</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div>
