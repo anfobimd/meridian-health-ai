@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Users, Calendar, Stethoscope, ClipboardList, UserCog,
   Activity, FlaskConical, FileText, Pill, DollarSign, ClipboardPlus, ShieldCheck, DoorOpen, Store, Package,
   CreditCard, TrendingUp, Calculator, MonitorCheck, Briefcase, Search, LogOut, CalendarClock, TrendingDown,
-  Settings, UserCircle, FileText,
+  Settings, UserCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
