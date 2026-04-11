@@ -717,6 +717,86 @@ export default function Dashboard() {
           </Card>
         </div>
       </div>
+
+      {/* Productivity Section */}
+      <Separator />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Provider Utilization */}
+        <Card>
+          <CardHeader className="pb-2 pt-4 px-5">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <UserCheck className="h-4 w-4 text-primary" />
+              Provider Utilization (30d)
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            {providerUtilization && providerUtilization.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Provider</TableHead>
+                    <TableHead>Completed</TableHead>
+                    <TableHead>Hours</TableHead>
+                    <TableHead>Utilization</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {providerUtilization.slice(0, 8).map((p: any) => (
+                    <TableRow key={p.id}>
+                      <TableCell className="font-medium text-xs">{p.name}</TableCell>
+                      <TableCell className="text-xs">{p.completed}/{p.total}</TableCell>
+                      <TableCell className="text-xs font-mono">{p.hours}h</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Progress value={p.utilization} className="h-1.5 w-16" />
+                          <span className="text-[10px] font-mono">{p.utilization}%</span>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <p className="text-xs text-muted-foreground py-8 text-center">No appointment data</p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Procedure Mix */}
+        <Card>
+          <CardHeader className="pb-2 pt-4 px-5">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Stethoscope className="h-4 w-4 text-primary" />
+              Procedure Mix (30d)
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-5 pb-4">
+            {procedureMix && procedureMix.length > 0 ? (
+              <div className="space-y-2">
+                {procedureMix.map((p: any, i: number) => {
+                  const maxCount = procedureMix[0]?.count || 1;
+                  const pct = Math.round((p.count / maxCount) * 100);
+                  return (
+                    <div key={i} className="flex items-center gap-3">
+                      <div className="w-32 truncate text-xs font-medium">{p.name}</div>
+                      <div className="flex-1">
+                        <div className="h-5 bg-muted rounded-sm overflow-hidden">
+                          <div className="h-full bg-primary/20 rounded-sm flex items-center px-2" style={{ width: `${pct}%` }}>
+                            <span className="text-[10px] font-mono text-foreground">{p.count}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <Badge variant="outline" className="text-[9px]">{p.category}</Badge>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground py-8 text-center">No completed procedures</p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
