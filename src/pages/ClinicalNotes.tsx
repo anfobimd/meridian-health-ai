@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ClipboardList } from "lucide-react";
 import { format, parseISO } from "date-fns";
+import { AddendumSection } from "@/components/clinical/AddendumSection";
 
 export default function ClinicalNotes() {
   const { data: notes, isLoading } = useQuery({
@@ -61,6 +62,7 @@ export default function ClinicalNotes() {
                     <div><p className="text-xs font-semibold text-muted-foreground mb-1">PLAN</p><p className="line-clamp-2">{note.plan}</p></div>
                   )}
                 </div>
+                <AddendumSection noteId={note.id} noteStatus={note.status} />
               </CardContent>
             </Card>
           ))}
