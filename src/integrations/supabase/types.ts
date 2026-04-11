@@ -387,6 +387,8 @@ export type Database = {
       }
       appointment_waitlist: {
         Row: {
+          ai_rank_reason: string | null
+          auto_notified_at: string | null
           created_at: string
           fulfilled_appointment_id: string | null
           id: string
@@ -396,11 +398,14 @@ export type Database = {
           preferred_date: string | null
           preferred_time_end: string | null
           preferred_time_start: string | null
+          priority_score: number | null
           provider_id: string | null
           treatment_id: string | null
           updated_at: string
         }
         Insert: {
+          ai_rank_reason?: string | null
+          auto_notified_at?: string | null
           created_at?: string
           fulfilled_appointment_id?: string | null
           id?: string
@@ -410,11 +415,14 @@ export type Database = {
           preferred_date?: string | null
           preferred_time_end?: string | null
           preferred_time_start?: string | null
+          priority_score?: number | null
           provider_id?: string | null
           treatment_id?: string | null
           updated_at?: string
         }
         Update: {
+          ai_rank_reason?: string | null
+          auto_notified_at?: string | null
           created_at?: string
           fulfilled_appointment_id?: string | null
           id?: string
@@ -424,6 +432,7 @@ export type Database = {
           preferred_date?: string | null
           preferred_time_end?: string | null
           preferred_time_start?: string | null
+          priority_score?: number | null
           provider_id?: string | null
           treatment_id?: string | null
           updated_at?: string
