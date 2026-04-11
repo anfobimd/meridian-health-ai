@@ -1,113 +1,148 @@
 
 
-# Admin User Stories Audit & Implementation Workflow
+# Front Desk & Scheduler User Stories — Implementation Plan
 
-## Gap Analysis: 28 Stories, 6 Epics
+## Gap Analysis: 23 Stories, 6 Epics
 
-### EP-A01: Account & Security Management (3 stories)
+### EP-FD01: Account & Security (3 stories)
+| Story | Title | Status | Gap |
+|-------|-------|--------|-----|
+| US-FD001 | Change My Password | **PARTIAL** | Settings has basic form; needs AI password strength scoring, lockout, session invalidation |
+| US-FD002 | Set Up Two-Factor Authentication | **PARTIAL** | Settings has MFA toggle; needs TOTP QR, backup codes, trusted devices |
+| US-FD003 | Configure Notification Preferences | **MISSING** | No per-user notification preference UI with channel/type toggles + AI suggestions |
 
-| Story | Title | Status | Notes |
-|-------|-------|--------|-------|
-| US-A001 | Change My Password | **Partial** | Settings page has MFA but no password change form with strength validation, lockout, or session invalidation |
-| US-A002 | Enable/Manage MFA | **Built** | TOTP enrollment, QR code, verify, unenroll all in Settings.tsx |
-| US-A003 | Reset Another User's Password | **Missing** | No user management page for admins to reset other users' passwords |
+### EP-FD02: Patient Registration & Identity (4 stories)
+| Story | Title | Status | Gap |
+|-------|-------|--------|-----|
+| US-FD004 | Register a New Patient | **PARTIAL** | Basic add form exists; needs AI duplicate detection, email/phone validation, referral source, emergency contact, shell records |
+| US-FD005 | Verify Patient Identity at Arrival | **MISSING** | No identity verification flow with photo ID check |
+| US-FD006 | Collect Digital Consent Forms | **MISSING** | No consent_templates / patient_consents tables, no digital signature flow |
+| US-FD007 | Verify Insurance Eligibility | **PARTIAL** | patient_insurance table exists; no eligibility check UI or AI cost estimation |
 
-### EP-A02: Clinic & Catalog Configuration (6 stories)
+### EP-FD03: Check-In & Check-Out (4 stories)
+| Story | Title | Status | Gap |
+|-------|-------|--------|-----|
+| US-FD008 | Check Patient In | **PARTIAL** | FrontDesk.tsx has basic check-in button; needs pre-check validation, AI Patient Brief, room assignment, consent gating |
+| US-FD009 | Handle Walk-In Patients | **PARTIAL** | Walk-in dialog exists; needs AI provider recommendation, capacity check, walk-in badge |
+| US-FD010 | Check Patient Out | **MISSING** | No checkout flow — checklist, follow-up booking, package credit, AI open-items check |
+| US-FD011 | Process Payment at Checkout | **PARTIAL** | Invoices/payments tables exist; no checkout payment UI with package credits, discounts, payment plans |
 
-| Story | Title | Status | Notes |
-|-------|-------|--------|-------|
-| US-A004 | Add/Remove Procedures (Catalog) | **Partial** | Treatments.tsx has basic CRUD but missing: Requires GFE flag, Requires MD Review flag, template association, role restrictions, active/inactive toggle, audit logging |
-| US-A005 | Add/Remove Medications & Hormones | **Missing** | No medications/formulary management page |
-| US-A006 | Configure Procedure Pricing | **Partial** | Treatments has price field but no member vs non-member pricing, bulk adjustments, price history, effective dates |
-| US-A007 | Create/Manage Treatment Packages | **Built** | Packages.tsx has full CRUD, AI insights, package sales, session tracking |
-| US-A008 | Configure Clinic Hours & Schedules | **Partial** | ProviderSchedule.tsx exists for provider availability but no clinic-level operating hours, holiday closures, or coverage management |
-| US-A009 | Manage Provider Roles & Clearances | **Missing** | No procedure clearance management per provider |
+### EP-FD04: Scheduling (5 stories — shared with admin)
+| Story | Title | Status | Gap |
+|-------|-------|--------|-----|
+| US-FD012 | Book Appointment | **BUILT** | Appointments.tsx has full booking with AI |
+| US-FD013 | View Full Clinic Schedule | **BUILT** | MultiProviderCalendar.tsx exists |
+| US-FD014 | Handle Cancellations & Reschedules | **PARTIAL** | Cancel exists; needs AI waitlist match, no-show counter, re-engagement draft |
+| US-FD015 | Manage Patient Waitlist | **PARTIAL** | Waitlist.tsx exists; needs AI ranking, slot-available SMS, auto-cancel |
+| US-FD016 | Send Appointment Reminders | **PARTIAL** | NotificationCenter exists; needs per-appointment reminder send, AI no-show risk badge |
 
-### EP-A03: Patient Scheduling & Notifications (6 stories)
+### EP-FD05: Patient Communication (3 stories)
+| Story | Title | Status | Gap |
+|-------|-------|--------|-----|
+| US-FD017 | Handle Inbound Patient Inquiries | **MISSING** | No patient-facing unified inbox with AI intent classification and draft replies |
+| US-FD018 | View Patient Communication History | **MISSING** | No communication timeline in patient record |
+| US-FD019 | Send Aftercare/Follow-Up Messages | **MISSING** | No aftercare message templates or post-visit automation |
 
-| Story | Title | Status | Notes |
-|-------|-------|--------|-------|
-| US-A010 | Book an Appointment | **Built** | Appointments.tsx has multi-step booking with AI suggestions, conflict detection, slot picker |
-| US-A011 | Automated/Manual Notifications | **Missing** | No notification system (SMS/email reminders, confirm/cancel links) |
-| US-A012 | Notify Providers Daily Schedule | **Missing** | Provider Day page exists but no automated morning notification system |
-| US-A013 | View/Manage Full Clinic Schedule | **Partial** | Appointments page has list view but no multi-provider column calendar, drag-drop, or real-time KPI sidebar |
-| US-A014 | Manage Patient Waitlist | **Partial** | `appointment_waitlist` table exists but no dedicated waitlist UI with matching/notification |
-| US-A015 | Handle Cancellations & Reschedules | **Partial** | Status changes exist but no cancellation reason tracking, no-show counter, or re-engagement automation |
+### EP-FD06: Packages, Pricing & Point of Sale (4 stories)
+| Story | Title | Status | Gap |
+|-------|-------|--------|-----|
+| US-FD020 | Present & Sell a Package | **PARTIAL** | Packages page exists; needs patient-facing sale flow, AI recommendation, savings display |
+| US-FD021 | Apply Package Credits at Checkout | **MISSING** | No credit application in checkout |
+| US-FD022 | Answer Patient Pricing Questions | **MISSING** | No pricing reference/quoting tool with AI package suggestion |
+| US-FD023 | Enroll Patient in Membership | **PARTIAL** | MembershipBilling page exists; needs front-desk enrollment flow, AI tier recommendation |
 
-### EP-A04: Chart Review & Documentation Oversight (3 stories)
-
-| Story | Title | Status | Notes |
-|-------|-------|--------|-------|
-| US-A016 | Monitor Outstanding Charts | **Partial** | MdOversightDashboard has some metrics but no admin-specific unsigned chart tracker with provider charting lag |
-| US-A017 | Review Charts for Admin Completeness | **Missing** | No administrative completeness checklist (consent, GFE, ICD-10, CPT verification) |
-| US-A018 | View MD Oversight Status | **Built** | MdOversight + MdOversightDashboard cover review status, compliance %, and AI analysis |
-
-### EP-A05: Productivity, Analytics & Reporting (4 stories)
-
-| Story | Title | Status | Notes |
-|-------|-------|--------|-------|
-| US-A019 | Clinic-Wide Productivity Dashboard | **Partial** | Index.tsx has KPIs and AI briefing but missing provider utilization %, procedure mix chart, provider performance table |
-| US-A020 | Provider-Level Productivity Metrics | **Partial** | Earnings has per-provider data but no individual drill-down with 6-month trends, schedule fill rate, or PDF export |
-| US-A021 | Revenue by Procedure/Provider/Package | **Partial** | Earnings.tsx has procedure-level revenue; Proforma exists; but no A/R aging or package revenue split |
-| US-A022 | Generate/Export Reports | **Missing** | No report generator with payroll hours, PDF/CSV export, or scheduled auto-send |
-
-### EP-A06: Super-Admin & Application Administration (6 stories)
-
-| Story | Title | Status | Notes |
-|-------|-------|--------|-------|
-| US-A023 | Manage Contracts & Clinic Managers | **Missing** | No contracts/multi-clinic hierarchy management |
-| US-A024 | Assign MD Coverage | **Partial** | oversight_config table exists with sampling rates but no MD coverage matrix UI |
-| US-A025 | Platform-Wide AI Intelligence Report | **Built** | ai_oversight_reports table + AI monthly report edge function exist |
-| US-A026 | Master Procedure/Medication Catalog | **Missing** | No platform-level master catalog (only clinic-level treatments) |
-| US-A027 | Cross-Clinic Performance Benchmarks | **Missing** | No cross-clinic comparison view |
-| US-A028 | Platform Notification/Automation Rules | **Missing** | No automation rules engine |
-
-### Summary: 4 Built, 12 Partial, 12 Missing
+### Summary: 2 Built | 10 Partial | 11 Missing
 
 ---
 
-## Implementation Workflow (5 Batches)
+## Implementation Batches
 
-### Batch A -- Core Admin Config (Must-haves, highest impact)
-1. **Password Change UI** (US-A001) -- Add password change form to Settings with strength meter, lockout, session invalidation
-2. **Enhanced Treatment Catalog** (US-A004) -- Add GFE/MD Review flags, template association, active/inactive, audit logging to Treatments.tsx
-3. **Medications & Formulary** (US-A005) -- New page: medication management with categories, dosing, credential restrictions, controlled substance tracking
-4. **Provider Clearances** (US-A009) -- New section in Providers page: procedure clearance management per provider with expiration dates
+### Batch A — Check-In/Check-Out Core + AI (Highest value)
+**Stories:** US-FD008, US-FD009, US-FD010, US-FD011
 
-### Batch B -- Scheduling & Calendar (Critical operational)
-5. **Clinic Hours & Closures** (US-A008) -- New clinic hours config with holidays, provider schedule overrides
-6. **Full Clinic Schedule View** (US-A013) -- Multi-provider calendar grid with day/week views, drag-drop, KPI sidebar
-7. **Waitlist Management** (US-A014) -- Waitlist UI with cancellation-slot matching, SMS-ready notification drafts
-8. **Cancellation & Reschedule Flow** (US-A015) -- Cancellation reason tracking, no-show counter, re-engagement workflow
+**Database:**
+- `consent_templates` table (name, body, procedure_types, is_active)
+- `patient_consents` table (patient_id, template_id, encounter_id, signed_at, signature_data, status)
+- `patient_communication_log` table (patient_id, channel, direction, content, template_used, delivery_status, staff_user_id)
+- Add `no_show_count`, `late_cancel_count` to patients table
 
-### Batch C -- Analytics & Oversight
-9. **Pricing Management** (US-A006) -- Member/non-member pricing, bulk adjustments, price history, effective dates
-10. **Outstanding Charts Monitor** (US-A016) -- Admin chart completion tracker with provider charting lag, reminder actions
-11. **Admin Completeness Review** (US-A017) -- Checklist view for consent, GFE, ICD-10, CPT verification on signed encounters
-12. **Productivity Dashboard Enhancement** (US-A019) -- Provider utilization %, procedure mix chart, performance table
+**Edge Functions:**
+- `ai-patient-brief` — Lovable AI generates a one-paragraph patient brief at check-in (last visit, protocol status, churn risk, key notes)
+- `ai-checkout-review` — AI checks for open items (unsigned notes, missing consent) before checkout closes
 
-### Batch D -- Reporting & Provider Analytics
-13. **Provider Drill-Down Metrics** (US-A020) -- Individual provider detail view with trends, fill rate, exportable PDF
-14. **Revenue Breakdown Enhancement** (US-A021) -- A/R aging, package revenue split, provider revenue per hour
-15. **Report Generator** (US-A022) -- Payroll, productivity, revenue reports with PDF/CSV export and scheduling
+**UI Changes:**
+- Enhance FrontDesk.tsx check-in flow: pre-check validation panel (consent status, clearance), room assignment dropdown, AI Patient Brief card, check-in notes
+- Walk-in enhancement: AI provider recommendation based on capacity/expertise, walk-in badge on cards
+- New checkout panel: checklist (payment, follow-up, package credits), AI follow-up date suggestion, "Complete Checkout" action
+- Checkout payment: invoice display, apply package credit, apply discount code, record payment method, receipt send
 
-### Batch E -- Super-Admin Platform Management
-16. **Contracts & Clinic Hierarchy** (US-A023) -- Multi-clinic contract management with assignments
-17. **MD Coverage Matrix** (US-A024) -- Visual MD-to-clinic assignment grid with sampling rates
-18. **Master Catalog** (US-A026) -- Platform-level procedure/medication catalog that clinics select from
-19. **Cross-Clinic Benchmarks** (US-A027) -- Side-by-side clinic comparison dashboard
-20. **Automation Rules Engine** (US-A028) -- Trigger/condition/action rule builder for notifications
+### Batch B — Patient Registration & Consent (EP-FD02)
+**Stories:** US-FD004, US-FD005, US-FD006, US-FD007
 
-Notifications (US-A011, US-A012) require external services (Twilio/SendGrid) and are deferred until those connectors are configured. User management password reset (US-A003) depends on Supabase admin API access.
+**Database:**
+- Add `emergency_contact_name`, `emergency_contact_phone`, `emergency_contact_relationship`, `referral_source`, `preferred_contact_channel`, `preferred_name`, `sex_at_birth`, `gender_identity` to patients table
+
+**Edge Functions:**
+- `ai-patient-registration` — AI validates input (email typo detection, phone formatting, DOB plausibility), checks duplicates, suggests intake forms based on booked procedure
+
+**UI Changes:**
+- Enhanced patient registration dialog: full fields per spec, duplicate detection before save, shell record option, referral source picker
+- Identity verification panel at check-in: photo ID match confirmation, DOB verification
+- Consent form workflow: template list by procedure, one-click send (SMS/email via Twilio), digital signature pad, consent status badges on appointment cards
+- Insurance eligibility panel: trigger check, display results, AI cost estimation, manual notes
+
+### Batch C — Communication & Messaging (EP-FD05)
+**Stories:** US-FD017, US-FD018, US-FD019, US-FD003
+
+**Edge Functions:**
+- `ai-message-classifier` — Lovable AI classifies inbound messages by intent (Appointment Request, Pricing, Complaint, Cancellation, General) and drafts responses
+- `ai-aftercare-message` — AI generates personalized aftercare instructions based on procedure type
+
+**Database:**
+- `staff_notification_preferences` table (user_id, notification_type, channel, is_enabled, quiet_hours_start, quiet_hours_end)
+
+**UI Changes:**
+- Patient Inbox: unified view of SMS/email/portal messages, AI intent badges, AI draft replies, escalation to manager, resolve/archive
+- Patient Communication History tab on PatientRecord: timeline of all messages with delivery status
+- Aftercare message templates: post-visit auto-send config, manual send with AI personalization
+- Notification preferences panel in Settings: per-type channel toggles, quiet hours, AI role-based suggestions
+
+### Batch D — Scheduling Enhancements + POS (EP-FD04 gaps + EP-FD06)
+**Stories:** US-FD014, US-FD015, US-FD016, US-FD020, US-FD021, US-FD022, US-FD023
+
+**Edge Functions:**
+- `ai-waitlist-rank` — AI ranks waitlisted patients by fill probability
+- `ai-package-recommend` — AI recommends packages based on patient history and calculates savings vs. a la carte
+
+**UI Changes:**
+- Cancel/reschedule enhancements: AI waitlist match on cancellation, no-show counter display, AI re-engagement message draft
+- Waitlist enhancements: AI ranking, slot-available SMS send, auto-expire stale entries
+- Per-appointment reminder send button with AI no-show risk badge and personalized message
+- Package sale flow from patient record: AI recommendation, savings display, one-click sell
+- Pricing reference/quoting tool: search treatments, build multi-item quote, member vs. non-member pricing, email/SMS quote
+- Membership enrollment from front desk: tier comparison, AI optimal tier recommendation, projected savings
+
+### Batch E — Security Hardening (EP-FD01 remaining)
+**Stories:** US-FD001, US-FD002
+
+**Edge Functions:**
+- `ai-password-strength` — AI scores password and flags name/clinic patterns
+
+**UI Changes:**
+- Enhanced password change: AI real-time strength scoring, lockout after 3 failures, session invalidation
+- MFA setup: TOTP QR code enrollment, backup codes display, trusted devices list
 
 ---
 
-## Step 1: Save Audit to Memory
+## Technical Notes
 
-Write the full gap analysis to `mem://features/admin-stories-audit` and update the index.
+- All AI features use Lovable AI Gateway (`google/gemini-3-flash-preview` default) via edge functions
+- AI degrades gracefully — all workflows function without AI if gateway is unavailable
+- Twilio (already connected) used for SMS consent links, reminders, and patient communication
+- All patient-facing actions logged to `patient_communication_log` and audit trail
+- Role enforcement: front_desk role cannot access clinical chart content, pricing config, or provider analytics
 
-## Step 2: Build Batch A First
+## Batch Order Rationale
 
-Batch A delivers the most critical admin configuration capabilities. Each subsequent batch is independently shippable.
+Batch A first because check-in/check-out is the front desk's most time-critical workflow and delivers the AI Patient Brief — the most impactful AI feature. Batch B follows with registration (the patient's first touchpoint). Batch C adds communication tools. Batch D enhances existing scheduling and adds POS. Batch E hardens security last since basic auth already works.
 
-Shall I proceed?
