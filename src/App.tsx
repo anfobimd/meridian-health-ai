@@ -103,6 +103,8 @@ const App = () => (
                 <Route path="/md-feedback" element={<MdFeedbackInbox />} />
                 <Route path="/check-in" element={<ProviderCheckIn />} />
                 <Route path="/messages" element={<Messages />} />
+                <Route path="/outstanding-charts" element={<OutstandingCharts />} />
+                <Route path="/chart-completeness" element={<ChartCompleteness />} />
               </Route>
             </Route>
             {/* Public routes — no auth required */}
