@@ -44,6 +44,7 @@ import TemplateManager from "./pages/TemplateManager";
 import TimeOff from "./pages/TimeOff";
 import MdFeedbackInbox from "./pages/MdFeedbackInbox";
 import ProviderCheckIn from "./pages/ProviderCheckIn";
+import Messages from "./pages/Messages";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
