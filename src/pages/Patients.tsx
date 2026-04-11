@@ -1,20 +1,16 @@
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
+import { Card, CardContent } from "@/components/ui/card";
 import { Plus, Search, User } from "lucide-react";
-import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
+import { PatientRegistrationDialog } from "@/components/front-desk/PatientRegistrationDialog";
 
 export default function Patients() {
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
-  const queryClient = useQueryClient();
   const navigate = useNavigate();
 
   const { data: patients, isLoading } = useQuery({
@@ -30,26 +26,6 @@ export default function Patients() {
     },
   });
 
-  const addPatient = useMutation({
-    mutationFn: async (formData: FormData) => {
-      const patient = {
-        first_name: formData.get("first_name") as string,
-        last_name: formData.get("last_name") as string,
-        email: formData.get("email") as string || null,
-        phone: formData.get("phone") as string || null,
-        date_of_birth: formData.get("dob") as string || null,
-      };
-      const { error } = await supabase.from("patients").insert(patient);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["patients"] });
-      setDialogOpen(false);
-      toast.success("Patient added successfully");
-    },
-    onError: () => toast.error("Failed to add patient"),
-  });
-
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -57,44 +33,10 @@ export default function Patients() {
           <h1 className="text-2xl font-bold">Patients</h1>
           <p className="text-muted-foreground">Manage patient records</p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button><Plus className="h-4 w-4 mr-2" />Add Patient</Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add New Patient</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={(e) => { e.preventDefault(); addPatient.mutate(new FormData(e.currentTarget)); }} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="first_name">First Name *</Label>
-                  <Input id="first_name" name="first_name" required />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="last_name">Last Name *</Label>
-                  <Input id="last_name" name="last_name" required />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input id="email" name="email" type="email" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone</Label>
-                <Input id="phone" name="phone" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="dob">Date of Birth</Label>
-                <Input id="dob" name="dob" type="date" />
-              </div>
-              <Button type="submit" className="w-full" disabled={addPatient.isPending}>
-                {addPatient.isPending ? "Adding..." : "Add Patient"}
-              </Button>
-            </form>
-          </DialogContent>
-        </Dialog>
+        <Button onClick={() => setDialogOpen(true)}><Plus className="h-4 w-4 mr-2" />Add Patient</Button>
       </div>
+
+      <PatientRegistrationDialog open={dialogOpen} onOpenChange={setDialogOpen} />
 
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
