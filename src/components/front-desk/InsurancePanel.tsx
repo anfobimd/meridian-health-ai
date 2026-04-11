@@ -87,7 +87,7 @@ export function InsurancePanel({ patientId }: Props) {
           <div key={ins.id} className="p-2.5 rounded-lg border space-y-1">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-medium">{ins.carrier_name}</span>
+                <span className="text-sm font-medium">{ins.provider_name}</span>
                 {ins.is_primary && <Badge variant="secondary" className="text-[10px]">Primary</Badge>}
               </div>
               <Badge className={`text-[10px] ${statusColor(ins.eligibility_status)}`}>
