@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
@@ -8,14 +8,17 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { format, addDays, startOfWeek, isSameDay, parseISO } from "date-fns";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, AlertTriangle, Loader2, Brain, Clock } from "lucide-react";
 
-const HOURS = Array.from({ length: 12 }, (_, i) => i + 8); // 8 AM - 7 PM
+const HOURS = Array.from({ length: 12 }, (_, i) => i + 8);
 
 export default function MultiProviderCalendar() {
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
   const [viewMode, setViewMode] = useState<"day" | "week">("day");
   const [selectedDay, setSelectedDay] = useState(new Date());
+  const [delays, setDelays] = useState<any[]>([]);
+  const [utilization, setUtilization] = useState<any[]>([]);
+  const [loadingDelays, setLoadingDelays] = useState(false);
 
   const weekDays = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
 
@@ -52,6 +55,25 @@ export default function MultiProviderCalendar() {
     },
   });
 
+  // Running-behind detection (day view only)
+  useEffect(() => {
+    if (viewMode !== "day") return;
+    const checkDelays = async () => {
+      setLoadingDelays(true);
+      try {
+        const { data } = await supabase.functions.invoke("ai-schedule-optimizer", {
+          body: { mode: "running_behind", data: { date: format(selectedDay, "yyyy-MM-dd") } },
+        });
+        setDelays(data?.delays || []);
+        setUtilization(data?.utilization || []);
+      } catch { /* non-fatal */ }
+      setLoadingDelays(false);
+    };
+    checkDelays();
+    const interval = setInterval(checkDelays, 120000); // refresh every 2 min
+    return () => clearInterval(interval);
+  }, [selectedDay, viewMode]);
+
   const statusColor = (s: string) => {
     if (s === "completed") return "bg-emerald-500/20 border-emerald-500/40 text-emerald-700";
     if (s === "checked_in" || s === "roomed") return "bg-blue-500/20 border-blue-500/40 text-blue-700";
@@ -67,13 +89,20 @@ export default function MultiProviderCalendar() {
     });
   };
 
+  const getDelayForProvider = (providerId: string) => delays.filter(d => {
+    const appt = appointments.find((a: any) => a.id === d.appointment_id);
+    return appt && (appt as any).provider_id === providerId;
+  });
+
+  const getUtilForProvider = (providerId: string) => utilization.find(u => u.provider_id === providerId);
+
   return (
     <div className="space-y-6">
       <Breadcrumbs />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Provider Calendar</h1>
-          <p className="text-sm text-muted-foreground">Multi-provider schedule grid</p>
+          <p className="text-sm text-muted-foreground">Multi-provider schedule grid with AI delay detection</p>
         </div>
         <div className="flex items-center gap-2">
           <Select value={viewMode} onValueChange={(v: "day" | "week") => setViewMode(v)}>
@@ -96,34 +125,103 @@ export default function MultiProviderCalendar() {
         </div>
       </div>
 
+      {/* Running-behind alerts */}
+      {viewMode === "day" && delays.length > 0 && (
+        <Card className="border-warning/30">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-warning" />
+              Running Behind — {delays.length} delay{delays.length > 1 ? "s" : ""} detected
+              {loadingDelays && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {delays.map((d, i) => (
+                <div key={i} className={cn("flex items-center justify-between p-2 rounded border text-xs",
+                  d.severity === "critical" ? "border-destructive/30 bg-destructive/5" : "border-warning/30 bg-warning/5"
+                )}>
+                  <div>
+                    <span className="font-medium">{d.patient}</span>
+                    <span className="text-muted-foreground ml-2">w/ {d.provider} • {d.treatment}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={d.severity === "critical" ? "destructive" : "secondary"} className="text-[9px]">
+                      {d.delay_minutes} min late
+                    </Badge>
+                  </div>
+                </div>
+              ))}
+              {delays.some(d => d.severity === "critical") && (
+                <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                  <Brain className="h-2.5 w-2.5" />Consider reassigning patients or adjusting downstream appointments
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {viewMode === "day" ? (
         <Card>
-          <CardHeader><CardTitle>Day View — {format(selectedDay, "EEEE, MMMM d, yyyy")}</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <span>Day View — {format(selectedDay, "EEEE, MMMM d, yyyy")}</span>
+              {loadingDelays && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+            </CardTitle>
+          </CardHeader>
           <CardContent className="overflow-x-auto">
             <div className="grid" style={{ gridTemplateColumns: `80px repeat(${providers.length}, minmax(140px, 1fr))` }}>
-              {/* Header */}
+              {/* Header with utilization scores */}
               <div className="border-b border-r p-2 bg-muted/50 text-xs font-medium">Time</div>
-              {providers.map(p => (
-                <div key={p.id} className="border-b p-2 bg-muted/50 text-xs font-medium text-center">{p.first_name} {p.last_name?.charAt(0)}.</div>
-              ))}
+              {providers.map(p => {
+                const util = getUtilForProvider(p.id);
+                const provDelays = getDelayForProvider(p.id);
+                return (
+                  <div key={p.id} className={cn("border-b p-2 bg-muted/50 text-xs font-medium text-center", provDelays.length > 0 && "bg-warning/10")}>
+                    <div>{p.first_name} {p.last_name?.charAt(0)}.</div>
+                    {util && (
+                      <div className="flex items-center justify-center gap-1 mt-0.5">
+                        <Badge variant="outline" className={cn("text-[8px]",
+                          util.utilization_pct >= 80 ? "text-success border-success/30" :
+                          util.utilization_pct >= 50 ? "text-primary border-primary/30" :
+                          "text-muted-foreground"
+                        )}>
+                          {util.utilization_pct}% done
+                        </Badge>
+                        {provDelays.length > 0 && (
+                          <Badge variant="destructive" className="text-[8px]">
+                            <Clock className="h-2 w-2 mr-0.5" />{provDelays.length}
+                          </Badge>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
               {/* Time slots */}
               {HOURS.map(hour => (
-                <>
-                  <div key={`h-${hour}`} className="border-b border-r p-2 text-xs text-muted-foreground">{format(new Date(2000, 0, 1, hour), "h a")}</div>
+                <div key={`row-${hour}`} className="contents">
+                  <div className="border-b border-r p-2 text-xs text-muted-foreground">{format(new Date(2000, 0, 1, hour), "h a")}</div>
                   {providers.map(p => {
                     const appts = getApptForSlot(p.id, hour, selectedDay);
+                    const hasDelay = delays.some(d => d.appointment_id && appts.some((a: any) => a.id === d.appointment_id));
                     return (
-                      <div key={`${p.id}-${hour}`} className="border-b min-h-[48px] p-0.5">
-                        {appts.map((a: any) => (
-                          <div key={a.id} className={cn("rounded px-1.5 py-0.5 text-[10px] border mb-0.5", statusColor(a.status))}>
-                            <p className="font-medium truncate">{(a.patients as any)?.first_name} {(a.patients as any)?.last_name?.charAt(0)}.</p>
-                            <p className="truncate opacity-70">{(a.treatments as any)?.name || "—"}</p>
-                          </div>
-                        ))}
+                      <div key={`${p.id}-${hour}`} className={cn("border-b min-h-[48px] p-0.5", hasDelay && "bg-warning/5")}>
+                        {appts.map((a: any) => {
+                          const delay = delays.find(d => d.appointment_id === a.id);
+                          return (
+                            <div key={a.id} className={cn("rounded px-1.5 py-0.5 text-[10px] border mb-0.5", statusColor(a.status), delay && "ring-1 ring-warning")}>
+                              <p className="font-medium truncate">{(a.patients as any)?.first_name} {(a.patients as any)?.last_name?.charAt(0)}.</p>
+                              <p className="truncate opacity-70">{(a.treatments as any)?.name || "—"}</p>
+                              {delay && <p className="text-warning font-medium">⚠ {delay.delay_minutes}m late</p>}
+                            </div>
+                          );
+                        })}
                       </div>
                     );
                   })}
-                </>
+                </div>
               ))}
             </div>
           </CardContent>
@@ -140,8 +238,8 @@ export default function MultiProviderCalendar() {
                 </div>
               ))}
               {providers.map(p => (
-                <>
-                  <div key={`p-${p.id}`} className="border-b border-r p-2 text-xs font-medium">{p.first_name} {p.last_name?.charAt(0)}.</div>
+                <div key={`row-${p.id}`} className="contents">
+                  <div className="border-b border-r p-2 text-xs font-medium">{p.first_name} {p.last_name?.charAt(0)}.</div>
                   {weekDays.map(d => {
                     const dayAppts = appointments.filter((a: any) => a.provider_id === p.id && isSameDay(parseISO(a.scheduled_at), d));
                     return (
@@ -152,32 +250,57 @@ export default function MultiProviderCalendar() {
                       </div>
                     );
                   })}
-                </>
+                </div>
               ))}
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Room utilization summary */}
-      <Card>
-        <CardHeader><CardTitle className="text-sm">Room Utilization</CardTitle></CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-4 gap-3">
-            {rooms.map(room => {
-              const roomAppts = appointments.filter((a: any) => a.room_id === room.id);
-              return (
-                <div key={room.id} className="rounded-lg border p-3">
-                  <p className="text-sm font-medium">{room.name}</p>
-                  <p className="text-2xl font-bold">{roomAppts.length}</p>
-                  <p className="text-[10px] text-muted-foreground">bookings</p>
-                </div>
-              );
-            })}
-            {rooms.length === 0 && <p className="text-sm text-muted-foreground col-span-4">No rooms configured</p>}
-          </div>
-        </CardContent>
-      </Card>
+      {/* Room utilization + provider utilization summary */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader><CardTitle className="text-sm">Room Utilization</CardTitle></CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-3">
+              {rooms.map(room => {
+                const roomAppts = appointments.filter((a: any) => a.room_id === room.id);
+                return (
+                  <div key={room.id} className="rounded-lg border p-3">
+                    <p className="text-sm font-medium">{room.name}</p>
+                    <p className="text-2xl font-bold">{roomAppts.length}</p>
+                    <p className="text-[10px] text-muted-foreground">bookings</p>
+                  </div>
+                );
+              })}
+              {rooms.length === 0 && <p className="text-sm text-muted-foreground col-span-2">No rooms configured</p>}
+            </div>
+          </CardContent>
+        </Card>
+
+        {viewMode === "day" && utilization.length > 0 && (
+          <Card>
+            <CardHeader><CardTitle className="text-sm flex items-center gap-1"><Brain className="h-3.5 w-3.5 text-primary" />Provider Utilization</CardTitle></CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {utilization.map(u => (
+                  <div key={u.provider_id} className="flex items-center justify-between">
+                    <span className="text-sm">{u.provider_name}</span>
+                    <div className="flex items-center gap-2">
+                      <div className="w-24 h-2 bg-muted rounded-full overflow-hidden">
+                        <div className={cn("h-full rounded-full",
+                          u.utilization_pct >= 80 ? "bg-success" : u.utilization_pct >= 50 ? "bg-primary" : "bg-warning"
+                        )} style={{ width: `${u.utilization_pct}%` }} />
+                      </div>
+                      <span className="text-xs text-muted-foreground w-16 text-right">{u.completed}/{u.total_today}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
     </div>
   );
 }

@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Calendar, Sparkles, Loader2, DoorOpen, Cpu, AlertTriangle, Brain, Clock, Check, XCircle, Ban } from "lucide-react";
+import { Plus, Calendar, Sparkles, Loader2, DoorOpen, Cpu, AlertTriangle, Brain, Clock, Check, XCircle, Ban, ShieldAlert, Timer, UserCheck } from "lucide-react";
 import { toast } from "sonner";
 import { format, parseISO, addMinutes } from "date-fns";
 import { Calendar as CalendarWidget } from "@/components/ui/calendar";
@@ -41,7 +41,7 @@ export default function Appointments() {
   const queryClient = useQueryClient();
 
   // Slot picker state
-  const [bookingStep, setBookingStep] = useState(0); // 0=patient/treatment, 1=provider, 2=date/slot
+  const [bookingStep, setBookingStep] = useState(0);
   const [bookPatientId, setBookPatientId] = useState("");
   const [bookTreatmentId, setBookTreatmentId] = useState("");
   const [bookProviderId, setBookProviderId] = useState("");
@@ -53,6 +53,16 @@ export default function Appointments() {
   const [bookNotes, setBookNotes] = useState("");
   const [bookRoomId, setBookRoomId] = useState("");
   const [bookDeviceId, setBookDeviceId] = useState("");
+
+  // AI scheduling intelligence state
+  const [noShowRisk, setNoShowRisk] = useState<any>(null);
+  const [loadingNoShowRisk, setLoadingNoShowRisk] = useState(false);
+  const [durationEstimate, setDurationEstimate] = useState<any>(null);
+  const [loadingDuration, setLoadingDuration] = useState(false);
+  const [providerMatch, setProviderMatch] = useState<any>(null);
+  const [loadingProviderMatch, setLoadingProviderMatch] = useState(false);
+  const [contraindicationCheck, setContraindicationCheck] = useState<any>(null);
+  const [loadingContra, setLoadingContra] = useState(false);
 
   const { data: appointments, isLoading } = useQuery({
     queryKey: ["appointments"],
@@ -107,18 +117,70 @@ export default function Appointments() {
     },
   });
 
+  // ── AI: No-show risk check when patient is selected ──
+  useEffect(() => {
+    if (!bookPatientId) { setNoShowRisk(null); return; }
+    const run = async () => {
+      setLoadingNoShowRisk(true);
+      try {
+        const { data } = await supabase.functions.invoke("ai-schedule-optimizer", {
+          body: { mode: "no_show_risk", data: { patient_id: bookPatientId } },
+        });
+        setNoShowRisk(data);
+      } catch { /* non-fatal */ }
+      setLoadingNoShowRisk(false);
+    };
+    run();
+  }, [bookPatientId]);
+
+  // ── AI: Duration estimate + contraindication when patient+treatment selected ──
+  useEffect(() => {
+    if (!bookPatientId || !bookTreatmentId) { setDurationEstimate(null); setContraindicationCheck(null); return; }
+    const run = async () => {
+      setLoadingDuration(true);
+      setLoadingContra(true);
+      try {
+        const [durRes, contraRes] = await Promise.all([
+          supabase.functions.invoke("ai-schedule-optimizer", {
+            body: { mode: "duration_estimate", data: { patient_id: bookPatientId, treatment_id: bookTreatmentId } },
+          }),
+          supabase.functions.invoke("ai-schedule-optimizer", {
+            body: { mode: "contraindication_check", data: { patient_id: bookPatientId, treatment_id: bookTreatmentId } },
+          }),
+        ]);
+        setDurationEstimate(durRes.data);
+        setContraindicationCheck(contraRes.data);
+      } catch { /* non-fatal */ }
+      setLoadingDuration(false);
+      setLoadingContra(false);
+    };
+    run();
+  }, [bookPatientId, bookTreatmentId]);
+
+  // ── AI: Provider matching when moving to step 1 ──
+  useEffect(() => {
+    if (bookingStep !== 1 || !bookPatientId || !bookTreatmentId) { setProviderMatch(null); return; }
+    const run = async () => {
+      setLoadingProviderMatch(true);
+      try {
+        const { data } = await supabase.functions.invoke("ai-schedule-optimizer", {
+          body: { mode: "provider_match", data: { patient_id: bookPatientId, treatment_id: bookTreatmentId } },
+        });
+        setProviderMatch(data);
+      } catch { /* non-fatal */ }
+      setLoadingProviderMatch(false);
+    };
+    run();
+  }, [bookingStep, bookPatientId, bookTreatmentId]);
+
   const addAppointment = useMutation({
     mutationFn: async () => {
       if (!selectedSlot) throw new Error("No slot selected");
-      const duration = treatments?.find((t) => t.id === bookTreatmentId)?.duration_minutes ?? 30;
+      const duration = durationEstimate?.suggested_duration || treatments?.find((t) => t.id === bookTreatmentId)?.duration_minutes || 30;
 
-      // Final conflict check
       const result = await checkConflicts(
-        bookProviderId || null,
-        bookRoomId || null,
-        bookDeviceId || null,
-        selectedSlot.start,
-        addMinutes(selectedSlot.start, duration)
+        bookProviderId || null, bookRoomId || null, bookDeviceId || null,
+        selectedSlot.start, addMinutes(selectedSlot.start, duration)
       );
       if (result.hasConflict) {
         setConflictResult(result);
@@ -149,40 +211,26 @@ export default function Appointments() {
   const resetBookingForm = () => {
     setDialogOpen(false);
     setBookingStep(0);
-    setBookPatientId("");
-    setBookTreatmentId("");
-    setBookProviderId("");
-    setBookDate(undefined);
-    setAvailableSlots([]);
-    setSelectedSlot(null);
-    setConflictResult(null);
-    setBookNotes("");
-    setBookRoomId("");
-    setBookDeviceId("");
-    setAiSuggestion(null);
+    setBookPatientId(""); setBookTreatmentId(""); setBookProviderId("");
+    setBookDate(undefined); setAvailableSlots([]); setSelectedSlot(null);
+    setConflictResult(null); setBookNotes(""); setBookRoomId(""); setBookDeviceId("");
+    setAiSuggestion(null); setNoShowRisk(null); setDurationEstimate(null);
+    setProviderMatch(null); setContraindicationCheck(null);
   };
 
-  // Load slots when provider + date + treatment are selected
   const loadSlots = async () => {
     if (!bookProviderId || !bookDate || !bookTreatmentId) return;
-    const duration = treatments?.find((t) => t.id === bookTreatmentId)?.duration_minutes ?? 30;
-    setLoadingSlots(true);
-    setSelectedSlot(null);
-    setConflictResult(null);
+    const duration = durationEstimate?.suggested_duration || treatments?.find((t) => t.id === bookTreatmentId)?.duration_minutes || 30;
+    setLoadingSlots(true); setSelectedSlot(null); setConflictResult(null);
     try {
       const slots = await getAvailableSlots(bookProviderId, bookDate, duration);
       setAvailableSlots(slots);
-    } catch {
-      toast.error("Failed to load available slots");
-    } finally {
-      setLoadingSlots(false);
-    }
+    } catch { toast.error("Failed to load available slots"); }
+    finally { setLoadingSlots(false); }
   };
 
   useEffect(() => {
-    if (bookProviderId && bookDate && bookTreatmentId) {
-      loadSlots();
-    }
+    if (bookProviderId && bookDate && bookTreatmentId) loadSlots();
   }, [bookProviderId, bookDate, bookTreatmentId]);
 
   const updateStatus = useMutation({
@@ -199,46 +247,34 @@ export default function Appointments() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["appointments"] });
-      setRoomingDialogOpen(false);
-      setAiSuggestion(null);
+      setRoomingDialogOpen(false); setAiSuggestion(null);
       toast.success("Status updated");
     },
   });
 
   const CANCEL_REASONS = ["Patient request", "Schedule conflict", "Provider unavailable", "Weather/emergency", "Insurance issue", "No reason given", "Other"];
-
   const [waitlistMatches, setWaitlistMatches] = useState<any>(null);
   const [loadingMatches, setLoadingMatches] = useState(false);
+  const [reEngageDraft, setReEngageDraft] = useState<string>("");
 
   const cancelAppointment = useMutation({
     mutationFn: async () => {
       if (!selectedApt) return;
       const { error } = await supabase.from("appointments").update({
-        status: "cancelled",
-        cancellation_reason: cancelReason || "No reason given",
+        status: "cancelled", cancellation_reason: cancelReason || "No reason given",
         cancelled_at: new Date().toISOString(),
       }).eq("id", selectedApt.id);
       if (error) throw error;
-      // Increment late_cancel_count if within 24h
       const aptTime = new Date(selectedApt.scheduled_at).getTime();
       if (aptTime - Date.now() < 24 * 3600000 && selectedApt.patients?.id) {
         await supabase.from("patients").update({
           late_cancel_count: (selectedApt.patients.late_cancel_count || 0) + 1,
         } as any).eq("id", selectedApt.patients.id);
       }
-      // Check waitlist for matches
       setLoadingMatches(true);
       try {
         const { data } = await supabase.functions.invoke("ai-smart-schedule", {
-          body: {
-            mode: "cancellation_match",
-            data: {
-              provider_id: selectedApt.provider_id,
-              treatment_id: selectedApt.treatment_id,
-              scheduled_at: selectedApt.scheduled_at,
-              duration_minutes: selectedApt.duration_minutes,
-            },
-          },
+          body: { mode: "cancellation_match", data: { provider_id: selectedApt.provider_id, treatment_id: selectedApt.treatment_id, scheduled_at: selectedApt.scheduled_at, duration_minutes: selectedApt.duration_minutes } },
         });
         if (data?.matches?.length > 0) setWaitlistMatches(data);
       } catch { /* non-fatal */ }
@@ -246,21 +282,27 @@ export default function Appointments() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["appointments"] });
-      if (!waitlistMatches) {
-        setCancelDialogOpen(false);
-        setCancelReason("");
-      }
+      if (!waitlistMatches) { setCancelDialogOpen(false); setCancelReason(""); }
       toast.success("Appointment cancelled");
     },
   });
 
   const markNoShow = useMutation({
-    mutationFn: async (id: string) => {
+    mutationFn: async (apt: any) => {
       const { error } = await supabase.from("appointments").update({
-        status: "no_show",
-        cancellation_reason: "No-show",
-      }).eq("id", id);
+        status: "no_show", cancellation_reason: "No-show",
+      }).eq("id", apt.id);
       if (error) throw error;
+      // Generate re-engagement message
+      try {
+        const { data } = await supabase.functions.invoke("ai-notification-engine", {
+          body: { mode: "re_engage_draft", data: { patient_id: apt.patient_id, no_show_date: apt.scheduled_at, treatment_name: apt.treatments?.name } },
+        });
+        if (data?.sms_draft) {
+          setReEngageDraft(data.sms_draft);
+          setSelectedApt(apt);
+        }
+      } catch { /* non-fatal */ }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["appointments"] });
@@ -268,88 +310,41 @@ export default function Appointments() {
     },
   });
 
-  const requestAiSuggestion = async (treatmentId: string, scheduledAt: string, duration: number) => {
-    if (!treatmentId || !scheduledAt) return;
-    setLoadingAi(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("ai-smart-schedule", {
-        body: { action: "book", treatment_id: treatmentId, scheduled_at: scheduledAt, duration_minutes: duration },
-      });
-      if (error) throw error;
-      setAiSuggestion(data);
-      if (data.has_conflict) {
-        toast.warning(data.conflict_message || "Device conflict detected!");
-      }
-    } catch {
-      toast.error("Failed to get AI suggestion");
-    } finally {
-      setLoadingAi(false);
-    }
-  };
-
   const openRoomingDialog = async (apt: any) => {
-    setSelectedApt(apt);
-    setSelectedRoomId("");
-    setSelectedDeviceId("");
-    setAiSuggestion(null);
-    setRoomingDialogOpen(true);
-    setLoadingAi(true);
+    setSelectedApt(apt); setSelectedRoomId(""); setSelectedDeviceId(""); setAiSuggestion(null);
+    setRoomingDialogOpen(true); setLoadingAi(true);
     try {
       const { data, error } = await supabase.functions.invoke("ai-smart-schedule", {
-        body: {
-          action: "room",
-          appointment_id: apt.id,
-          treatment_id: apt.treatments?.id,
-          scheduled_at: apt.scheduled_at,
-          duration_minutes: apt.duration_minutes,
-          patient_id: apt.patients?.id,
-        },
+        body: { action: "room", appointment_id: apt.id, treatment_id: apt.treatments?.id, scheduled_at: apt.scheduled_at, duration_minutes: apt.duration_minutes, patient_id: apt.patients?.id },
       });
       if (error) throw error;
       setAiSuggestion(data);
       if (data.recommended_room_id) setSelectedRoomId(data.recommended_room_id);
       if (data.recommended_device_id) setSelectedDeviceId(data.recommended_device_id);
-    } catch {
-      toast.error("Failed to get AI room recommendation");
-    } finally {
-      setLoadingAi(false);
-    }
+    } catch { toast.error("Failed to get AI room recommendation"); }
+    finally { setLoadingAi(false); }
   };
 
   const confirmRooming = () => {
     if (!selectedApt) return;
     updateStatus.mutate({
-      id: selectedApt.id,
-      status: "roomed",
-      room_id: selectedRoomId || undefined,
-      device_id: selectedDeviceId || undefined,
+      id: selectedApt.id, status: "roomed",
+      room_id: selectedRoomId || undefined, device_id: selectedDeviceId || undefined,
       provider_id: (!selectedApt.provider_id && aiSuggestion?.recommended_provider_id) ? aiSuggestion.recommended_provider_id : undefined,
     });
   };
 
   const generateSoapNote = async (apt: any) => {
-    setSelectedApt(apt);
-    setSoapNote(null);
-    setSoapDialogOpen(true);
-    setGeneratingNote(true);
+    setSelectedApt(apt); setSoapNote(null); setSoapDialogOpen(true); setGeneratingNote(true);
     try {
-      const { data: priorNotes } = await supabase
-        .from("clinical_notes")
-        .select("subjective, objective, assessment, plan, created_at")
-        .eq("patient_id", apt.patients?.id)
-        .order("created_at", { ascending: false })
-        .limit(3);
-
+      const { data: priorNotes } = await supabase.from("clinical_notes").select("subjective, objective, assessment, plan, created_at").eq("patient_id", apt.patients?.id).order("created_at", { ascending: false }).limit(3);
       const { data, error } = await supabase.functions.invoke("ai-soap-note", {
         body: { patient: apt.patients, appointment: apt, treatment: apt.treatments, provider: apt.providers, priorNotes: priorNotes ?? [] },
       });
       if (error) throw error;
       setSoapNote(data);
-    } catch (e: any) {
-      toast.error(e.message || "Failed to generate SOAP note");
-    } finally {
-      setGeneratingNote(false);
-    }
+    } catch (e: any) { toast.error(e.message || "Failed to generate SOAP note"); }
+    finally { setGeneratingNote(false); }
   };
 
   const saveSoapNote = useMutation({
@@ -357,43 +352,27 @@ export default function Appointments() {
       if (!soapNote || !selectedApt) return;
       const { error } = await supabase.from("clinical_notes").insert({
         patient_id: selectedApt.patients?.id ?? selectedApt.patient_id,
-        provider_id: selectedApt.provider_id,
-        appointment_id: selectedApt.id,
-        subjective: soapNote.subjective,
-        objective: soapNote.objective,
-        assessment: soapNote.assessment,
-        plan: soapNote.plan,
-        ai_generated: true,
-        status: "draft",
+        provider_id: selectedApt.provider_id, appointment_id: selectedApt.id,
+        subjective: soapNote.subjective, objective: soapNote.objective,
+        assessment: soapNote.assessment, plan: soapNote.plan,
+        ai_generated: true, status: "draft",
       });
       if (error) throw error;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["clinical-notes"] });
-      setSoapDialogOpen(false);
-      toast.success("SOAP note saved as draft");
-    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["clinical-notes"] }); setSoapDialogOpen(false); toast.success("SOAP note saved as draft"); },
     onError: () => toast.error("Failed to save note"),
   });
 
   const nextStatus = (current: string) => {
-    const flow: Record<string, string> = {
-      booked: "checked_in",
-      checked_in: "roomed",
-      roomed: "in_progress",
-      in_progress: "completed",
-    };
+    const flow: Record<string, string> = { booked: "checked_in", checked_in: "roomed", roomed: "in_progress", in_progress: "completed" };
     return flow[current];
   };
 
   const handleNextStatus = (apt: any) => {
     const next = nextStatus(apt.status);
     if (!next) return;
-    if (next === "roomed") {
-      openRoomingDialog(apt);
-    } else {
-      updateStatus.mutate({ id: apt.id, status: next });
-    }
+    if (next === "roomed") openRoomingDialog(apt);
+    else updateStatus.mutate({ id: apt.id, status: next });
   };
 
   return (
@@ -425,7 +404,7 @@ export default function Appointments() {
               ))}
             </div>
 
-            {/* Step 0: Patient + Treatment */}
+            {/* Step 0: Patient + Treatment + AI Insights */}
             {bookingStep === 0 && (
               <div className="space-y-4">
                 <div className="space-y-2">
@@ -435,6 +414,28 @@ export default function Appointments() {
                     {patients?.map((p) => <option key={p.id} value={p.id}>{p.last_name}, {p.first_name}</option>)}
                   </select>
                 </div>
+
+                {/* AI: No-show risk warning */}
+                {loadingNoShowRisk && bookPatientId && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" />Checking patient history…</div>
+                )}
+                {noShowRisk && noShowRisk.risk_level !== "low" && (
+                  <div className={`rounded-md border p-3 space-y-1 ${noShowRisk.risk_level === "high" ? "border-destructive/50 bg-destructive/5" : "border-warning/50 bg-warning/5"}`}>
+                    <p className={`text-xs font-medium flex items-center gap-1 ${noShowRisk.risk_level === "high" ? "text-destructive" : "text-warning"}`}>
+                      <AlertTriangle className="h-3 w-3" />
+                      No-Show Risk: {noShowRisk.risk_level.toUpperCase()} ({noShowRisk.risk_score}%)
+                    </p>
+                    <p className="text-[10px] text-muted-foreground">
+                      {noShowRisk.no_show_count} no-shows out of {noShowRisk.total_appointments} appointments ({noShowRisk.no_show_rate}% rate)
+                    </p>
+                    {noShowRisk.needs_deposit && (
+                      <p className="text-[10px] font-medium text-destructive flex items-center gap-1">
+                        <ShieldAlert className="h-2.5 w-2.5" />{noShowRisk.deposit_reason}
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 <div className="space-y-2">
                   <Label>Treatment *</Label>
                   <select value={bookTreatmentId} onChange={(e) => setBookTreatmentId(e.target.value)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
@@ -442,15 +443,81 @@ export default function Appointments() {
                     {treatments?.map((t) => <option key={t.id} value={t.id}>{t.name} ({t.duration_minutes} min)</option>)}
                   </select>
                 </div>
+
+                {/* AI: Duration auto-select */}
+                {loadingDuration && bookTreatmentId && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" />Estimating duration…</div>
+                )}
+                {durationEstimate && durationEstimate.suggested_duration !== durationEstimate.base_duration && (
+                  <div className="rounded-md border border-primary/30 bg-primary/5 p-3">
+                    <p className="text-xs font-medium text-primary flex items-center gap-1">
+                      <Timer className="h-3 w-3" />Duration adjusted: {durationEstimate.base_duration} → {durationEstimate.suggested_duration} min
+                    </p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{durationEstimate.reason}</p>
+                  </div>
+                )}
+
+                {/* AI: Contraindication check */}
+                {loadingContra && bookTreatmentId && bookPatientId && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" />Safety check…</div>
+                )}
+                {contraindicationCheck?.has_warnings && (
+                  <div className="rounded-md border border-destructive/50 bg-destructive/5 p-3 space-y-1">
+                    <p className="text-xs font-medium text-destructive flex items-center gap-1">
+                      <ShieldAlert className="h-3 w-3" />Contraindication Alert
+                    </p>
+                    {contraindicationCheck.recommendations
+                      .filter((r: any) => r.severity !== "info")
+                      .map((r: any, i: number) => (
+                        <div key={i} className="flex items-start gap-1.5">
+                          <Badge variant={r.severity === "critical" ? "destructive" : "secondary"} className="text-[9px] flex-shrink-0">{r.severity}</Badge>
+                          <p className="text-[10px] text-muted-foreground"><span className="font-medium">{r.label}:</span> {r.detail}</p>
+                        </div>
+                      ))}
+                    <p className="text-[10px] text-muted-foreground italic mt-1">{contraindicationCheck.narrative}</p>
+                  </div>
+                )}
+
                 <Button className="w-full" disabled={!bookPatientId || !bookTreatmentId} onClick={() => setBookingStep(1)}>
                   Next: Choose Provider →
                 </Button>
               </div>
             )}
 
-            {/* Step 1: Provider */}
+            {/* Step 1: Provider with AI matching */}
             {bookingStep === 1 && (
               <div className="space-y-4">
+                {/* AI Provider Recommendations */}
+                {loadingProviderMatch && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" />AI matching best providers…</div>
+                )}
+                {providerMatch?.rankings?.length > 0 && (
+                  <div className="rounded-md border border-primary/30 bg-primary/5 p-3 space-y-2">
+                    <p className="text-xs font-medium text-primary flex items-center gap-1"><UserCheck className="h-3 w-3" />AI Provider Recommendations</p>
+                    {providerMatch.rankings.slice(0, 3).map((r: any, i: number) => {
+                      const prov = providersList?.find(p => p.id === r.id);
+                      return (
+                        <button key={r.id} type="button" onClick={() => setBookProviderId(r.id)}
+                          className={`w-full text-left p-2 rounded border text-xs transition-colors ${bookProviderId === r.id ? "border-primary bg-primary/10" : "border-border hover:border-primary/40"}`}>
+                          <div className="flex justify-between items-center">
+                            <span className="font-medium">
+                              {i === 0 && "🥇 "}
+                              {i === 1 && "🥈 "}
+                              {i === 2 && "🥉 "}
+                              {prov ? `Dr. ${prov.last_name}, ${prov.first_name}` : r.id}
+                            </span>
+                            <Badge variant="outline" className="text-[9px]">{r.score}%</Badge>
+                          </div>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">{r.reason}</p>
+                        </button>
+                      );
+                    })}
+                    {providerMatch.narrative && (
+                      <p className="text-[10px] text-muted-foreground italic">{providerMatch.narrative}</p>
+                    )}
+                  </div>
+                )}
+
                 <div className="space-y-2">
                   <Label>Provider</Label>
                   <select value={bookProviderId} onChange={(e) => setBookProviderId(e.target.value)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
@@ -460,9 +527,7 @@ export default function Appointments() {
                 </div>
                 <div className="flex gap-2">
                   <Button variant="outline" onClick={() => setBookingStep(0)}>← Back</Button>
-                  <Button className="flex-1" disabled={!bookProviderId} onClick={() => setBookingStep(2)}>
-                    Next: Pick Slot →
-                  </Button>
+                  <Button className="flex-1" disabled={!bookProviderId} onClick={() => setBookingStep(2)}>Next: Pick Slot →</Button>
                 </div>
               </div>
             )}
@@ -473,23 +538,14 @@ export default function Appointments() {
                 <div className="flex flex-col sm:flex-row gap-4">
                   <div>
                     <Label className="text-xs mb-1 block">Select Date</Label>
-                    <CalendarWidget
-                      mode="single"
-                      selected={bookDate}
-                      onSelect={(d) => setBookDate(d)}
-                      disabled={(d) => d < new Date(new Date().setHours(0, 0, 0, 0))}
-                      className="rounded-md border"
-                    />
+                    <CalendarWidget mode="single" selected={bookDate} onSelect={(d) => setBookDate(d)} disabled={(d) => d < new Date(new Date().setHours(0, 0, 0, 0))} className="rounded-md border" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <Label className="text-xs mb-1 block">Available Slots</Label>
                     {!bookDate ? (
                       <p className="text-xs text-muted-foreground py-4">Pick a date to see slots</p>
                     ) : loadingSlots ? (
-                      <div className="flex items-center gap-2 py-4">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        <span className="text-xs text-muted-foreground">Loading slots…</span>
-                      </div>
+                      <div className="flex items-center gap-2 py-4"><Loader2 className="h-4 w-4 animate-spin" /><span className="text-xs text-muted-foreground">Loading slots…</span></div>
                     ) : availableSlots.length === 0 ? (
                       <p className="text-xs text-muted-foreground py-4">No available slots on this date</p>
                     ) : (
@@ -497,16 +553,8 @@ export default function Appointments() {
                         {availableSlots.map((slot, i) => {
                           const isSelected = selectedSlot?.start.getTime() === slot.start.getTime();
                           return (
-                            <button
-                              key={i}
-                              type="button"
-                              onClick={() => { setSelectedSlot(slot); setConflictResult(null); }}
-                              className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                                isSelected
-                                  ? "bg-primary text-primary-foreground"
-                                  : "bg-muted hover:bg-muted/80 text-foreground"
-                              }`}
-                            >
+                            <button key={i} type="button" onClick={() => { setSelectedSlot(slot); setConflictResult(null); }}
+                              className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${isSelected ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/80 text-foreground"}`}>
                               {format(slot.start, "h:mm a")}
                             </button>
                           );
@@ -521,11 +569,11 @@ export default function Appointments() {
                     <p className="text-xs font-medium text-primary flex items-center gap-1">
                       <Clock className="h-3 w-3" />
                       Selected: {format(selectedSlot.start, "EEE, MMM d")} at {format(selectedSlot.start, "h:mm a")}–{format(selectedSlot.end, "h:mm a")}
+                      {durationEstimate && ` (${durationEstimate.suggested_duration} min)`}
                     </p>
                   </div>
                 )}
 
-                {/* Optional room/device */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <Label className="text-xs">Room</Label>
@@ -548,7 +596,6 @@ export default function Appointments() {
                   <Input value={bookNotes} onChange={(e) => setBookNotes(e.target.value)} placeholder="Optional notes" />
                 </div>
 
-                {/* Conflict warnings */}
                 {conflictResult?.hasConflict && (
                   <div className="rounded-md border border-destructive/50 bg-destructive/5 p-3 space-y-1">
                     <p className="text-xs font-medium text-destructive flex items-center gap-1"><AlertTriangle className="h-3 w-3" />Conflicts Detected</p>
@@ -560,11 +607,7 @@ export default function Appointments() {
 
                 <div className="flex gap-2">
                   <Button variant="outline" onClick={() => setBookingStep(1)}>← Back</Button>
-                  <Button
-                    className="flex-1"
-                    disabled={!selectedSlot || addAppointment.isPending}
-                    onClick={() => addAppointment.mutate()}
-                  >
+                  <Button className="flex-1" disabled={!selectedSlot || addAppointment.isPending} onClick={() => addAppointment.mutate()}>
                     {addAppointment.isPending ? "Scheduling…" : "Schedule Appointment"}
                   </Button>
                 </div>
@@ -577,24 +620,13 @@ export default function Appointments() {
       {/* Rooming Dialog */}
       <Dialog open={roomingDialogOpen} onOpenChange={setRoomingDialogOpen}>
         <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <DoorOpen className="h-5 w-5 text-primary" />
-              Room Patient
-            </DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle className="flex items-center gap-2"><DoorOpen className="h-5 w-5 text-primary" />Room Patient</DialogTitle></DialogHeader>
           {loadingAi ? (
-            <div className="flex flex-col items-center py-8 gap-3">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">AI is finding the best room...</p>
-            </div>
+            <div className="flex flex-col items-center py-8 gap-3"><Loader2 className="h-8 w-8 animate-spin text-primary" /><p className="text-sm text-muted-foreground">AI is finding the best room...</p></div>
           ) : (
             <div className="space-y-4">
               {aiSuggestion?.has_conflict && (
-                <div className="rounded-md border border-destructive/50 bg-destructive/5 p-3 flex items-start gap-2">
-                  <AlertTriangle className="h-4 w-4 text-destructive mt-0.5" />
-                  <p className="text-xs text-destructive">{aiSuggestion.conflict_message}</p>
-                </div>
+                <div className="rounded-md border border-destructive/50 bg-destructive/5 p-3 flex items-start gap-2"><AlertTriangle className="h-4 w-4 text-destructive mt-0.5" /><p className="text-xs text-destructive">{aiSuggestion.conflict_message}</p></div>
               )}
               {aiSuggestion?.room_reasoning && (
                 <div className="rounded-md border border-primary/30 bg-primary/5 p-3 space-y-1">
@@ -620,9 +652,7 @@ export default function Appointments() {
               {!selectedApt?.provider_id && aiSuggestion?.recommended_provider_name && (
                 <p className="text-xs text-primary flex items-center gap-1"><Brain className="h-3 w-3" />Provider will be auto-assigned: {aiSuggestion.recommended_provider_name}</p>
               )}
-              <Button onClick={confirmRooming} disabled={updateStatus.isPending} className="w-full">
-                {updateStatus.isPending ? "Rooming..." : "Confirm Room Assignment"}
-              </Button>
+              <Button onClick={confirmRooming} disabled={updateStatus.isPending} className="w-full">{updateStatus.isPending ? "Rooming..." : "Confirm Room Assignment"}</Button>
             </div>
           )}
         </DialogContent>
@@ -631,17 +661,9 @@ export default function Appointments() {
       {/* SOAP Note AI Dialog */}
       <Dialog open={soapDialogOpen} onOpenChange={setSoapDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-primary" />
-              AI-Generated SOAP Note
-            </DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-primary" />AI-Generated SOAP Note</DialogTitle></DialogHeader>
           {generatingNote ? (
-            <div className="flex flex-col items-center py-12 gap-3">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">Generating clinical note with AI...</p>
-            </div>
+            <div className="flex flex-col items-center py-12 gap-3"><Loader2 className="h-8 w-8 animate-spin text-primary" /><p className="text-sm text-muted-foreground">Generating clinical note with AI...</p></div>
           ) : soapNote ? (
             <div className="space-y-4">
               {(["subjective", "objective", "assessment", "plan"] as const).map((section) => (
@@ -651,9 +673,7 @@ export default function Appointments() {
                 </div>
               ))}
               <div className="flex gap-2">
-                <Button onClick={() => saveSoapNote.mutate()} disabled={saveSoapNote.isPending} className="flex-1">
-                  {saveSoapNote.isPending ? "Saving..." : "Save as Draft"}
-                </Button>
+                <Button onClick={() => saveSoapNote.mutate()} disabled={saveSoapNote.isPending} className="flex-1">{saveSoapNote.isPending ? "Saving..." : "Save as Draft"}</Button>
                 <Button variant="outline" onClick={() => setSoapDialogOpen(false)}>Cancel</Button>
               </div>
             </div>
@@ -666,23 +686,14 @@ export default function Appointments() {
       {/* Cancel Dialog */}
       <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
         <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <XCircle className="h-5 w-5 text-destructive" />
-              Cancel Appointment
-            </DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle className="flex items-center gap-2"><XCircle className="h-5 w-5 text-destructive" />Cancel Appointment</DialogTitle></DialogHeader>
           <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              {selectedApt && `${selectedApt.patients?.first_name} ${selectedApt.patients?.last_name} — ${selectedApt.treatments?.name ?? "General"}`}
-            </p>
+            <p className="text-sm text-muted-foreground">{selectedApt && `${selectedApt.patients?.first_name} ${selectedApt.patients?.last_name} — ${selectedApt.treatments?.name ?? "General"}`}</p>
             <div className="space-y-2">
               <Label>Cancellation Reason</Label>
               <Select value={cancelReason} onValueChange={setCancelReason}>
                 <SelectTrigger><SelectValue placeholder="Select reason" /></SelectTrigger>
-                <SelectContent>
-                  {CANCEL_REASONS.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
-                </SelectContent>
+                <SelectContent>{CANCEL_REASONS.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <Button variant="destructive" className="w-full" onClick={() => cancelAppointment.mutate()} disabled={cancelAppointment.isPending}>
@@ -698,14 +709,34 @@ export default function Appointments() {
                     <p className="text-muted-foreground mt-0.5">{m.reason}</p>
                   </div>
                 ))}
-                {waitlistMatches.sms_draft && (
-                  <p className="text-[10px] text-muted-foreground italic">SMS draft: "{waitlistMatches.sms_draft}"</p>
-                )}
-                <Button size="sm" variant="outline" className="w-full text-xs" onClick={() => { setCancelDialogOpen(false); setCancelReason(""); setWaitlistMatches(null); }}>
-                  Done
-                </Button>
+                <Button size="sm" variant="outline" className="w-full text-xs" onClick={() => { setCancelDialogOpen(false); setCancelReason(""); setWaitlistMatches(null); }}>Done</Button>
               </div>
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Re-engagement SMS draft after no-show */}
+      <Dialog open={!!reEngageDraft} onOpenChange={() => setReEngageDraft("")}>
+        <DialogContent>
+          <DialogHeader><DialogTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-primary" />AI Re-Engagement Draft</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">Send a "We missed you" message to this no-show patient?</p>
+            <div className="rounded-md border border-primary/30 bg-primary/5 p-3">
+              <Textarea value={reEngageDraft} onChange={(e) => setReEngageDraft(e.target.value)} rows={3} className="text-sm" />
+              <p className="text-[10px] text-muted-foreground mt-1">{reEngageDraft.length}/160 characters</p>
+            </div>
+            <div className="flex gap-2">
+              <Button className="flex-1" onClick={async () => {
+                if (!selectedApt?.patients?.phone) { toast.error("No phone number"); return; }
+                try {
+                  await supabase.functions.invoke("send-sms", { body: { to: selectedApt.patients.phone, body: reEngageDraft } });
+                  toast.success("Re-engagement SMS sent");
+                  setReEngageDraft("");
+                } catch { toast.error("Failed to send"); }
+              }}>Send SMS</Button>
+              <Button variant="outline" onClick={() => setReEngageDraft("")}>Skip</Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
@@ -722,27 +753,19 @@ export default function Appointments() {
                     <Calendar className="h-5 w-5 text-primary" />
                   </div>
                   <div>
-                    <p className="font-medium text-sm">
-                      {apt.patients?.first_name} {apt.patients?.last_name}
-                    </p>
+                    <p className="font-medium text-sm">{apt.patients?.first_name} {apt.patients?.last_name}</p>
                     <p className="text-xs text-muted-foreground">
                       {apt.treatments?.name ?? "General"} • Dr. {apt.providers?.last_name ?? "Unassigned"} • {format(parseISO(apt.scheduled_at), "MMM d, yyyy 'at' h:mm a")}
                     </p>
                     <div className="flex items-center gap-2 mt-1 flex-wrap">
-                      {apt.rooms && (
-                        <Badge variant="outline" className="text-[10px] gap-1"><DoorOpen className="h-2.5 w-2.5" />{apt.rooms.name}</Badge>
-                      )}
-                      {apt.devices && (
-                        <Badge variant="outline" className="text-[10px] gap-1"><Cpu className="h-2.5 w-2.5" />{apt.devices.name}</Badge>
-                      )}
+                      {apt.rooms && <Badge variant="outline" className="text-[10px] gap-1"><DoorOpen className="h-2.5 w-2.5" />{apt.rooms.name}</Badge>}
+                      {apt.devices && <Badge variant="outline" className="text-[10px] gap-1"><Cpu className="h-2.5 w-2.5" />{apt.devices.name}</Badge>}
                     </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
                   {apt.status === "completed" && (
-                    <Button size="sm" variant="outline" className="text-xs gap-1" onClick={() => generateSoapNote(apt)}>
-                      <Sparkles className="h-3 w-3" /> Generate Note
-                    </Button>
+                    <Button size="sm" variant="outline" className="text-xs gap-1" onClick={() => generateSoapNote(apt)}><Sparkles className="h-3 w-3" /> Generate Note</Button>
                   )}
                   {!["cancelled", "no_show", "completed"].includes(apt.status) && (
                     <>
@@ -750,20 +773,16 @@ export default function Appointments() {
                         <XCircle className="h-3 w-3 mr-1" />Cancel
                       </Button>
                       {apt.status === "booked" && (
-                        <Button size="sm" variant="ghost" className="text-xs text-destructive" onClick={() => markNoShow.mutate(apt.id)}>
+                        <Button size="sm" variant="ghost" className="text-xs text-destructive" onClick={() => markNoShow.mutate(apt)}>
                           <Ban className="h-3 w-3 mr-1" />No-Show
                         </Button>
                       )}
                     </>
                   )}
                   {nextStatus(apt.status) && (
-                    <Button size="sm" variant="ghost" className="text-xs" onClick={() => handleNextStatus(apt)}>
-                      → {nextStatus(apt.status)!.replace("_", " ")}
-                    </Button>
+                    <Button size="sm" variant="ghost" className="text-xs" onClick={() => handleNextStatus(apt)}>→ {nextStatus(apt.status)!.replace("_", " ")}</Button>
                   )}
-                  <Badge variant="secondary" className={statusColors[apt.status] ?? ""}>
-                    {apt.status.replace("_", " ")}
-                  </Badge>
+                  <Badge variant="secondary" className={statusColors[apt.status] ?? ""}>{apt.status.replace("_", " ")}</Badge>
                   {apt.cancellation_reason && apt.status === "cancelled" && (
                     <span className="text-[10px] text-muted-foreground italic">{apt.cancellation_reason}</span>
                   )}
@@ -776,7 +795,8 @@ export default function Appointments() {
         <Card>
           <CardContent className="py-12 text-center">
             <Calendar className="h-12 w-12 mx-auto text-muted-foreground/50" />
-            <p className="mt-4 text-muted-foreground">No appointments yet</p>
+            <p className="mt-4 text-lg font-medium">No appointments yet</p>
+            <p className="text-sm text-muted-foreground">Click "New Appointment" to get started</p>
           </CardContent>
         </Card>
       )}
