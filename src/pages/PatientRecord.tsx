@@ -193,6 +193,11 @@ export default function PatientRecord() {
                   <p><span className="text-muted-foreground">Phone:</span> {patient.phone ?? "—"}</p>
                   <p><span className="text-muted-foreground">DOB:</span> {patient.date_of_birth ?? "—"}</p>
                   <p><span className="text-muted-foreground">Gender:</span> {patient.gender ?? "—"}</p>
+                  {(patient as any).preferred_name && <p><span className="text-muted-foreground">Preferred Name:</span> {(patient as any).preferred_name}</p>}
+                  {(patient as any).sex_at_birth && <p><span className="text-muted-foreground">Sex at Birth:</span> {(patient as any).sex_at_birth}</p>}
+                  {(patient as any).gender_identity && <p><span className="text-muted-foreground">Gender Identity:</span> {(patient as any).gender_identity}</p>}
+                  {(patient as any).referral_source && <p><span className="text-muted-foreground">Referral:</span> {(patient as any).referral_source}</p>}
+                  {(patient as any).preferred_contact_channel && <p><span className="text-muted-foreground">Preferred Contact:</span> {(patient as any).preferred_contact_channel}</p>}
                 </div>
               </div>
               <div className="space-y-4">
@@ -203,6 +208,11 @@ export default function PatientRecord() {
                 </p>
                 <h3 className="font-semibold text-[11px] text-muted-foreground uppercase tracking-wider mt-4">Insurance</h3>
                 <p className="text-sm">{patient.insurance_provider ?? "None"} {patient.insurance_id && `• ${patient.insurance_id}`}</p>
+                {(patient as any).photo_id_verified && (
+                  <Badge variant="secondary" className="bg-success/10 text-success text-xs">
+                    <CheckCircle className="h-3 w-3 mr-1" />ID Verified
+                  </Badge>
+                )}
               </div>
               <div className="space-y-4">
                 <h3 className="font-semibold text-[11px] text-muted-foreground uppercase tracking-wider">Medical</h3>
@@ -225,8 +235,11 @@ export default function PatientRecord() {
               </div>
               <div className="space-y-4">
                 <h3 className="font-semibold text-[11px] text-muted-foreground uppercase tracking-wider">Emergency Contact</h3>
-                <p className="text-sm">{patient.emergency_contact_name ?? "—"}</p>
-                <p className="text-xs text-muted-foreground">{patient.emergency_contact_phone ?? ""}</p>
+                <p className="text-sm">{(patient as any).emergency_contact_name ?? patient.emergency_contact_name ?? "—"}</p>
+                <p className="text-xs text-muted-foreground">
+                  {(patient as any).emergency_contact_phone ?? patient.emergency_contact_phone ?? ""}
+                  {(patient as any).emergency_contact_relationship && ` • ${(patient as any).emergency_contact_relationship}`}
+                </p>
               </div>
             </CardContent>
           </Card>
