@@ -2910,6 +2910,9 @@ export type Database = {
       patient_insurance: {
         Row: {
           created_at: string
+          eligibility_checked_at: string | null
+          eligibility_notes: string | null
+          eligibility_status: string | null
           group_number: string | null
           id: string
           is_active: boolean
@@ -2924,6 +2927,9 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          eligibility_checked_at?: string | null
+          eligibility_notes?: string | null
+          eligibility_status?: string | null
           group_number?: string | null
           id?: string
           is_active?: boolean
@@ -2938,6 +2944,9 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          eligibility_checked_at?: string | null
+          eligibility_notes?: string | null
+          eligibility_status?: string | null
           group_number?: string | null
           id?: string
           is_active?: boolean
