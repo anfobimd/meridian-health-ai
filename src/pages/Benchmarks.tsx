@@ -79,7 +79,7 @@ export default function Benchmarks() {
 
   return (
     <div className="space-y-6">
-      <Breadcrumbs items={[{ label: "Platform" }, { label: "Benchmarks" }]} />
+      <Breadcrumbs />
 
       <div>
         <h1 className="text-2xl font-bold">Cross-Clinic Benchmarks</h1>

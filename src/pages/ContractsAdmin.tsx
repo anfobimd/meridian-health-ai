@@ -78,7 +78,7 @@ export default function ContractsAdmin() {
 
   return (
     <div className="space-y-6">
-      <Breadcrumbs items={[{ label: "Platform" }, { label: "Contracts & Clinics" }]} />
+      <Breadcrumbs />
 
       <div className="flex items-center justify-between">
         <div>
