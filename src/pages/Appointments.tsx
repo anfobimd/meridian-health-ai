@@ -663,6 +663,7 @@ export default function Appointments() {
         </DialogContent>
       </Dialog>
 
+      {isLoading ? (
         <div className="space-y-3">{[1,2,3].map(i => <Card key={i} className="animate-pulse"><CardContent className="p-6 h-20" /></Card>)}</div>
       ) : appointments && appointments.length > 0 ? (
         <div className="space-y-3">
