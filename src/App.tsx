@@ -46,6 +46,8 @@ import TimeOff from "./pages/TimeOff";
 import MdFeedbackInbox from "./pages/MdFeedbackInbox";
 import ProviderCheckIn from "./pages/ProviderCheckIn";
 import Messages from "./pages/Messages";
+import ClinicHours from "./pages/ClinicHours";
+import Waitlist from "./pages/Waitlist";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -90,6 +92,8 @@ const App = () => (
                 <Route path="/churn-risk" element={<ChurnRisk />} />
                 <Route path="/my-marketplace" element={<ProviderMarketplace />} />
                 <Route path="/provider-schedule" element={<ProviderSchedule />} />
+                <Route path="/clinic-hours" element={<ClinicHours />} />
+                <Route path="/waitlist" element={<Waitlist />} />
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/my-profile" element={<ProviderProfile />} />
                 <Route path="/templates" element={<TemplateManager />} />
