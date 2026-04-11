@@ -558,6 +558,57 @@ export type Database = {
         }
         Relationships: []
       }
+      automation_rules: {
+        Row: {
+          action_config: Json | null
+          action_type: string
+          conditions: Json | null
+          created_at: string
+          delay_minutes: number
+          id: string
+          is_active: boolean
+          is_platform_rule: boolean
+          name: string
+          recipient_type: string
+          run_count: number
+          success_count: number
+          trigger_event: string
+          updated_at: string
+        }
+        Insert: {
+          action_config?: Json | null
+          action_type: string
+          conditions?: Json | null
+          created_at?: string
+          delay_minutes?: number
+          id?: string
+          is_active?: boolean
+          is_platform_rule?: boolean
+          name: string
+          recipient_type?: string
+          run_count?: number
+          success_count?: number
+          trigger_event: string
+          updated_at?: string
+        }
+        Update: {
+          action_config?: Json | null
+          action_type?: string
+          conditions?: Json | null
+          created_at?: string
+          delay_minutes?: number
+          id?: string
+          is_active?: boolean
+          is_platform_rule?: boolean
+          name?: string
+          recipient_type?: string
+          run_count?: number
+          success_count?: number
+          trigger_event?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       chart_review_records: {
         Row: {
           ai_priority_score: number | null
@@ -872,6 +923,45 @@ export type Database = {
         }
         Relationships: []
       }
+      clinic_catalog_items: {
+        Row: {
+          clinic_id: string
+          enabled_at: string | null
+          id: string
+          is_enabled: boolean
+          master_item_id: string
+        }
+        Insert: {
+          clinic_id: string
+          enabled_at?: string | null
+          id?: string
+          is_enabled?: boolean
+          master_item_id: string
+        }
+        Update: {
+          clinic_id?: string
+          enabled_at?: string | null
+          id?: string
+          is_enabled?: boolean
+          master_item_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clinic_catalog_items_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clinic_catalog_items_master_item_id_fkey"
+            columns: ["master_item_id"]
+            isOneToOne: false
+            referencedRelation: "master_catalog_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clinic_holidays: {
         Row: {
           close_time: string | null
@@ -1101,6 +1191,47 @@ export type Database = {
           },
         ]
       }
+      clinics: {
+        Row: {
+          address: string | null
+          contract_id: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          manager_user_id: string | null
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          contract_id?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          manager_user_id?: string | null
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          contract_id?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          manager_user_id?: string | null
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clinics_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       coaching_actions: {
         Row: {
           action_type: string
@@ -1147,6 +1278,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      contracts: {
+        Row: {
+          contract_admin_id: string | null
+          created_at: string
+          end_date: string | null
+          id: string
+          name: string
+          notes: string | null
+          start_date: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          contract_admin_id?: string | null
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          start_date?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          contract_admin_id?: string | null
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          start_date?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       devices: {
         Row: {
@@ -2004,6 +2171,104 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      master_catalog_items: {
+        Row: {
+          category: string | null
+          created_at: string
+          default_template_id: string | null
+          deprecated_at: string | null
+          deprecated_deadline: string | null
+          id: string
+          item_type: string
+          name: string
+          platform_rules: Json | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          default_template_id?: string | null
+          deprecated_at?: string | null
+          deprecated_deadline?: string | null
+          id?: string
+          item_type?: string
+          name: string
+          platform_rules?: Json | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          default_template_id?: string | null
+          deprecated_at?: string | null
+          deprecated_deadline?: string | null
+          id?: string
+          item_type?: string
+          name?: string
+          platform_rules?: Json | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "master_catalog_items_default_template_id_fkey"
+            columns: ["default_template_id"]
+            isOneToOne: false
+            referencedRelation: "chart_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      md_coverage_assignments: {
+        Row: {
+          clinic_id: string
+          created_at: string
+          effective_from: string
+          effective_until: string | null
+          id: string
+          is_primary: boolean
+          md_provider_id: string
+          sampling_rate: number
+        }
+        Insert: {
+          clinic_id: string
+          created_at?: string
+          effective_from?: string
+          effective_until?: string | null
+          id?: string
+          is_primary?: boolean
+          md_provider_id: string
+          sampling_rate?: number
+        }
+        Update: {
+          clinic_id?: string
+          created_at?: string
+          effective_from?: string
+          effective_until?: string | null
+          id?: string
+          is_primary?: boolean
+          md_provider_id?: string
+          sampling_rate?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "md_coverage_assignments_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "md_coverage_assignments_md_provider_id_fkey"
+            columns: ["md_provider_id"]
+            isOneToOne: false
+            referencedRelation: "providers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       medications: {
         Row: {
