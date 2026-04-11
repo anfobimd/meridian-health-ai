@@ -1,3 +1,5 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -25,14 +27,80 @@ async function callAI(systemPrompt: string, userMessage: string) {
   let data;
   try { data = JSON.parse(rawText); } catch { return { narrative: rawText }; }
   const content = data.choices?.[0]?.message?.content || "{}";
-  // Try to extract JSON from the response
   try {
-    // Remove markdown code fences if present
     const cleaned = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
     return JSON.parse(cleaned);
   } catch {
     return { narrative: content };
   }
+}
+
+function getSupabaseAdmin() {
+  return createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+  );
+}
+
+async function gatherWeeklyMetrics() {
+  const sb = getSupabaseAdmin();
+  const now = new Date();
+  const weekAgo = new Date(now.getTime() - 7 * 86400000);
+  const twoWeeksAgo = new Date(now.getTime() - 14 * 86400000);
+
+  const thisStart = weekAgo.toISOString();
+  const lastStart = twoWeeksAgo.toISOString();
+  const nowStr = now.toISOString();
+
+  // This week queries
+  const [aptsThis, aptsLast, revenueThis, revenueLast, unsignedNotes, reviewsThis, newPatients, newPatientsLast] = await Promise.all([
+    sb.from("appointments").select("id, status", { count: "exact" }).gte("scheduled_at", thisStart).lt("scheduled_at", nowStr),
+    sb.from("appointments").select("id, status", { count: "exact" }).gte("scheduled_at", lastStart).lt("scheduled_at", thisStart),
+    sb.from("invoices").select("total").eq("status", "paid").gte("created_at", thisStart),
+    sb.from("invoices").select("total").eq("status", "paid").gte("created_at", lastStart).lt("created_at", thisStart),
+    sb.from("clinical_notes").select("id", { count: "exact", head: true }).eq("status", "draft"),
+    sb.from("chart_review_records").select("id, status").gte("created_at", thisStart),
+    sb.from("patients").select("id", { count: "exact", head: true }).gte("created_at", thisStart),
+    sb.from("patients").select("id", { count: "exact", head: true }).gte("created_at", lastStart).lt("created_at", thisStart),
+  ]);
+
+  const thisApts = aptsThis.data || [];
+  const lastApts = aptsLast.data || [];
+
+  const completedThis = thisApts.filter((a: any) => a.status === "completed").length;
+  const noShowThis = thisApts.filter((a: any) => a.status === "no_show").length;
+  const completedLast = lastApts.filter((a: any) => a.status === "completed").length;
+  const noShowLast = lastApts.filter((a: any) => a.status === "no_show").length;
+
+  const revThis = (revenueThis.data || []).reduce((s: number, r: any) => s + (r.total || 0), 0);
+  const revLast = (revenueLast.data || []).reduce((s: number, r: any) => s + (r.total || 0), 0);
+
+  const reviewData = reviewsThis.data || [];
+  const corrections = reviewData.filter((r: any) => r.status === "corrected").length;
+
+  return {
+    this_week: {
+      appointments: thisApts.length,
+      completed: completedThis,
+      no_shows: noShowThis,
+      completion_rate: thisApts.length > 0 ? Math.round((completedThis / thisApts.length) * 100) : 0,
+      revenue: revThis,
+      new_patients: newPatients.count ?? 0,
+      charts_reviewed: reviewData.length,
+      corrections,
+    },
+    last_week: {
+      appointments: lastApts.length,
+      completed: completedLast,
+      no_shows: noShowLast,
+      completion_rate: lastApts.length > 0 ? Math.round((completedLast / lastApts.length) * 100) : 0,
+      revenue: revLast,
+      new_patients: newPatientsLast.count ?? 0,
+    },
+    current_state: {
+      unsigned_notes: unsignedNotes.count ?? 0,
+    },
+  };
 }
 
 Deno.serve(async (req) => {
@@ -46,6 +114,24 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Invalid JSON body" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
     const { mode, ...params } = body;
+
+    if (mode === "weekly_insights") {
+      const metrics = await gatherWeeklyMetrics();
+      const result = await callAI(
+        `You are a medspa clinic analytics AI. Analyze the past 7 days of clinic performance and compare to the prior week.
+Return JSON: {
+  "narrative": "2-3 paragraph executive summary of this week's clinic performance. Be specific with numbers.",
+  "kpi_highlights": [{"label": "metric name", "value": "formatted value", "trend": "up|down|stable"}],
+  "weekly_action": "One specific, actionable recommendation for the coming week",
+  "trends": [{"metric": "name", "this_week": "value", "last_week": "value", "change_pct": "+X% or -X%"}]
+}
+Include 4-6 KPI highlights covering: appointments, revenue, completion rate, no-shows, new patients, compliance.
+Include 4-5 trend rows. Be professional, data-driven, and actionable. Reference actual numbers.`,
+        JSON.stringify(metrics)
+      );
+      return new Response(JSON.stringify(result), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     if (mode === "earnings_analysis") {
       const result = await callAI(
         `You are a medspa financial advisor AI. Analyze provider earnings data and provide actionable insights.
@@ -105,6 +191,7 @@ Be specific, actionable, and reference the actual numbers provided. Flag anythin
 
     return new Response(JSON.stringify({ error: "Unknown mode" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e: any) {
+    console.error("Edge function error:", e);
     return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 });
