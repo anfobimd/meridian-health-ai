@@ -56,6 +56,7 @@ const navSections = [
       { to: "/medications", icon: Pill, label: "Medications" },
       { to: "/rooms-devices", icon: DoorOpen, label: "Rooms & Devices" },
       { to: "/provider-schedule", icon: CalendarClock, label: "Schedules" },
+      { to: "/calendar-grid", icon: CalendarDays, label: "Calendar Grid" },
       { to: "/clinic-hours", icon: Clock, label: "Clinic Hours" },
       { to: "/waitlist", icon: ListChecks, label: "Waitlist" },
       { to: "/providers", icon: UserCog, label: "Providers" },
