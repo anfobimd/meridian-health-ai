@@ -1,5 +1,4 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -7,7 +6,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
@@ -20,100 +19,162 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
-    // ===== MARKETPLACE: Generate Bio =====
-    if (mode === "generate_bio") {
-      const { provider } = body;
-      const prompt = `Write a professional, warm marketplace bio (2-3 sentences) for this aesthetic medicine provider:
-Name: ${provider.first_name} ${provider.last_name}
-Credentials: ${provider.credentials || "N/A"}
-Specialty: ${provider.specialty || "Aesthetics"}
-Skills: ${(provider.skills || []).join(", ") || "General aesthetics"}
-
-Return JSON: {"bio": "..."}`;
-
-      const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const callAI = async (system: string, user: string) => {
+      const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
         headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           model: "google/gemini-3-flash-preview",
           messages: [
-            { role: "system", content: "Return only valid JSON, no markdown." },
-            { role: "user", content: prompt },
+            { role: "system", content: "You are a clinical scheduling AI. Return only valid JSON, no markdown fences." },
+            { role: "user", content: `${system}\n\n${user}` },
           ],
         }),
       });
-      if (!aiResp.ok) throw new Error(`AI error: ${aiResp.status}`);
-      const aiData = await aiResp.json();
-      const content = aiData.choices?.[0]?.message?.content ?? "{}";
+      if (!res.ok) {
+        const status = res.status;
+        if (status === 429) throw new Error("Rate limit exceeded");
+        if (status === 402) throw new Error("AI credits exhausted");
+        throw new Error(`AI gateway error: ${status}`);
+      }
+      const json = await res.json();
+      const content = json.choices?.[0]?.message?.content ?? "{}";
       const cleaned = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-      const result = JSON.parse(cleaned);
+      return JSON.parse(cleaned);
+    };
+
+    // ─── MODE: rank_waitlist ────────────────────────────────────────────
+    if (mode === "rank_waitlist") {
+      const { data: waitlist } = await sb
+        .from("appointment_waitlist")
+        .select("*, patients(first_name, last_name, no_show_count, late_cancel_count), treatments(name), providers(first_name, last_name)")
+        .eq("is_fulfilled", false)
+        .order("created_at", { ascending: true });
+
+      if (!waitlist?.length) {
+        return new Response(JSON.stringify({ ranked: [] }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      const patientIds = [...new Set(waitlist.map((w: any) => w.patient_id))];
+      const { data: recentApts } = await sb
+        .from("appointments")
+        .select("patient_id, status, scheduled_at")
+        .in("patient_id", patientIds)
+        .order("scheduled_at", { ascending: false })
+        .limit(100);
+
+      const result = await callAI(
+        `Rank waitlisted patients by fill probability (0-100). Factors: wait duration (longer=higher), reliability (low no-shows=higher), flexibility (no preferences=higher), treatment value. Return JSON: {"ranked":[{"waitlist_id":"uuid","score":number,"reason":"1 sentence"}]} sorted desc.`,
+        JSON.stringify({
+          waitlist: waitlist.map((w: any) => ({
+            id: w.id, patient: `${w.patients?.first_name} ${w.patients?.last_name}`,
+            no_shows: w.patients?.no_show_count || 0, late_cancels: w.patients?.late_cancel_count || 0,
+            treatment: w.treatments?.name || "Any", preferred_date: w.preferred_date || "Any",
+            preferred_provider: w.providers ? `${w.providers.first_name} ${w.providers.last_name}` : "Any",
+            wait_since: w.created_at, notes: w.notes,
+          })),
+          recent_appointments: recentApts?.slice(0, 50),
+          now: new Date().toISOString(),
+        })
+      );
+
+      for (const item of result.ranked || []) {
+        await sb.from("appointment_waitlist").update({
+          priority_score: item.score, ai_rank_reason: item.reason,
+        }).eq("id", item.waitlist_id);
+      }
+
       return new Response(JSON.stringify(result), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // ===== MARKETPLACE: Match Providers =====
-    if (mode === "marketplace_match") {
-      const { treatment_id, preferred_date } = body;
+    // ─── MODE: cancellation_match ──────────────────────────────────────
+    if (mode === "cancellation_match") {
+      const { provider_id, treatment_id, scheduled_at, duration_minutes } = body.data || {};
 
-      const [
-        { data: treatment },
-        { data: mpProviders },
-        { data: skills },
-        { data: availability },
-        { data: memberships },
-      ] = await Promise.all([
-        sb.from("treatments").select("*").eq("id", treatment_id).single(),
-        sb.from("providers").select("*").eq("is_active", true).eq("marketplace_enabled", true),
-        sb.from("provider_skills").select("*"),
-        sb.from("provider_availability").select("*").eq("is_active", true),
-        sb.from("provider_memberships").select("*").eq("is_active", true),
-      ]);
+      const { data: waitlist } = await sb
+        .from("appointment_waitlist")
+        .select("*, patients(first_name, last_name, phone, email), treatments(name)")
+        .eq("is_fulfilled", false)
+        .order("priority_score", { ascending: false });
 
-      const prompt = `You are a medspa provider matching AI. Rank these marketplace providers for the requested treatment.
+      if (!waitlist?.length) {
+        return new Response(JSON.stringify({ matches: [], sms_draft: "" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
 
-TREATMENT: ${treatment?.name || "Unknown"} (${treatment?.category || "general"})
+      const { data: treatment } = treatment_id
+        ? await sb.from("treatments").select("name").eq("id", treatment_id).single()
+        : { data: null };
 
-AVAILABLE PROVIDERS:
-${(mpProviders ?? []).map((p: any) => {
-  const pSkills = (skills ?? []).filter((s: any) => s.provider_id === p.id);
-  const pAvail = (availability ?? []).filter((a: any) => a.provider_id === p.id);
-  const pMembership = (memberships ?? []).find((m: any) => m.provider_id === p.id);
-  return `- ${p.first_name} ${p.last_name} (${p.credentials || "N/A"}, ${p.specialty || "General"})
-  Skills: ${pSkills.map((s: any) => `${s.skill_name}[${s.certification_level}]`).join(", ") || "none listed"}
-  Availability: ${pAvail.map((a: any) => `Day${a.day_of_week} ${a.start_time}-${a.end_time}`).join(", ") || "not set"}
-  Membership: ${pMembership ? pMembership.tier : "none"}
-  ID: ${p.id}`;
-}).join("\n\n")}
+      const result = await callAI(
+        `A cancellation occurred. Find best waitlist matches. Return JSON: {"matches":[{"waitlist_id":"uuid","patient_name":string,"phone":string|null,"fit_score":number,"reason":"1 sentence"}],"sms_draft":"under 160 chars offering slot"} Top 5 max, sorted by fit_score desc.`,
+        JSON.stringify({
+          cancelled_slot: { scheduled_at, duration_minutes: duration_minutes || 30, treatment: treatment?.name || "General", provider_id },
+          waitlist_entries: waitlist.map((w: any) => ({
+            id: w.id, patient: `${w.patients?.first_name} ${w.patients?.last_name}`,
+            phone: w.patients?.phone, treatment: w.treatments?.name || "Any",
+            preferred_date: w.preferred_date, priority_score: w.priority_score,
+          })),
+        })
+      );
 
-PREFERRED DATE: ${preferred_date || "flexible"}
-
-Return JSON:
-{
-  "matches": [
-    {"provider_id": "uuid", "provider_name": "Name", "score": 95, "reasoning": "Why this provider is a good match"}
-  ]
-}
-Rank by skill match, certification level, and availability overlap. Return top 5 max.`;
-
-      const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "google/gemini-3-flash-preview",
-          messages: [
-            { role: "system", content: "Return only valid JSON, no markdown." },
-            { role: "user", content: prompt },
-          ],
-        }),
-      });
-      if (!aiResp.ok) throw new Error(`AI error: ${aiResp.status}`);
-      const aiData = await aiResp.json();
-      const content = aiData.choices?.[0]?.message?.content ?? "{}";
-      const cleaned = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-      const result = JSON.parse(cleaned);
-      return new Response(JSON.stringify({ ...result, treatment_id }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify(result), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // ===== ORIGINAL: Room/Book scheduling =====
+    // ─── MODE: re_engagement_draft ─────────────────────────────────────
+    if (mode === "re_engagement_draft") {
+      const { patient_name, no_show_count, treatment_name } = body.data || {};
+      const result = await callAI(
+        `Write re-engagement messages for a patient who no-showed/cancelled late. Be empathetic, not punitive. Return JSON: {"sms":"under 160 chars","email_subject":"subject","email_body":"2-3 sentences"}`,
+        JSON.stringify({ patient_name, no_show_count, treatment_name })
+      );
+      return new Response(JSON.stringify(result), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // ─── MODE: no_show_risk ────────────────────────────────────────────
+    if (mode === "no_show_risk") {
+      const { patient_id } = body.data || {};
+      const { data: patient } = await sb.from("patients").select("first_name, last_name, no_show_count, late_cancel_count").eq("id", patient_id).single();
+      const { data: history } = await sb.from("appointments").select("status").eq("patient_id", patient_id).limit(20);
+      const total = history?.length || 0;
+      const noShows = history?.filter((a: any) => a.status === "no_show").length || 0;
+      const cancels = history?.filter((a: any) => a.status === "cancelled").length || 0;
+      const riskScore = total === 0 ? 20 : Math.min(100, Math.round(((noShows * 3 + cancels) / (total + 1)) * 100));
+      const riskLevel = riskScore >= 60 ? "high" : riskScore >= 30 ? "medium" : "low";
+      return new Response(JSON.stringify({ risk_score: riskScore, risk_level: riskLevel, stats: { total, no_shows: noShows, cancellations: cancels } }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // ─── MODE: pricing_quote ────────────────────────────────────────────
+    if (mode === "pricing_quote") {
+      const { treatment_ids, patient_id } = body.data || {};
+      const { data: treatments } = await sb.from("treatments").select("id, name, price, category").in("id", treatment_ids || []);
+      const { data: packages } = await sb.from("service_packages").select("*, service_package_items(treatment_id, treatment_name, sessions_included, unit_price)").eq("is_active", true);
+      const alaCarteTotal = (treatments || []).reduce((s: number, t: any) => s + (t.price || 0), 0);
+
+      const result = await callAI(
+        `Build an itemized quote comparing à la carte vs packages. Return JSON: {"line_items":[{"name":string,"price":number}],"a_la_carte_total":number,"package_options":[{"package_name":string,"package_id":string|null,"package_price":number,"savings":number,"savings_pct":number,"covers":string[]}],"recommendation":"1-2 sentences"}`,
+        JSON.stringify({ treatments, packages, a_la_carte_total: alaCarteTotal })
+      );
+
+      return new Response(JSON.stringify(result), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // ─── MODE: membership_recommend ─────────────────────────────────────
+    if (mode === "membership_recommend") {
+      const { patient_id } = body.data || {};
+      const { data: history } = await sb.from("appointments").select("*, treatments(name, price, category)").eq("patient_id", patient_id).eq("status", "completed").order("scheduled_at", { ascending: false }).limit(30);
+      const { data: packages } = await sb.from("service_packages").select("*").eq("is_active", true);
+      const totalSpent = (history || []).reduce((s: number, a: any) => s + (a.treatments?.price || 0), 0);
+      const visitCount = history?.length || 0;
+
+      const result = await callAI(
+        `Recommend optimal membership tier based on treatment history. Return JSON: {"recommended_tier":"single|double|triple|founding","reasoning":"2-3 sentences","projected_annual_savings":number,"break_even_months":number,"top_packages":[{"name":string,"id":string|null,"savings_vs_alacarte":number}],"spending_summary":{"total_6mo":number,"avg_per_visit":number,"visit_count":number,"top_treatment":string}}`,
+        JSON.stringify({ treatment_history: history, packages, total_spent: totalSpent, visit_count: visitCount })
+      );
+
+      return new Response(JSON.stringify(result), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // ─── ORIGINAL: Room/Book scheduling (action-based) ─────────────────
     const { action, appointment_id, treatment_id, scheduled_at, duration_minutes, patient_id } = body;
 
     const [
@@ -131,7 +192,6 @@ Rank by skill match, certification level, and availability overlap. Return top 5
     const requiredDeviceIds = (requirements ?? [])
       .filter((r: any) => r.treatment_id === treatment_id && r.is_required)
       .map((r: any) => r.device_id);
-
     const requiredDevices = (devices ?? []).filter((d: any) => requiredDeviceIds.includes(d.id));
 
     let conflicts: any[] = [];
@@ -213,38 +273,10 @@ Respond with a JSON object (no markdown) with these keys:
 - "recommended_provider_name": string or null
 - "provider_reasoning": string`;
 
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: "You are a clinical scheduling AI. Return only valid JSON, no markdown fences." },
-          { role: "user", content: prompt },
-        ],
-      }),
-    });
-
-    if (!aiResponse.ok) {
-      const status = aiResponse.status;
-      if (status === 429) return new Response(JSON.stringify({ error: "Rate limit exceeded" }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      if (status === 402) return new Response(JSON.stringify({ error: "AI credits exhausted" }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      throw new Error(`AI gateway error: ${status}`);
-    }
-
-    const aiData = await aiResponse.json();
-    const content = aiData.choices?.[0]?.message?.content ?? "{}";
-    let recommendation;
-    try {
-      const cleaned = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-      recommendation = JSON.parse(cleaned);
-    } catch {
-      recommendation = { error: "Failed to parse AI recommendation", raw: content };
-    }
+    const recommendation = await callAI("", prompt);
 
     // Post-process: resolve AI-returned names back to real UUIDs
     if (recommendation && !recommendation.error) {
-      // Resolve room ID
       if (recommendation.recommended_room_id && rooms) {
         const matchedRoom = (rooms as any[]).find((r: any) =>
           r.id === recommendation.recommended_room_id ||
@@ -258,7 +290,6 @@ Respond with a JSON object (no markdown) with these keys:
           recommendation.recommended_room_id = null;
         }
       }
-      // Resolve provider ID
       if (recommendation.recommended_provider_id && providers) {
         const matchedProvider = (providers as any[]).find((p: any) =>
           p.id === recommendation.recommended_provider_id ||
