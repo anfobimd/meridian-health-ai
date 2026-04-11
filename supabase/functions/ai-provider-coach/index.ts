@@ -118,6 +118,47 @@ Write 3-5 sentences summarizing key things the provider should know: total patie
       });
     }
 
+    // ─── BIO DRAFT MODE ───
+    if (mode === "bio_draft") {
+      const ctx = body.context || {};
+      const bioPrompt = `Write a concise, professional marketplace bio (2-3 sentences) for a medical aesthetics provider.
+Name: ${ctx.first_name || ""} ${ctx.last_name || ""}
+Specialty: ${ctx.specialty || "Aesthetic Medicine"}
+Credentials: ${ctx.credentials || ""}
+Modalities: ${(ctx.modalities || []).join(", ") || "Various aesthetic treatments"}
+Tone: Warm, professional, confidence-inspiring. No markdown.`;
+
+      const aiResponse = await fetch("https://api.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${lovableKey}` },
+        body: JSON.stringify({
+          model: "google/gemini-3-flash-preview",
+          messages: [
+            { role: "system", content: "You are a professional bio writer for healthcare providers. Return only the bio text, no quotes or labels." },
+            { role: "user", content: bioPrompt },
+          ],
+        }),
+      });
+
+      if (!aiResponse.ok) throw new Error("AI gateway error");
+      const aiData = await aiResponse.json();
+      const bio = aiData.choices?.[0]?.message?.content || "";
+
+      const latency = Date.now() - startTime;
+      await supabase.from("ai_api_calls").insert({
+        function_name: "ai-provider-coach",
+        model_used: "google/gemini-3-flash-preview",
+        status: "success",
+        latency_ms: latency,
+        input_tokens: aiData.usage?.prompt_tokens || 0,
+        output_tokens: aiData.usage?.completion_tokens || 0,
+      });
+
+      return new Response(JSON.stringify({ success: true, bio }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // ─── COACHING MODE (original) ───
     const { data: provider } = await supabase
       .from("providers")
