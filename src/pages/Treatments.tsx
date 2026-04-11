@@ -77,8 +77,9 @@ export default function Treatments() {
   });
 
   const toggleFlag = useMutation({
-    mutationFn: async ({ id, field, value }: { id: string; field: string; value: boolean }) => {
-      const { error } = await supabase.from("treatments").update({ [field]: value }).eq("id", id);
+    mutationFn: async ({ id, field, value }: { id: string; field: "requires_gfe" | "requires_md_review"; value: boolean }) => {
+      const updateData = field === "requires_gfe" ? { requires_gfe: value } : { requires_md_review: value };
+      const { error } = await supabase.from("treatments").update(updateData).eq("id", id);
       if (error) throw error;
       await supabase.from("audit_logs").insert({
         user_id: user?.id,
