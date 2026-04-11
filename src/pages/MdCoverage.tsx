@@ -22,7 +22,7 @@ export default function MdCoverage() {
   const [rate, setRate] = useState("100");
   const [isPrimary, setIsPrimary] = useState(true);
 
-  const { data: providers = [] } = useQuery({
+  const { data: providers = [] } = useQuery<{id: string; name: string; credentials: string | null}[]>({
     queryKey: ["providers-md"],
     queryFn: async () => {
       const { data } = await supabase.from("providers").select("id, first_name, last_name, credentials").eq("is_active", true);
@@ -38,7 +38,7 @@ export default function MdCoverage() {
     },
   });
 
-  const { data: assignments = [] } = useQuery({
+  const { data: assignments = [] } = useQuery<any[]>({
     queryKey: ["md-coverage"],
     queryFn: async () => {
       const { data } = await supabase.from("md_coverage_assignments").select("*, providers(first_name, last_name, credentials), clinics(name)").order("created_at", { ascending: false });
