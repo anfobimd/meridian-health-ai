@@ -16,7 +16,46 @@ serve(async (req) => {
   const supabase = createClient(supabaseUrl, supabaseKey);
 
   try {
-    const { encounter_id } = await req.json();
+    const body = await req.json();
+
+    // ── MODE: pattern_detect (admin completeness patterns) ──
+    if (body.mode === "pattern_detect") {
+      const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${lovableKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "google/gemini-3-flash-preview",
+          messages: [
+            { role: "system", content: "You are a clinical documentation QA AI. Analyze chart completeness patterns and identify systemic issues. Return JSON with: narrative (string), patterns (array of {label, detail, severity}), recommendations (array of {label, detail})." },
+            { role: "user", content: JSON.stringify(body.data) },
+          ],
+          tools: [{
+            type: "function",
+            function: {
+              name: "pattern_analysis",
+              description: "Return documentation pattern analysis",
+              parameters: {
+                type: "object",
+                properties: {
+                  narrative: { type: "string" },
+                  patterns: { type: "array", items: { type: "object", properties: { label: { type: "string" }, detail: { type: "string" }, severity: { type: "string", enum: ["info", "warning", "critical"] } }, required: ["label", "detail", "severity"] } },
+                  recommendations: { type: "array", items: { type: "object", properties: { label: { type: "string" }, detail: { type: "string" } }, required: ["label", "detail"] } },
+                },
+                required: ["narrative", "patterns"],
+              },
+            },
+          }],
+          tool_choice: { type: "function", function: { name: "pattern_analysis" } },
+        }),
+      });
+      const aiData = await aiResponse.json();
+      let result;
+      try { result = JSON.parse(aiData.choices[0].message.tool_calls[0].function.arguments); }
+      catch { result = { narrative: "Unable to analyze patterns.", patterns: [], recommendations: [] }; }
+      return new Response(JSON.stringify(result), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const { encounter_id } = body;
     if (!encounter_id) throw new Error("encounter_id required");
 
     // 1. Fetch encounter + relations
