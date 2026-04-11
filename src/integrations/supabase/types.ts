@@ -1279,6 +1279,39 @@ export type Database = {
           },
         ]
       }
+      consent_templates: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          procedure_types: string[] | null
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          procedure_types?: string[] | null
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          procedure_types?: string[] | null
+          updated_at?: string
+          version?: number
+        }
+        Relationships: []
+      }
       contracts: {
         Row: {
           contract_admin_id: string | null
@@ -2699,6 +2732,137 @@ export type Database = {
           },
         ]
       }
+      patient_communication_log: {
+        Row: {
+          appointment_id: string | null
+          channel: string
+          content: string | null
+          created_at: string
+          delivery_status: string | null
+          direction: string
+          id: string
+          metadata: Json | null
+          patient_id: string
+          staff_user_id: string | null
+          template_used: string | null
+        }
+        Insert: {
+          appointment_id?: string | null
+          channel?: string
+          content?: string | null
+          created_at?: string
+          delivery_status?: string | null
+          direction?: string
+          id?: string
+          metadata?: Json | null
+          patient_id: string
+          staff_user_id?: string | null
+          template_used?: string | null
+        }
+        Update: {
+          appointment_id?: string | null
+          channel?: string
+          content?: string | null
+          created_at?: string
+          delivery_status?: string | null
+          direction?: string
+          id?: string
+          metadata?: Json | null
+          patient_id?: string
+          staff_user_id?: string | null
+          template_used?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "patient_communication_log_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "patient_communication_log_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      patient_consents: {
+        Row: {
+          appointment_id: string | null
+          consent_text: string
+          created_at: string
+          encounter_id: string | null
+          id: string
+          ip_address: string | null
+          patient_id: string
+          signature_data: string | null
+          signed_at: string | null
+          status: string
+          template_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          appointment_id?: string | null
+          consent_text: string
+          created_at?: string
+          encounter_id?: string | null
+          id?: string
+          ip_address?: string | null
+          patient_id: string
+          signature_data?: string | null
+          signed_at?: string | null
+          status?: string
+          template_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          appointment_id?: string | null
+          consent_text?: string
+          created_at?: string
+          encounter_id?: string | null
+          id?: string
+          ip_address?: string | null
+          patient_id?: string
+          signature_data?: string | null
+          signed_at?: string | null
+          status?: string
+          template_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "patient_consents_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "patient_consents_encounter_id_fkey"
+            columns: ["encounter_id"]
+            isOneToOne: false
+            referencedRelation: "encounters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "patient_consents_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "patient_consents_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "consent_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       patient_contacts: {
         Row: {
           created_at: string
@@ -3047,9 +3211,11 @@ export type Database = {
           insurance_provider: string | null
           is_active: boolean
           last_name: string
+          late_cancel_count: number
           lmp_status: string | null
           medications: string[] | null
           meno_status: string | null
+          no_show_count: number
           phone: string | null
           preferences: Json | null
           preferred_routes: string[] | null
@@ -3083,9 +3249,11 @@ export type Database = {
           insurance_provider?: string | null
           is_active?: boolean
           last_name: string
+          late_cancel_count?: number
           lmp_status?: string | null
           medications?: string[] | null
           meno_status?: string | null
+          no_show_count?: number
           phone?: string | null
           preferences?: Json | null
           preferred_routes?: string[] | null
@@ -3119,9 +3287,11 @@ export type Database = {
           insurance_provider?: string | null
           is_active?: boolean
           last_name?: string
+          late_cancel_count?: number
           lmp_status?: string | null
           medications?: string[] | null
           meno_status?: string | null
+          no_show_count?: number
           phone?: string | null
           preferences?: Json | null
           preferred_routes?: string[] | null
