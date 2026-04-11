@@ -179,6 +179,69 @@ export default function Dashboard() {
     },
   });
 
+  // Provider utilization (last 30 days)
+  const { data: providerUtilization } = useQuery({
+    queryKey: ["dash-provider-utilization"],
+    queryFn: async () => {
+      const thirtyDaysAgo = subDays(new Date(), 30).toISOString();
+      const { data: apts } = await supabase
+        .from("appointments")
+        .select("provider_id, status, duration_minutes, providers(first_name, last_name, credentials)")
+        .gte("scheduled_at", thirtyDaysAgo)
+        .not("provider_id", "is", null);
+      if (!apts) return [];
+
+      const byProvider: Record<string, { name: string; total: number; completed: number; totalMinutes: number }> = {};
+      apts.forEach((a: any) => {
+        if (!a.provider_id) return;
+        if (!byProvider[a.provider_id]) {
+          byProvider[a.provider_id] = {
+            name: `${a.providers?.first_name || ""} ${a.providers?.last_name || ""}`,
+            total: 0, completed: 0, totalMinutes: 0,
+          };
+        }
+        byProvider[a.provider_id].total += 1;
+        if (a.status === "completed") {
+          byProvider[a.provider_id].completed += 1;
+          byProvider[a.provider_id].totalMinutes += (a.duration_minutes || 30);
+        }
+      });
+      return Object.entries(byProvider)
+        .map(([id, v]) => ({
+          id, name: v.name,
+          total: v.total, completed: v.completed,
+          utilization: v.total > 0 ? Math.round((v.completed / v.total) * 100) : 0,
+          hours: Math.round(v.totalMinutes / 60),
+        }))
+        .sort((a, b) => b.utilization - a.utilization);
+    },
+  });
+
+  // Procedure mix (last 30 days)
+  const { data: procedureMix } = useQuery({
+    queryKey: ["dash-procedure-mix"],
+    queryFn: async () => {
+      const thirtyDaysAgo = subDays(new Date(), 30).toISOString();
+      const { data } = await supabase
+        .from("appointments")
+        .select("treatment_id, treatments(name, category)")
+        .eq("status", "completed")
+        .gte("scheduled_at", thirtyDaysAgo)
+        .not("treatment_id", "is", null);
+      if (!data) return [];
+
+      const byTreatment: Record<string, { name: string; category: string; count: number }> = {};
+      data.forEach((a: any) => {
+        const tid = a.treatment_id;
+        if (!byTreatment[tid]) {
+          byTreatment[tid] = { name: a.treatments?.name || "Unknown", category: a.treatments?.category || "—", count: 0 };
+        }
+        byTreatment[tid].count += 1;
+      });
+      return Object.values(byTreatment).sort((a, b) => b.count - a.count).slice(0, 10);
+    },
+  });
+
   // --- AI Daily Briefing ---
   const loadBriefing = async () => {
     setBriefingLoading(true);
