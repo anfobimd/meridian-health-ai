@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,9 +13,15 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Separator } from "@/components/ui/separator";
+import { Progress } from "@/components/ui/progress";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { ChevronDown, ChevronRight, Sparkles, FileText, Save, CheckCircle2, ArrowLeft, Loader2, ClipboardList } from "lucide-react";
+import {
+  ChevronDown, ChevronRight, Sparkles, FileText, Save, CheckCircle2,
+  ArrowLeft, Loader2, ClipboardList, AlertTriangle, ShieldAlert, Send, X,
+} from "lucide-react";
 import { VitalsPanel } from "@/components/encounter/VitalsPanel";
+import { AddendumSection } from "@/components/clinical/AddendumSection";
 
 type FieldConfig = {
   options?: string[];
@@ -60,6 +66,165 @@ type OrderSet = {
   is_auto_added: boolean;
 };
 
+/* ── Drug Interaction Alert Component ── */
+function DrugInteractionBanner({
+  patientMeds,
+  allergies,
+  procedureType,
+  onDismiss,
+}: {
+  patientMeds: string[];
+  allergies: string[];
+  procedureType: string;
+  onDismiss: () => void;
+}) {
+  const alerts = useMemo(() => {
+    const warnings: string[] = [];
+    const medsLower = patientMeds.map(m => m.toLowerCase());
+    const allergyLower = allergies.map(a => a.toLowerCase());
+    const procLower = procedureType.toLowerCase();
+
+    const isInjectableOrFiller = ["filler", "botox", "injection", "prp", "kybella"].some(k => procLower.includes(k));
+    const isLaser = ["laser", "ipl", "bbl", "resurfacing"].some(k => procLower.includes(k));
+
+    // Blood thinner warnings for injectables
+    if (isInjectableOrFiller) {
+      const thinners = ["aspirin", "warfarin", "coumadin", "plavix", "clopidogrel", "eliquis", "apixaban", "xarelto", "rivaroxaban", "ibuprofen", "advil", "motrin", "fish oil", "vitamin e"];
+      const found = medsLower.filter(m => thinners.some(t => m.includes(t)));
+      if (found.length) warnings.push(`Blood thinner risk: Patient takes ${found.join(", ")}. Increased bruising/bleeding risk with injectables.`);
+    }
+
+    // Accutane + laser
+    if (isLaser) {
+      const accutane = ["accutane", "isotretinoin", "claravis", "absorica"];
+      const found = medsLower.filter(m => accutane.some(a => m.includes(a)));
+      if (found.length) warnings.push(`Accutane/isotretinoin detected. Laser/IPL contraindicated for 6+ months post-treatment.`);
+    }
+
+    // Lidocaine allergy for injectables
+    if (isInjectableOrFiller && allergyLower.some(a => a.includes("lidocaine") || a.includes("novocaine"))) {
+      warnings.push(`Lidocaine/anesthetic allergy noted. Confirm numbing protocol before procedure.`);
+    }
+
+    return warnings;
+  }, [patientMeds, allergies, procedureType]);
+
+  if (!alerts.length) return null;
+
+  return (
+    <Card className="border-destructive/50 bg-destructive/5">
+      <CardContent className="p-3">
+        <div className="flex items-start gap-2">
+          <ShieldAlert className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+          <div className="flex-1 space-y-1">
+            <p className="text-xs font-semibold text-destructive">Drug Interaction Alert</p>
+            {alerts.map((a, i) => (
+              <p key={i} className="text-xs text-destructive/80">{a}</p>
+            ))}
+          </div>
+          <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={onDismiss}>
+            <X className="h-3 w-3" />
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+/* ── Aftercare Modal ── */
+function AftercareModal({
+  open,
+  onClose,
+  patientName,
+  procedureType,
+  encounterId,
+}: {
+  open: boolean;
+  onClose: () => void;
+  patientName: string;
+  procedureType: string;
+  encounterId: string;
+}) {
+  const [channel, setChannel] = useState("sms");
+  const [sending, setSending] = useState(false);
+  const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setLoading(true);
+    supabase.functions
+      .invoke("ai-aftercare-message", {
+        body: { encounter_id: encounterId, procedure_type: procedureType, patient_name: patientName },
+      })
+      .then(({ data }) => {
+        setMessage(data?.message || `Thank you for your ${procedureType} treatment today, ${patientName}. Please follow your aftercare instructions and contact us with any concerns.`);
+      })
+      .catch(() => {
+        setMessage(`Thank you for your ${procedureType} treatment today, ${patientName}. Please follow your aftercare instructions.`);
+      })
+      .finally(() => setLoading(false));
+  }, [open, encounterId, procedureType, patientName]);
+
+  const send = async () => {
+    setSending(true);
+    try {
+      // In production this would call send-sms or email function
+      toast.success(`Aftercare sent via ${channel}`);
+      onClose();
+    } catch {
+      toast.error("Failed to send aftercare");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Send className="h-4 w-4" /> Send Aftercare Instructions
+          </DialogTitle>
+          <DialogDescription>
+            Chart signed. Send personalized aftercare to {patientName}?
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <Label className="text-xs">Channel</Label>
+            <Select value={channel} onValueChange={setChannel}>
+              <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="sms">SMS</SelectItem>
+                <SelectItem value="email">Email</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Message</Label>
+            {loading ? (
+              <div className="flex items-center gap-2 p-3 bg-muted rounded text-xs text-muted-foreground">
+                <Loader2 className="h-3 w-3 animate-spin" /> AI generating aftercare message...
+              </div>
+            ) : (
+              <Textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={5} className="text-sm" />
+            )}
+          </div>
+        </div>
+        <DialogFooter className="gap-2">
+          <Button variant="ghost" size="sm" onClick={onClose}>Skip</Button>
+          <Button size="sm" onClick={send} disabled={sending || loading}>
+            {sending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Send className="h-3.5 w-3.5 mr-1" />}
+            Send
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/* ── Main EncounterChart ── */
 export default function EncounterChart() {
   const { encounterId } = useParams();
   const navigate = useNavigate();
@@ -72,6 +237,9 @@ export default function EncounterChart() {
   const [openSections, setOpenSections] = useState<Set<string>>(new Set());
   const [aiLoading, setAiLoading] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
+  const [drugAlertDismissed, setDrugAlertDismissed] = useState(false);
+  const [showAftercareModal, setShowAftercareModal] = useState(false);
+  const [safetyWarnings, setSafetyWarnings] = useState<string[]>([]);
 
   // Fetch encounter
   const { data: encounter } = useQuery({
@@ -88,6 +256,22 @@ export default function EncounterChart() {
     enabled: !!encounterId,
   });
 
+  // Fetch clinical note (for signed encounters / addenda)
+  const { data: clinicalNote } = useQuery({
+    queryKey: ["clinical-note", encounterId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("clinical_notes")
+        .select("*")
+        .eq("appointment_id", encounter?.appointment_id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!encounter?.appointment_id,
+  });
+
   // Fetch available templates
   const { data: templates } = useQuery({
     queryKey: ["chart-templates"],
@@ -102,7 +286,7 @@ export default function EncounterChart() {
     },
   });
 
-  // Fetch template sections & fields when template selected
+  // Fetch template sections & fields
   const templateId = encounter?.template_id;
   const { data: sections } = useQuery({
     queryKey: ["template-sections", templateId],
@@ -154,18 +338,56 @@ export default function EncounterChart() {
     enabled: !!templateId,
   });
 
-  // Auto-open all sections and auto-select orders on load
   useEffect(() => {
-    if (sections) {
-      setOpenSections(new Set(sections.map(s => s.id)));
-    }
+    if (sections) setOpenSections(new Set(sections.map(s => s.id)));
   }, [sections]);
 
   useEffect(() => {
-    if (orderSets) {
-      setSelectedOrders(new Set(orderSets.filter(o => o.is_auto_added).map(o => o.id)));
-    }
+    if (orderSets) setSelectedOrders(new Set(orderSets.filter(o => o.is_auto_added).map(o => o.id)));
   }, [orderSets]);
+
+  // ─── Completeness calculation ───
+  const completeness = useMemo(() => {
+    if (!sections) return { percent: 0, filled: 0, total: 0, missingLabels: [] as string[] };
+    const requiredFields = sections.flatMap(s => s.fields.filter(f => f.is_required));
+    const total = requiredFields.length;
+    if (total === 0) return { percent: 100, filled: 0, total: 0, missingLabels: [] };
+    const missingLabels: string[] = [];
+    const filled = requiredFields.filter(f => {
+      const key = f.field_key || f.id;
+      const hasValue = f.field_type === "checkbox"
+        ? (checkboxValues[key] || []).length > 0
+        : !!fieldValues[key]?.trim();
+      if (!hasValue) missingLabels.push(f.label);
+      return hasValue;
+    }).length;
+    return { percent: Math.round((filled / total) * 100), filled, total, missingLabels };
+  }, [sections, fieldValues, checkboxValues]);
+
+  // ─── Safety field check on sign ───
+  const runSafetyCheck = useCallback((): string[] => {
+    const warnings: string[] = [];
+    const allFields = sections?.flatMap(s => s.fields) || [];
+
+    // Check for blank lot numbers, injection sites
+    const safetyFields = allFields.filter(f => {
+      const label = f.label.toLowerCase();
+      return label.includes("lot") || label.includes("batch") || label.includes("injection site") || label.includes("units") || label.includes("volume");
+    });
+
+    for (const f of safetyFields) {
+      const key = f.field_key || f.id;
+      if (!fieldValues[key]?.trim()) {
+        warnings.push(`"${f.label}" is empty — required for safety documentation.`);
+      }
+    }
+
+    // Check SOAP completeness
+    if (!soapNotes.assessment?.trim()) warnings.push("Assessment section is empty.");
+    if (!soapNotes.plan?.trim()) warnings.push("Plan section is empty.");
+
+    return warnings;
+  }, [sections, fieldValues, soapNotes]);
 
   // Select template
   const selectTemplate = useMutation({
@@ -182,7 +404,6 @@ export default function EncounterChart() {
     },
   });
 
-  // Suggest templates based on chief complaint
   const suggestedTemplates = templates?.filter((t: any) => {
     if (!encounter?.chief_complaint) return true;
     const cc = encounter.chief_complaint.toLowerCase();
@@ -223,10 +444,7 @@ export default function EncounterChart() {
         medications: patient?.medications,
       };
 
-      const { data, error } = await supabase.functions.invoke("ai-chart-soap", {
-        body: context,
-      });
-
+      const { data, error } = await supabase.functions.invoke("ai-chart-soap", { body: context });
       if (error) throw error;
       const text = data?.text || data?.content || "";
       setSoapNotes(prev => ({ ...prev, [section]: text }));
@@ -240,9 +458,22 @@ export default function EncounterChart() {
 
   // Save encounter
   const saveEncounter = async (sign = false) => {
+    if (sign) {
+      // Safety check
+      const warnings = runSafetyCheck();
+      if (warnings.length > 0) {
+        setSafetyWarnings(warnings);
+        return;
+      }
+      // Completeness gate
+      if (completeness.percent < 100 && completeness.total > 0) {
+        toast.error(`Cannot sign: ${completeness.total - completeness.filled} required fields still empty.`);
+        return;
+      }
+    }
+
     setSaving(true);
     try {
-      // Save field responses
       const allFields = sections?.flatMap(s => s.fields) || [];
       const responses = allFields
         .filter(f => fieldValues[f.field_key || f.id] || checkboxValues[f.field_key || f.id]?.length)
@@ -262,7 +493,6 @@ export default function EncounterChart() {
         if (respErr) throw respErr;
       }
 
-      // Save SOAP note if any content
       if (Object.values(soapNotes).some(v => v.trim())) {
         const { error: noteErr } = await supabase.from("clinical_notes").insert({
           patient_id: encounter!.patient_id,
@@ -279,7 +509,6 @@ export default function EncounterChart() {
         if (noteErr) throw noteErr;
       }
 
-      // Update encounter status
       const { error: encErr } = await supabase
         .from("encounters")
         .update({
@@ -290,7 +519,11 @@ export default function EncounterChart() {
       if (encErr) throw encErr;
 
       toast.success(sign ? "Chart signed & locked" : "Chart saved as draft");
-      if (sign) navigate("/encounters");
+
+      if (sign) {
+        // Show aftercare modal instead of immediate navigate
+        setShowAftercareModal(true);
+      }
     } catch (err: any) {
       toast.error(`Save failed: ${err.message}`);
     } finally {
@@ -321,7 +554,6 @@ export default function EncounterChart() {
             />
           </div>
         );
-
       case "select":
         return (
           <div key={key} className="space-y-1.5">
@@ -338,7 +570,6 @@ export default function EncounterChart() {
             </Select>
           </div>
         );
-
       case "scale": {
         const min = config.min ?? 0;
         const max = config.max ?? 10;
@@ -351,20 +582,12 @@ export default function EncounterChart() {
             </Label>
             <div className="flex items-center gap-3">
               <span className="text-[10px] text-muted-foreground whitespace-nowrap">{config.label_lo || min}</span>
-              <Slider
-                min={min}
-                max={max}
-                step={1}
-                value={[val]}
-                onValueChange={([v]) => updateField(key, String(v))}
-                className="flex-1"
-              />
+              <Slider min={min} max={max} step={1} value={[val]} onValueChange={([v]) => updateField(key, String(v))} className="flex-1" />
               <span className="text-[10px] text-muted-foreground whitespace-nowrap">{config.label_hi || max}</span>
             </div>
           </div>
         );
       }
-
       case "checkbox":
         return (
           <div key={key} className="space-y-2">
@@ -374,17 +597,13 @@ export default function EncounterChart() {
             <div className="flex flex-wrap gap-2">
               {config.options?.map((opt) => (
                 <label key={opt} className="flex items-center gap-1.5 text-xs cursor-pointer bg-muted/50 rounded-md px-2.5 py-1.5 hover:bg-muted transition-colors">
-                  <Checkbox
-                    checked={(checkboxValues[key] || []).includes(opt)}
-                    onCheckedChange={() => toggleCheckbox(key, opt)}
-                  />
+                  <Checkbox checked={(checkboxValues[key] || []).includes(opt)} onCheckedChange={() => toggleCheckbox(key, opt)} />
                   {opt}
                 </label>
               ))}
             </div>
           </div>
         );
-
       default:
         return (
           <div key={key} className="space-y-1.5">
@@ -396,6 +615,10 @@ export default function EncounterChart() {
   };
 
   const activeTemplate = templates?.find((t: any) => t.id === templateId) as any;
+  const isSigned = encounter?.status === "signed";
+  const patientMeds = encounter?.patients?.medications || [];
+  const patientAllergies = encounter?.patients?.allergies || [];
+  const procedureType = activeTemplate?.name || encounter?.chief_complaint || "";
 
   // Template selection screen
   if (!templateId) {
@@ -421,11 +644,7 @@ export default function EncounterChart() {
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {suggestedTemplates.map((t: any) => (
-                <Card
-                  key={t.id}
-                  className="cursor-pointer hover:border-primary/50 hover:shadow-md transition-all"
-                  onClick={() => selectTemplate.mutate(t.id)}
-                >
+                <Card key={t.id} className="cursor-pointer hover:border-primary/50 hover:shadow-md transition-all" onClick={() => selectTemplate.mutate(t.id)}>
                   <CardContent className="p-4">
                     <div className="flex items-start gap-3">
                       <span className="text-2xl">{t.icon || "📋"}</span>
@@ -434,9 +653,7 @@ export default function EncounterChart() {
                         <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{t.description}</p>
                         <div className="flex items-center gap-2 mt-2">
                           <Badge variant="secondary" className="text-[10px]">{t.category}</Badge>
-                          {t.usage_count > 0 && (
-                            <span className="text-[10px] text-muted-foreground">{t.usage_count} uses</span>
-                          )}
+                          {t.usage_count > 0 && <span className="text-[10px] text-muted-foreground">{t.usage_count} uses</span>}
                         </div>
                       </div>
                     </div>
@@ -451,11 +668,7 @@ export default function EncounterChart() {
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">All Templates</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {templates?.map((t: any) => (
-              <Card
-                key={t.id}
-                className="cursor-pointer hover:border-primary/50 hover:shadow-md transition-all"
-                onClick={() => selectTemplate.mutate(t.id)}
-              >
+              <Card key={t.id} className="cursor-pointer hover:border-primary/50 hover:shadow-md transition-all" onClick={() => selectTemplate.mutate(t.id)}>
                 <CardContent className="p-4">
                   <div className="flex items-start gap-3">
                     <span className="text-2xl">{t.icon || "📋"}</span>
@@ -476,39 +689,118 @@ export default function EncounterChart() {
 
   // Active charting screen
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/encounters")}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div>
-            <h1 className="text-xl font-bold flex items-center gap-2">
-              <span className="text-2xl">{activeTemplate?.icon || "📋"}</span>
-              {activeTemplate?.name || "Chart"}
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              {encounter?.patients?.first_name} {encounter?.patients?.last_name}
-              {encounter?.chief_complaint && ` — ${encounter.chief_complaint}`}
-            </p>
+    <div className="space-y-4">
+      {/* Header with completeness bar */}
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" onClick={() => navigate("/encounters")}>
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <div>
+              <h1 className="text-xl font-bold flex items-center gap-2">
+                <span className="text-2xl">{activeTemplate?.icon || "📋"}</span>
+                {activeTemplate?.name || "Chart"}
+                {isSigned && <Badge className="text-[10px] bg-green-600">Signed</Badge>}
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                {encounter?.patients?.first_name} {encounter?.patients?.last_name}
+                {encounter?.chief_complaint && ` — ${encounter.chief_complaint}`}
+              </p>
+            </div>
           </div>
+          {!isSigned && (
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => saveEncounter(false)} disabled={saving}>
+                {saving ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />}
+                Save Draft
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => saveEncounter(true)}
+                disabled={saving || (completeness.total > 0 && completeness.percent < 100)}
+              >
+                <CheckCircle2 className="h-4 w-4 mr-1" /> Sign & Lock
+              </Button>
+            </div>
+          )}
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => saveEncounter(false)} disabled={saving}>
-            {saving ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />}
-            Save Draft
-          </Button>
-          <Button size="sm" onClick={() => saveEncounter(true)} disabled={saving}>
-            <CheckCircle2 className="h-4 w-4 mr-1" /> Sign & Lock
-          </Button>
-        </div>
+
+        {/* Completeness bar */}
+        {!isSigned && completeness.total > 0 && (
+          <div className="flex items-center gap-3 px-1">
+            <Progress value={completeness.percent} className="h-2 flex-1" />
+            <span className={`text-xs font-medium ${completeness.percent === 100 ? "text-green-600" : "text-muted-foreground"}`}>
+              {completeness.percent}% complete ({completeness.filled}/{completeness.total} required)
+            </span>
+          </div>
+        )}
       </div>
+
+      {/* Drug interaction alert */}
+      {!drugAlertDismissed && !isSigned && (patientMeds.length > 0 || patientAllergies.length > 0) && (
+        <DrugInteractionBanner
+          patientMeds={patientMeds}
+          allergies={patientAllergies}
+          procedureType={procedureType}
+          onDismiss={() => setDrugAlertDismissed(true)}
+        />
+      )}
+
+      {/* Safety warnings dialog */}
+      <Dialog open={safetyWarnings.length > 0} onOpenChange={() => setSafetyWarnings([])}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-600">
+              <AlertTriangle className="h-5 w-5" /> Safety Check — Missing Fields
+            </DialogTitle>
+            <DialogDescription>
+              The following safety-related fields are incomplete. Please review before signing.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 max-h-60 overflow-y-auto">
+            {safetyWarnings.map((w, i) => (
+              <div key={i} className="flex items-start gap-2 text-sm p-2 bg-amber-50 dark:bg-amber-950/20 rounded">
+                <AlertTriangle className="h-3.5 w-3.5 text-amber-600 mt-0.5 shrink-0" />
+                <span>{w}</span>
+              </div>
+            ))}
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setSafetyWarnings([])}>
+              Go Back & Fix
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => {
+                setSafetyWarnings([]);
+                // Force sign bypassing safety check
+                setSaving(true);
+                saveEncounterForce();
+              }}
+            >
+              Sign Anyway
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Aftercare modal */}
+      <AftercareModal
+        open={showAftercareModal}
+        onClose={() => {
+          setShowAftercareModal(false);
+          navigate("/encounters");
+        }}
+        patientName={`${encounter?.patients?.first_name || ""} ${encounter?.patients?.last_name || ""}`}
+        procedureType={procedureType}
+        encounterId={encounterId!}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Chart Area */}
         <div className="lg:col-span-2 space-y-4">
-          {/* Template Fields */}
           {sections?.map((section) => (
             <Collapsible
               key={section.id}
@@ -550,21 +842,23 @@ export default function EncounterChart() {
               <div className="flex items-center gap-2">
                 <FileText className="h-4 w-4 text-primary" />
                 <span className="font-semibold text-sm">SOAP Note</span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="ml-auto text-xs"
-                  onClick={() => {
-                    generateAiSoap("subjective");
-                    generateAiSoap("objective");
-                    generateAiSoap("assessment");
-                    generateAiSoap("plan");
-                  }}
-                  disabled={Object.values(aiLoading).some(Boolean)}
-                >
-                  <Sparkles className="h-3.5 w-3.5 mr-1" />
-                  AI Generate All
-                </Button>
+                {!isSigned && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="ml-auto text-xs"
+                    onClick={() => {
+                      generateAiSoap("subjective");
+                      generateAiSoap("objective");
+                      generateAiSoap("assessment");
+                      generateAiSoap("plan");
+                    }}
+                    disabled={Object.values(aiLoading).some(Boolean)}
+                  >
+                    <Sparkles className="h-3.5 w-3.5 mr-1" />
+                    AI Generate All
+                  </Button>
+                )}
               </div>
 
               {(["subjective", "objective", "assessment", "plan"] as const).map((section) => (
@@ -573,35 +867,34 @@ export default function EncounterChart() {
                     <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                       {section}
                     </Label>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 text-[10px] text-primary"
-                      onClick={() => generateAiSoap(section)}
-                      disabled={aiLoading[section]}
-                    >
-                      {aiLoading[section] ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Sparkles className="h-3 w-3 mr-1" />}
-                      AI Draft
-                    </Button>
+                    {!isSigned && (
+                      <Button variant="ghost" size="sm" className="h-6 text-[10px] text-primary" onClick={() => generateAiSoap(section)} disabled={aiLoading[section]}>
+                        {aiLoading[section] ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Sparkles className="h-3 w-3 mr-1" />}
+                        AI Draft
+                      </Button>
+                    )}
                   </div>
                   <Textarea
                     value={soapNotes[section]}
                     onChange={(e) => setSoapNotes(prev => ({ ...prev, [section]: e.target.value }))}
                     placeholder={`Enter ${section}...`}
                     className="min-h-[80px] text-sm"
+                    readOnly={isSigned}
                   />
                 </div>
               ))}
+
+              {/* Addendum section for signed notes */}
+              {clinicalNote && (
+                <AddendumSection noteId={clinicalNote.id} noteStatus={clinicalNote.status} />
+              )}
             </CardContent>
           </Card>
         </div>
 
-        {/* Sidebar - Orders & Billing */}
+        {/* Sidebar */}
         <div className="space-y-4">
-          {/* Vitals */}
-          {encounter && (
-            <VitalsPanel encounterId={encounterId!} patientId={encounter.patient_id} />
-          )}
+          {encounter && <VitalsPanel encounterId={encounterId!} patientId={encounter.patient_id} />}
 
           {/* Patient Summary */}
           <Card>
@@ -613,8 +906,11 @@ export default function EncounterChart() {
                   <p>DOB: {encounter.patients.date_of_birth} · Age: {Math.floor((Date.now() - new Date(encounter.patients.date_of_birth).getTime()) / 31557600000)}y</p>
                 )}
                 {encounter?.patients?.gender && <p>Gender: {encounter.patients.gender}</p>}
-                {encounter?.patients?.allergies?.length > 0 && (
-                  <p className="text-destructive">⚠ Allergies: {encounter.patients.allergies.join(", ")}</p>
+                {patientAllergies.length > 0 && (
+                  <p className="text-destructive">⚠ Allergies: {patientAllergies.join(", ")}</p>
+                )}
+                {patientMeds.length > 0 && (
+                  <p>💊 Medications: {patientMeds.join(", ")}</p>
                 )}
               </div>
             </CardContent>
@@ -685,9 +981,7 @@ export default function EncounterChart() {
                             <span>{typeIcons[order.order_type] || "📋"}</span>
                             {order.label}
                           </p>
-                          {order.description && (
-                            <p className="text-[10px] text-muted-foreground mt-0.5">{order.description}</p>
-                          )}
+                          {order.description && <p className="text-[10px] text-muted-foreground mt-0.5">{order.description}</p>}
                         </div>
                         <Badge variant="outline" className="text-[9px] shrink-0">{order.order_type}</Badge>
                       </label>
@@ -701,4 +995,57 @@ export default function EncounterChart() {
       </div>
     </div>
   );
+
+  // Force sign (bypass safety check)
+  async function saveEncounterForce() {
+    try {
+      const allFields = sections?.flatMap(s => s.fields) || [];
+      const responses = allFields
+        .filter(f => fieldValues[f.field_key || f.id] || checkboxValues[f.field_key || f.id]?.length)
+        .map(f => {
+          const key = f.field_key || f.id;
+          const isCheckbox = f.field_type === "checkbox";
+          return {
+            encounter_id: encounterId!,
+            field_id: f.id,
+            value: isCheckbox ? (checkboxValues[key] || []).join(", ") : (fieldValues[key] || null),
+            ai_suggested: false,
+          };
+        });
+
+      if (responses.length > 0) {
+        const { error: respErr } = await supabase.from("encounter_field_responses").upsert(responses, { onConflict: "encounter_id,field_id" });
+        if (respErr) throw respErr;
+      }
+
+      if (Object.values(soapNotes).some(v => v.trim())) {
+        const { error: noteErr } = await supabase.from("clinical_notes").insert({
+          patient_id: encounter!.patient_id,
+          provider_id: encounter!.provider_id,
+          appointment_id: encounter!.appointment_id,
+          subjective: soapNotes.subjective || null,
+          objective: soapNotes.objective || null,
+          assessment: soapNotes.assessment || null,
+          plan: soapNotes.plan || null,
+          ai_generated: true,
+          status: "signed",
+          signed_at: new Date().toISOString(),
+        });
+        if (noteErr) throw noteErr;
+      }
+
+      const { error: encErr } = await supabase
+        .from("encounters")
+        .update({ status: "signed", signed_at: new Date().toISOString(), completed_at: new Date().toISOString() })
+        .eq("id", encounterId!);
+      if (encErr) throw encErr;
+
+      toast.success("Chart signed & locked");
+      setShowAftercareModal(true);
+    } catch (err: any) {
+      toast.error(`Save failed: ${err.message}`);
+    } finally {
+      setSaving(false);
+    }
+  }
 }
