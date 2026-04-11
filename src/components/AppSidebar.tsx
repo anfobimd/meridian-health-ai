@@ -62,7 +62,7 @@ const navSections: NavSection[] = [
     label: "ME",
     items: [
       { to: "/my-profile", icon: UserCircle, label: "My Profile" },
-      { to: "/provider-performance", icon: BarChart3, label: "Performance", roles: ["provider"] },
+      { to: "/my-performance", icon: BarChart3, label: "Performance", roles: ["provider"] },
       { to: "/time-off", icon: CalendarOff, label: "Time Off" },
       { to: "/settings", icon: Settings, label: "Settings" },
     ],
