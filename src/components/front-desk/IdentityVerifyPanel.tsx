@@ -31,7 +31,7 @@ export function IdentityVerifyPanel({ patient, onVerified }: Props) {
       const { error } = await supabase.from("patients").update({
         photo_id_verified: true,
         photo_id_verified_at: new Date().toISOString(),
-      }).eq("id", patient.id);
+      } as any).eq("id", patient.id);
       if (error) throw error;
     },
     onSuccess: () => {

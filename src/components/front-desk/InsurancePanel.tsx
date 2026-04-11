@@ -32,13 +32,13 @@ export function InsurancePanel({ patientId }: Props) {
     mutationFn: async (formData: FormData) => {
       const { error } = await supabase.from("patient_insurance").insert({
         patient_id: patientId,
-        carrier_name: formData.get("carrier_name") as string,
+        provider_name: formData.get("carrier_name") as string,
         policy_number: formData.get("policy_number") as string || null,
         group_number: formData.get("group_number") as string || null,
         subscriber_name: formData.get("subscriber_name") as string || null,
-        relationship_to_subscriber: formData.get("relationship") as string || "self",
+        relationship: formData.get("relationship") as string || "self",
         is_primary: (insurance?.length ?? 0) === 0,
-      });
+      } as any);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -56,7 +56,7 @@ export function InsurancePanel({ patientId }: Props) {
         eligibility_status: "eligible",
         eligibility_checked_at: new Date().toISOString(),
         eligibility_notes: "Manual verification — eligible",
-      }).eq("id", insuranceId);
+      } as any).eq("id", insuranceId);
       if (error) throw error;
     },
     onSuccess: () => {
