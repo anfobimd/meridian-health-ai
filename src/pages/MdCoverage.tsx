@@ -25,8 +25,8 @@ export default function MdCoverage() {
   const { data: providers = [] } = useQuery({
     queryKey: ["providers-md"],
     queryFn: async () => {
-      const { data } = await supabase.from("providers").select("id, name, credentials").eq("is_active", true);
-      return data || [];
+      const { data } = await supabase.from("providers").select("id, first_name, last_name, credentials").eq("is_active", true);
+      return (data || []).map((p: any) => ({ id: p.id, name: `${p.first_name} ${p.last_name}`, credentials: p.credentials }));
     },
   });
 
@@ -41,7 +41,7 @@ export default function MdCoverage() {
   const { data: assignments = [] } = useQuery({
     queryKey: ["md-coverage"],
     queryFn: async () => {
-      const { data } = await supabase.from("md_coverage_assignments").select("*, providers(name, credentials), clinics(name)").order("created_at", { ascending: false });
+      const { data } = await supabase.from("md_coverage_assignments").select("*, providers(first_name, last_name, credentials), clinics(name)").order("created_at", { ascending: false });
       return data || [];
     },
   });
