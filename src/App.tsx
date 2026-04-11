@@ -57,6 +57,8 @@ import MdCoverage from "./pages/MdCoverage";
 import MasterCatalog from "./pages/MasterCatalog";
 import Benchmarks from "./pages/Benchmarks";
 import AutomationRules from "./pages/AutomationRules";
+import NotificationCenter from "./pages/NotificationCenter";
+import MultiProviderCalendar from "./pages/MultiProviderCalendar";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -119,6 +121,8 @@ const App = () => (
                 <Route path="/master-catalog" element={<MasterCatalog />} />
                 <Route path="/benchmarks" element={<Benchmarks />} />
                 <Route path="/automation-rules" element={<AutomationRules />} />
+                <Route path="/notifications" element={<NotificationCenter />} />
+                <Route path="/calendar-grid" element={<MultiProviderCalendar />} />
               </Route>
             </Route>
             {/* Public routes — no auth required */}
