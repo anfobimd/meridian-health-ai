@@ -3905,6 +3905,50 @@ export type Database = {
           },
         ]
       }
+      treatment_price_history: {
+        Row: {
+          change_reason: string | null
+          changed_by: string | null
+          created_at: string
+          id: string
+          new_member_price: number | null
+          new_price: number | null
+          old_member_price: number | null
+          old_price: number | null
+          treatment_id: string
+        }
+        Insert: {
+          change_reason?: string | null
+          changed_by?: string | null
+          created_at?: string
+          id?: string
+          new_member_price?: number | null
+          new_price?: number | null
+          old_member_price?: number | null
+          old_price?: number | null
+          treatment_id: string
+        }
+        Update: {
+          change_reason?: string | null
+          changed_by?: string | null
+          created_at?: string
+          id?: string
+          new_member_price?: number | null
+          new_price?: number | null
+          old_member_price?: number | null
+          old_price?: number | null
+          treatment_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "treatment_price_history_treatment_id_fkey"
+            columns: ["treatment_id"]
+            isOneToOne: false
+            referencedRelation: "treatments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       treatments: {
         Row: {
           category: string | null
@@ -3912,8 +3956,11 @@ export type Database = {
           created_at: string
           description: string | null
           duration_minutes: number | null
+          effective_date: string | null
           id: string
           is_active: boolean
+          is_member_pricing_enabled: boolean | null
+          member_price: number | null
           name: string
           price: number | null
           requires_gfe: boolean
@@ -3926,8 +3973,11 @@ export type Database = {
           created_at?: string
           description?: string | null
           duration_minutes?: number | null
+          effective_date?: string | null
           id?: string
           is_active?: boolean
+          is_member_pricing_enabled?: boolean | null
+          member_price?: number | null
           name: string
           price?: number | null
           requires_gfe?: boolean
@@ -3940,8 +3990,11 @@ export type Database = {
           created_at?: string
           description?: string | null
           duration_minutes?: number | null
+          effective_date?: string | null
           id?: string
           is_active?: boolean
+          is_member_pricing_enabled?: boolean | null
+          member_price?: number | null
           name?: string
           price?: number | null
           requires_gfe?: boolean

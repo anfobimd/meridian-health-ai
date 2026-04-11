@@ -7,12 +7,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   Users, Calendar, DollarSign, TrendingUp, Clock, AlertTriangle, CheckCircle2,
   FileText, ShieldCheck, Package, Sparkles, Loader2, ChevronRight,
-  Activity, Stethoscope, ArrowRight, Bell, BarChart3, Zap,
+  Activity, Stethoscope, ArrowRight, Bell, BarChart3, Zap, UserCheck,
 } from "lucide-react";
-import { format, parseISO, isToday, startOfMonth, endOfMonth, subMonths, getISOWeek } from "date-fns";
+import { format, parseISO, isToday, startOfMonth, endOfMonth, subMonths, subDays, getISOWeek } from "date-fns";
 import { toast } from "sonner";
 
 export default function Dashboard() {
@@ -175,6 +176,69 @@ export default function Dashboard() {
         .order("due_date", { ascending: true })
         .limit(10);
       return data ?? [];
+    },
+  });
+
+  // Provider utilization (last 30 days)
+  const { data: providerUtilization } = useQuery({
+    queryKey: ["dash-provider-utilization"],
+    queryFn: async () => {
+      const thirtyDaysAgo = subDays(new Date(), 30).toISOString();
+      const { data: apts } = await supabase
+        .from("appointments")
+        .select("provider_id, status, duration_minutes, providers(first_name, last_name, credentials)")
+        .gte("scheduled_at", thirtyDaysAgo)
+        .not("provider_id", "is", null);
+      if (!apts) return [];
+
+      const byProvider: Record<string, { name: string; total: number; completed: number; totalMinutes: number }> = {};
+      apts.forEach((a: any) => {
+        if (!a.provider_id) return;
+        if (!byProvider[a.provider_id]) {
+          byProvider[a.provider_id] = {
+            name: `${a.providers?.first_name || ""} ${a.providers?.last_name || ""}`,
+            total: 0, completed: 0, totalMinutes: 0,
+          };
+        }
+        byProvider[a.provider_id].total += 1;
+        if (a.status === "completed") {
+          byProvider[a.provider_id].completed += 1;
+          byProvider[a.provider_id].totalMinutes += (a.duration_minutes || 30);
+        }
+      });
+      return Object.entries(byProvider)
+        .map(([id, v]) => ({
+          id, name: v.name,
+          total: v.total, completed: v.completed,
+          utilization: v.total > 0 ? Math.round((v.completed / v.total) * 100) : 0,
+          hours: Math.round(v.totalMinutes / 60),
+        }))
+        .sort((a, b) => b.utilization - a.utilization);
+    },
+  });
+
+  // Procedure mix (last 30 days)
+  const { data: procedureMix } = useQuery({
+    queryKey: ["dash-procedure-mix"],
+    queryFn: async () => {
+      const thirtyDaysAgo = subDays(new Date(), 30).toISOString();
+      const { data } = await supabase
+        .from("appointments")
+        .select("treatment_id, treatments(name, category)")
+        .eq("status", "completed")
+        .gte("scheduled_at", thirtyDaysAgo)
+        .not("treatment_id", "is", null);
+      if (!data) return [];
+
+      const byTreatment: Record<string, { name: string; category: string; count: number }> = {};
+      data.forEach((a: any) => {
+        const tid = a.treatment_id;
+        if (!byTreatment[tid]) {
+          byTreatment[tid] = { name: a.treatments?.name || "Unknown", category: a.treatments?.category || "—", count: 0 };
+        }
+        byTreatment[tid].count += 1;
+      });
+      return Object.values(byTreatment).sort((a, b) => b.count - a.count).slice(0, 10);
     },
   });
 
@@ -652,6 +716,86 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         </div>
+      </div>
+
+      {/* Productivity Section */}
+      <Separator />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Provider Utilization */}
+        <Card>
+          <CardHeader className="pb-2 pt-4 px-5">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <UserCheck className="h-4 w-4 text-primary" />
+              Provider Utilization (30d)
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            {providerUtilization && providerUtilization.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Provider</TableHead>
+                    <TableHead>Completed</TableHead>
+                    <TableHead>Hours</TableHead>
+                    <TableHead>Utilization</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {providerUtilization.slice(0, 8).map((p: any) => (
+                    <TableRow key={p.id}>
+                      <TableCell className="font-medium text-xs">{p.name}</TableCell>
+                      <TableCell className="text-xs">{p.completed}/{p.total}</TableCell>
+                      <TableCell className="text-xs font-mono">{p.hours}h</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Progress value={p.utilization} className="h-1.5 w-16" />
+                          <span className="text-[10px] font-mono">{p.utilization}%</span>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <p className="text-xs text-muted-foreground py-8 text-center">No appointment data</p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Procedure Mix */}
+        <Card>
+          <CardHeader className="pb-2 pt-4 px-5">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Stethoscope className="h-4 w-4 text-primary" />
+              Procedure Mix (30d)
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-5 pb-4">
+            {procedureMix && procedureMix.length > 0 ? (
+              <div className="space-y-2">
+                {procedureMix.map((p: any, i: number) => {
+                  const maxCount = procedureMix[0]?.count || 1;
+                  const pct = Math.round((p.count / maxCount) * 100);
+                  return (
+                    <div key={i} className="flex items-center gap-3">
+                      <div className="w-32 truncate text-xs font-medium">{p.name}</div>
+                      <div className="flex-1">
+                        <div className="h-5 bg-muted rounded-sm overflow-hidden">
+                          <div className="h-full bg-primary/20 rounded-sm flex items-center px-2" style={{ width: `${pct}%` }}>
+                            <span className="text-[10px] font-mono text-foreground">{p.count}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <Badge variant="outline" className="text-[9px]">{p.category}</Badge>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground py-8 text-center">No completed procedures</p>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

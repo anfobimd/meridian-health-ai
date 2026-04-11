@@ -42,6 +42,8 @@ const navSections = [
     items: [
       { to: "/md-oversight", icon: ShieldCheck, label: "Oversight Hub" },
       { to: "/md-oversight/dashboard", icon: Activity, label: "Oversight Dashboard" },
+      { to: "/outstanding-charts", icon: FileText, label: "Outstanding Charts" },
+      { to: "/chart-completeness", icon: ClipboardCheck, label: "Completeness" },
       { to: "/churn-risk", icon: TrendingDown, label: "Churn Risk" },
     ],
   },

@@ -48,6 +48,8 @@ import ProviderCheckIn from "./pages/ProviderCheckIn";
 import Messages from "./pages/Messages";
 import ClinicHours from "./pages/ClinicHours";
 import Waitlist from "./pages/Waitlist";
+import OutstandingCharts from "./pages/OutstandingCharts";
+import ChartCompleteness from "./pages/ChartCompleteness";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -101,6 +103,8 @@ const App = () => (
                 <Route path="/md-feedback" element={<MdFeedbackInbox />} />
                 <Route path="/check-in" element={<ProviderCheckIn />} />
                 <Route path="/messages" element={<Messages />} />
+                <Route path="/outstanding-charts" element={<OutstandingCharts />} />
+                <Route path="/chart-completeness" element={<ChartCompleteness />} />
               </Route>
             </Route>
             {/* Public routes — no auth required */}
