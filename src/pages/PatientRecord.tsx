@@ -11,6 +11,7 @@ import { PhotoGallery } from "@/components/clinical-photos/PhotoGallery";
 import { PhotoUpload } from "@/components/clinical-photos/PhotoUpload";
 import { ComparisonView } from "@/components/clinical-photos/ComparisonView";
 import { TreatmentRecommendations } from "@/components/TreatmentRecommendations";
+import { CommunicationTimeline } from "@/components/front-desk/CommunicationTimeline";
 import { format, parseISO, differenceInDays } from "date-fns";
 import { useState } from "react";
 import { toast } from "@/hooks/use-toast";
@@ -181,6 +182,7 @@ export default function PatientRecord() {
           <TabsTrigger value="packages">Packages ({packagePurchases?.length ?? 0})</TabsTrigger>
           <TabsTrigger value="recommendations">AI Recs</TabsTrigger>
           <TabsTrigger value="photos">Photos</TabsTrigger>
+          <TabsTrigger value="comms">Communications</TabsTrigger>
         </TabsList>
 
         <TabsContent value="demographics">
@@ -526,6 +528,18 @@ export default function PatientRecord() {
 
         <TabsContent value="recommendations">
           <TreatmentRecommendations patientId={id!} patientName={`${patient.first_name} ${patient.last_name}`} />
+        </TabsContent>
+
+        <TabsContent value="comms">
+          <Card>
+            <CardContent className="p-6">
+              <CommunicationTimeline
+                patientId={id!}
+                patientName={`${patient.first_name} ${patient.last_name}`}
+                patientPhone={patient.phone ?? undefined}
+              />
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>

@@ -4,7 +4,7 @@ import {
   Activity, FlaskConical, FileText, Pill, DollarSign, ClipboardPlus, ShieldCheck, DoorOpen, Store, Package,
   CreditCard, TrendingUp, Calculator, MonitorCheck, Briefcase, Search, LogOut, CalendarClock, TrendingDown,
   Settings, UserCircle, CalendarOff, MessageSquare, ClipboardCheck, Mail, Clock, ListChecks,
-  Building2, BarChart3, Zap, BookOpen, Bell, CalendarDays,
+  Building2, BarChart3, Zap, BookOpen, Bell, CalendarDays, Inbox,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -20,6 +20,7 @@ const navSections = [
       { to: "/my-marketplace", icon: Store, label: "My Marketplace" },
       { to: "/md-feedback", icon: MessageSquare, label: "MD Feedback" },
       { to: "/messages", icon: Mail, label: "Messages" },
+      { to: "/patient-inbox", icon: Inbox, label: "Patient Inbox" },
       { to: "/time-off", icon: CalendarOff, label: "Time Off" },
       { to: "/my-profile", icon: UserCircle, label: "My Profile" },
       { to: "/notifications", icon: Bell, label: "Notifications" },

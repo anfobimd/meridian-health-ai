@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      aftercare_templates: {
+        Row: {
+          auto_send_hours: number | null
+          body: string
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          procedure_type: string | null
+          updated_at: string
+        }
+        Insert: {
+          auto_send_hours?: number | null
+          body: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          procedure_type?: string | null
+          updated_at?: string
+        }
+        Update: {
+          auto_send_hours?: number | null
+          body?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          procedure_type?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       ai_api_calls: {
         Row: {
           created_at: string
@@ -2734,6 +2767,8 @@ export type Database = {
       }
       patient_communication_log: {
         Row: {
+          ai_draft_reply: string | null
+          ai_intent: string | null
           appointment_id: string | null
           channel: string
           content: string | null
@@ -2741,12 +2776,17 @@ export type Database = {
           delivery_status: string | null
           direction: string
           id: string
+          is_resolved: boolean | null
           metadata: Json | null
           patient_id: string
+          resolved_at: string | null
+          resolved_by: string | null
           staff_user_id: string | null
           template_used: string | null
         }
         Insert: {
+          ai_draft_reply?: string | null
+          ai_intent?: string | null
           appointment_id?: string | null
           channel?: string
           content?: string | null
@@ -2754,12 +2794,17 @@ export type Database = {
           delivery_status?: string | null
           direction?: string
           id?: string
+          is_resolved?: boolean | null
           metadata?: Json | null
           patient_id: string
+          resolved_at?: string | null
+          resolved_by?: string | null
           staff_user_id?: string | null
           template_used?: string | null
         }
         Update: {
+          ai_draft_reply?: string | null
+          ai_intent?: string | null
           appointment_id?: string | null
           channel?: string
           content?: string | null
@@ -2767,8 +2812,11 @@ export type Database = {
           delivery_status?: string | null
           direction?: string
           id?: string
+          is_resolved?: boolean | null
           metadata?: Json | null
           patient_id?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
           staff_user_id?: string | null
           template_used?: string | null
         }
@@ -4357,6 +4405,42 @@ export type Database = {
           session_count?: number
           updated_at?: string
           valid_days?: number | null
+        }
+        Relationships: []
+      }
+      staff_notification_preferences: {
+        Row: {
+          channel: string
+          created_at: string
+          id: string
+          is_enabled: boolean
+          notification_type: string
+          quiet_hours_end: string | null
+          quiet_hours_start: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          channel?: string
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          notification_type: string
+          quiet_hours_end?: string | null
+          quiet_hours_start?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          channel?: string
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          notification_type?: string
+          quiet_hours_end?: string | null
+          quiet_hours_start?: string | null
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
