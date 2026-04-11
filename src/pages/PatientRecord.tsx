@@ -529,6 +529,18 @@ export default function PatientRecord() {
         <TabsContent value="recommendations">
           <TreatmentRecommendations patientId={id!} patientName={`${patient.first_name} ${patient.last_name}`} />
         </TabsContent>
+
+        <TabsContent value="comms">
+          <Card>
+            <CardContent className="p-6">
+              <CommunicationTimeline
+                patientId={id!}
+                patientName={`${patient.first_name} ${patient.last_name}`}
+                patientPhone={patient.phone ?? undefined}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
     </div>
   );
