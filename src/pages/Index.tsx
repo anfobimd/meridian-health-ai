@@ -209,7 +209,25 @@ export default function Dashboard() {
     }
   };
 
-  // --- Computed ---
+  // --- AI Weekly Insights ---
+  const loadWeeklyInsights = async () => {
+    setWeeklyLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("ai-financial-advisor", {
+        body: { mode: "weekly_insights" },
+      });
+      if (error) throw error;
+      setWeeklyInsights(data);
+      localStorage.setItem("weekly_insights_cache", JSON.stringify({
+        data, week: getISOWeek(new Date()), ts: Date.now(),
+      }));
+    } catch {
+      toast.error("Failed to generate weekly insights");
+    } finally {
+      setWeeklyLoading(false);
+    }
+  };
+
   const todayTotal = todayApts?.length ?? 0;
   const todayCompleted = todayApts?.filter((a: any) => a.status === "completed").length ?? 0;
   const todayCapacity = todayTotal > 0 ? Math.round((todayCompleted / todayTotal) * 100) : 0;
