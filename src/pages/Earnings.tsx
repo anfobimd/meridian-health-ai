@@ -308,6 +308,14 @@ export default function Earnings() {
         </CardContent>
       </Card>
 
+      {/* A/R Aging (US-A021) */}
+      {(() => {
+        const now = new Date();
+        const aging = { current: 0, d30: 0, d60: 0, d90: 0, over90: 0 };
+        // We'll fetch inline — but for now show the section structure
+        return null; // A/R aging is in the Reports page
+      })()}
+
       {/* Provider Table */}
       <Card>
         <CardHeader><CardTitle className="text-sm">Per-Provider Breakdown</CardTitle></CardHeader>
