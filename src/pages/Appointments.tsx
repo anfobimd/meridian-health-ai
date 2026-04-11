@@ -207,6 +207,9 @@ export default function Appointments() {
 
   const CANCEL_REASONS = ["Patient request", "Schedule conflict", "Provider unavailable", "Weather/emergency", "Insurance issue", "No reason given", "Other"];
 
+  const [waitlistMatches, setWaitlistMatches] = useState<any>(null);
+  const [loadingMatches, setLoadingMatches] = useState(false);
+
   const cancelAppointment = useMutation({
     mutationFn: async () => {
       if (!selectedApt) return;
@@ -216,11 +219,37 @@ export default function Appointments() {
         cancelled_at: new Date().toISOString(),
       }).eq("id", selectedApt.id);
       if (error) throw error;
+      // Increment late_cancel_count if within 24h
+      const aptTime = new Date(selectedApt.scheduled_at).getTime();
+      if (aptTime - Date.now() < 24 * 3600000 && selectedApt.patients?.id) {
+        await supabase.from("patients").update({
+          late_cancel_count: (selectedApt.patients.late_cancel_count || 0) + 1,
+        } as any).eq("id", selectedApt.patients.id);
+      }
+      // Check waitlist for matches
+      setLoadingMatches(true);
+      try {
+        const { data } = await supabase.functions.invoke("ai-smart-schedule", {
+          body: {
+            mode: "cancellation_match",
+            data: {
+              provider_id: selectedApt.provider_id,
+              treatment_id: selectedApt.treatment_id,
+              scheduled_at: selectedApt.scheduled_at,
+              duration_minutes: selectedApt.duration_minutes,
+            },
+          },
+        });
+        if (data?.matches?.length > 0) setWaitlistMatches(data);
+      } catch { /* non-fatal */ }
+      setLoadingMatches(false);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["appointments"] });
-      setCancelDialogOpen(false);
-      setCancelReason("");
+      if (!waitlistMatches) {
+        setCancelDialogOpen(false);
+        setCancelReason("");
+      }
       toast.success("Appointment cancelled");
     },
   });
@@ -659,6 +688,24 @@ export default function Appointments() {
             <Button variant="destructive" className="w-full" onClick={() => cancelAppointment.mutate()} disabled={cancelAppointment.isPending}>
               {cancelAppointment.isPending ? "Cancelling..." : "Confirm Cancellation"}
             </Button>
+            {loadingMatches && <p className="text-xs text-muted-foreground text-center">Checking waitlist for matches...</p>}
+            {waitlistMatches?.matches?.length > 0 && (
+              <div className="mt-3 space-y-2 border-t pt-3">
+                <p className="text-xs font-medium text-primary flex items-center gap-1"><Sparkles className="h-3 w-3" />Waitlist Matches for This Slot</p>
+                {waitlistMatches.matches.slice(0, 3).map((m: any, i: number) => (
+                  <div key={i} className="p-2 bg-primary/5 rounded border border-primary/20 text-xs">
+                    <div className="flex justify-between"><span className="font-medium">{m.patient_name}</span><Badge variant="outline" className="text-[9px]">{m.fit_score}%</Badge></div>
+                    <p className="text-muted-foreground mt-0.5">{m.reason}</p>
+                  </div>
+                ))}
+                {waitlistMatches.sms_draft && (
+                  <p className="text-[10px] text-muted-foreground italic">SMS draft: "{waitlistMatches.sms_draft}"</p>
+                )}
+                <Button size="sm" variant="outline" className="w-full text-xs" onClick={() => { setCancelDialogOpen(false); setCancelReason(""); setWaitlistMatches(null); }}>
+                  Done
+                </Button>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>
