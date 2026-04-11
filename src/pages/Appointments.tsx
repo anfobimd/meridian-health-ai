@@ -8,7 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Calendar, Sparkles, Loader2, DoorOpen, Cpu, AlertTriangle, Brain, Clock, Check } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Plus, Calendar, Sparkles, Loader2, DoorOpen, Cpu, AlertTriangle, Brain, Clock, Check, XCircle, Ban } from "lucide-react";
 import { toast } from "sonner";
 import { format, parseISO, addMinutes } from "date-fns";
 import { Calendar as CalendarWidget } from "@/components/ui/calendar";
@@ -28,6 +29,8 @@ export default function Appointments() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [soapDialogOpen, setSoapDialogOpen] = useState(false);
   const [roomingDialogOpen, setRoomingDialogOpen] = useState(false);
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
   const [selectedApt, setSelectedApt] = useState<any>(null);
   const [soapNote, setSoapNote] = useState<any>(null);
   const [generatingNote, setGeneratingNote] = useState(false);
@@ -199,6 +202,40 @@ export default function Appointments() {
       setRoomingDialogOpen(false);
       setAiSuggestion(null);
       toast.success("Status updated");
+    },
+  });
+
+  const CANCEL_REASONS = ["Patient request", "Schedule conflict", "Provider unavailable", "Weather/emergency", "Insurance issue", "No reason given", "Other"];
+
+  const cancelAppointment = useMutation({
+    mutationFn: async () => {
+      if (!selectedApt) return;
+      const { error } = await supabase.from("appointments").update({
+        status: "cancelled",
+        cancellation_reason: cancelReason || "No reason given",
+        cancelled_at: new Date().toISOString(),
+      }).eq("id", selectedApt.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["appointments"] });
+      setCancelDialogOpen(false);
+      setCancelReason("");
+      toast.success("Appointment cancelled");
+    },
+  });
+
+  const markNoShow = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("appointments").update({
+        status: "no_show",
+        cancellation_reason: "No-show",
+      }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["appointments"] });
+      toast.success("Marked as no-show");
     },
   });
 
@@ -597,6 +634,35 @@ export default function Appointments() {
         </DialogContent>
       </Dialog>
 
+      {/* Cancel Dialog */}
+      <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <XCircle className="h-5 w-5 text-destructive" />
+              Cancel Appointment
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              {selectedApt && `${selectedApt.patients?.first_name} ${selectedApt.patients?.last_name} — ${selectedApt.treatments?.name ?? "General"}`}
+            </p>
+            <div className="space-y-2">
+              <Label>Cancellation Reason</Label>
+              <Select value={cancelReason} onValueChange={setCancelReason}>
+                <SelectTrigger><SelectValue placeholder="Select reason" /></SelectTrigger>
+                <SelectContent>
+                  {CANCEL_REASONS.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button variant="destructive" className="w-full" onClick={() => cancelAppointment.mutate()} disabled={cancelAppointment.isPending}>
+              {cancelAppointment.isPending ? "Cancelling..." : "Confirm Cancellation"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {isLoading ? (
         <div className="space-y-3">{[1,2,3].map(i => <Card key={i} className="animate-pulse"><CardContent className="p-6 h-20" /></Card>)}</div>
       ) : appointments && appointments.length > 0 ? (
@@ -625,11 +691,23 @@ export default function Appointments() {
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
+                <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
                   {apt.status === "completed" && (
                     <Button size="sm" variant="outline" className="text-xs gap-1" onClick={() => generateSoapNote(apt)}>
                       <Sparkles className="h-3 w-3" /> Generate Note
                     </Button>
+                  )}
+                  {!["cancelled", "no_show", "completed"].includes(apt.status) && (
+                    <>
+                      <Button size="sm" variant="ghost" className="text-xs text-destructive" onClick={() => { setSelectedApt(apt); setCancelDialogOpen(true); setCancelReason(""); }}>
+                        <XCircle className="h-3 w-3 mr-1" />Cancel
+                      </Button>
+                      {apt.status === "booked" && (
+                        <Button size="sm" variant="ghost" className="text-xs text-destructive" onClick={() => markNoShow.mutate(apt.id)}>
+                          <Ban className="h-3 w-3 mr-1" />No-Show
+                        </Button>
+                      )}
+                    </>
                   )}
                   {nextStatus(apt.status) && (
                     <Button size="sm" variant="ghost" className="text-xs" onClick={() => handleNextStatus(apt)}>
@@ -639,6 +717,9 @@ export default function Appointments() {
                   <Badge variant="secondary" className={statusColors[apt.status] ?? ""}>
                     {apt.status.replace("_", " ")}
                   </Badge>
+                  {apt.cancellation_reason && apt.status === "cancelled" && (
+                    <span className="text-[10px] text-muted-foreground italic">{apt.cancellation_reason}</span>
+                  )}
                 </div>
               </CardContent>
             </Card>

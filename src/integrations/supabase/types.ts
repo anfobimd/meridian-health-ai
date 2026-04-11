@@ -428,6 +428,8 @@ export type Database = {
       }
       appointments: {
         Row: {
+          cancellation_reason: string | null
+          cancelled_at: string | null
           checked_in_at: string | null
           completed_at: string | null
           created_at: string
@@ -445,6 +447,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
           checked_in_at?: string | null
           completed_at?: string | null
           created_at?: string
@@ -462,6 +466,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
           checked_in_at?: string | null
           completed_at?: string | null
           created_at?: string
@@ -863,6 +869,66 @@ export type Database = {
           name?: string
           updated_at?: string
           usage_count?: number | null
+        }
+        Relationships: []
+      }
+      clinic_holidays: {
+        Row: {
+          close_time: string | null
+          created_at: string
+          holiday_date: string
+          id: string
+          is_full_day: boolean
+          name: string
+          open_time: string | null
+        }
+        Insert: {
+          close_time?: string | null
+          created_at?: string
+          holiday_date: string
+          id?: string
+          is_full_day?: boolean
+          name: string
+          open_time?: string | null
+        }
+        Update: {
+          close_time?: string | null
+          created_at?: string
+          holiday_date?: string
+          id?: string
+          is_full_day?: boolean
+          name?: string
+          open_time?: string | null
+        }
+        Relationships: []
+      }
+      clinic_hours: {
+        Row: {
+          close_time: string
+          created_at: string
+          day_of_week: number
+          id: string
+          is_closed: boolean
+          open_time: string
+          updated_at: string
+        }
+        Insert: {
+          close_time?: string
+          created_at?: string
+          day_of_week: number
+          id?: string
+          is_closed?: boolean
+          open_time?: string
+          updated_at?: string
+        }
+        Update: {
+          close_time?: string
+          created_at?: string
+          day_of_week?: number
+          id?: string
+          is_closed?: boolean
+          open_time?: string
+          updated_at?: string
         }
         Relationships: []
       }
