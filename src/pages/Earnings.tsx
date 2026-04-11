@@ -255,6 +255,59 @@ export default function Earnings() {
         </Card>
       </div>
 
+      {/* Procedure-Level Breakdown (US-025) */}
+      <Card>
+        <CardHeader><CardTitle className="text-sm">Procedure-Level Revenue</CardTitle></CardHeader>
+        <CardContent>
+          {earnings.length === 0 ? (
+            <p className="text-center text-muted-foreground py-8">No earnings data yet</p>
+          ) : (() => {
+            const byProcedure = earnings.reduce((acc: Record<string, any>, e) => {
+              const key = e.treatments?.name || e.modality || "Unknown";
+              if (!acc[key]) acc[key] = { name: key, sessions: 0, gross: 0, net: 0, cogs: 0, units: 0, minutes: 0 };
+              acc[key].sessions += 1;
+              acc[key].gross += e.gross_revenue || 0;
+              acc[key].net += e.net_revenue || 0;
+              acc[key].cogs += e.cogs || 0;
+              acc[key].units += e.units_used || 0;
+              acc[key].minutes += e.time_minutes || 0;
+              return acc;
+            }, {});
+            const procRows = Object.values(byProcedure).sort((a: any, b: any) => b.net - a.net);
+            return (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Procedure</TableHead>
+                    <TableHead>Sessions</TableHead>
+                    <TableHead>Units</TableHead>
+                    <TableHead>Gross</TableHead>
+                    <TableHead>COGS</TableHead>
+                    <TableHead>Net</TableHead>
+                    <TableHead>Avg $/session</TableHead>
+                    <TableHead>Hours</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {procRows.map((r: any) => (
+                    <TableRow key={r.name}>
+                      <TableCell className="font-medium">{r.name}</TableCell>
+                      <TableCell>{r.sessions}</TableCell>
+                      <TableCell>{r.units || "—"}</TableCell>
+                      <TableCell className="font-mono">${r.gross.toLocaleString()}</TableCell>
+                      <TableCell className="font-mono text-destructive">${r.cogs.toLocaleString()}</TableCell>
+                      <TableCell className="font-mono font-bold">${r.net.toLocaleString()}</TableCell>
+                      <TableCell className="font-mono">${r.sessions > 0 ? (r.net / r.sessions).toFixed(0) : 0}</TableCell>
+                      <TableCell>{(r.minutes / 60).toFixed(1)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            );
+          })()}
+        </CardContent>
+      </Card>
+
       {/* Provider Table */}
       <Card>
         <CardHeader><CardTitle className="text-sm">Per-Provider Breakdown</CardTitle></CardHeader>

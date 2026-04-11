@@ -44,6 +44,7 @@ import TemplateManager from "./pages/TemplateManager";
 import TimeOff from "./pages/TimeOff";
 import MdFeedbackInbox from "./pages/MdFeedbackInbox";
 import ProviderCheckIn from "./pages/ProviderCheckIn";
+import Messages from "./pages/Messages";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -93,6 +94,7 @@ const App = () => (
                 <Route path="/time-off" element={<TimeOff />} />
                 <Route path="/md-feedback" element={<MdFeedbackInbox />} />
                 <Route path="/check-in" element={<ProviderCheckIn />} />
+                <Route path="/messages" element={<Messages />} />
               </Route>
             </Route>
             {/* Public routes — no auth required */}
