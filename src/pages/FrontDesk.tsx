@@ -1,18 +1,19 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { format, parseISO, differenceInMinutes, isToday } from "date-fns";
+import { format } from "date-fns";
+import { QueueCard } from "@/components/front-desk/QueueCard";
 import {
   UserPlus, CheckCircle2, DoorOpen, Play, Flag, Clock, Users,
-  ArrowRight, Loader2, Sparkles, AlertTriangle, Search, RefreshCw,
+  Loader2, AlertTriangle, Search, RefreshCw, Sparkles,
 } from "lucide-react";
 
 type QueueStatus = "booked" | "checked_in" | "roomed" | "in_progress" | "completed" | "no_show" | "cancelled";
@@ -25,22 +26,11 @@ const QUEUE_COLUMNS: { status: QueueStatus; label: string; icon: React.ElementTy
   { status: "completed", label: "Completed", icon: CheckCircle2, color: "border-t-success" },
 ];
 
-const statusBadgeClass: Record<string, string> = {
-  booked: "bg-primary/10 text-primary",
-  checked_in: "bg-warning/10 text-warning",
-  roomed: "bg-info/10 text-info",
-  in_progress: "bg-accent/10 text-accent-foreground",
-  completed: "bg-success/10 text-success",
-  no_show: "bg-destructive/10 text-destructive",
-  cancelled: "bg-muted text-muted-foreground",
-};
-
 export default function FrontDesk() {
   const queryClient = useQueryClient();
   const [walkinOpen, setWalkinOpen] = useState(false);
   const [search, setSearch] = useState("");
 
-  // Today's appointments
   const { data: appointments, isLoading } = useQuery({
     queryKey: ["frontdesk-today"],
     queryFn: async () => {
@@ -49,14 +39,14 @@ export default function FrontDesk() {
       const end = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1).toISOString();
       const { data, error } = await supabase
         .from("appointments")
-        .select("*, patients(id, first_name, last_name, date_of_birth, phone), providers(id, first_name, last_name), treatments(id, name, duration_minutes), rooms:room_id(id, name)")
+        .select("*, patients(id, first_name, last_name, date_of_birth, phone, no_show_count), providers(id, first_name, last_name), treatments(id, name, duration_minutes), rooms:room_id(id, name)")
         .gte("scheduled_at", start)
         .lt("scheduled_at", end)
         .order("scheduled_at", { ascending: true });
       if (error) throw error;
       return data ?? [];
     },
-    refetchInterval: 15000, // auto-refresh every 15s
+    refetchInterval: 15000,
   });
 
   const { data: patients } = useQuery({
@@ -92,8 +82,16 @@ export default function FrontDesk() {
 
   const markNoShow = useMutation({
     mutationFn: async (id: string) => {
+      // Get patient_id first
+      const apt = appointments?.find((a: any) => a.id === id);
       const { error } = await supabase.from("appointments").update({ status: "no_show" as any }).eq("id", id);
       if (error) throw error;
+      // Increment no-show counter
+      if (apt?.patients?.id) {
+        await supabase.from("patients").update({
+          no_show_count: (apt.patients.no_show_count || 0) + 1,
+        }).eq("id", apt.patients.id);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["frontdesk-today"] });
@@ -101,12 +99,10 @@ export default function FrontDesk() {
     },
   });
 
-  // Walk-in: create patient + appointment in one step
   const createWalkin = useMutation({
     mutationFn: async (formData: FormData) => {
       const existingId = formData.get("existing_patient_id") as string;
       let patientId = existingId;
-
       if (!existingId) {
         const { data: newPatient, error: patErr } = await supabase.from("patients").insert({
           first_name: formData.get("first_name") as string,
@@ -117,7 +113,6 @@ export default function FrontDesk() {
         if (patErr) throw patErr;
         patientId = newPatient.id;
       }
-
       const { error } = await supabase.from("appointments").insert({
         patient_id: patientId,
         scheduled_at: new Date().toISOString(),
@@ -138,24 +133,6 @@ export default function FrontDesk() {
     onError: () => toast.error("Failed to create walk-in"),
   });
 
-  const nextAction = (status: string): { label: string; nextStatus: string; icon: React.ElementType } | null => {
-    const map: Record<string, { label: string; nextStatus: string; icon: React.ElementType }> = {
-      booked: { label: "Check In", nextStatus: "checked_in", icon: CheckCircle2 },
-      checked_in: { label: "Room", nextStatus: "roomed", icon: DoorOpen },
-      roomed: { label: "Start", nextStatus: "in_progress", icon: Play },
-      in_progress: { label: "Complete", nextStatus: "completed", icon: Flag },
-    };
-    return map[status] || null;
-  };
-
-  const getWaitTime = (apt: any): string | null => {
-    if (apt.status === "checked_in" && apt.checked_in_at) {
-      const mins = differenceInMinutes(new Date(), parseISO(apt.checked_in_at));
-      return `${mins}m`;
-    }
-    return null;
-  };
-
   const filtered = appointments?.filter((apt: any) => {
     if (!search) return true;
     const q = search.toLowerCase();
@@ -163,20 +140,12 @@ export default function FrontDesk() {
     return name.includes(q) || apt.treatments?.name?.toLowerCase().includes(q);
   }) ?? [];
 
-  // KPI stats
   const stats = {
     total: filtered.length,
     waiting: filtered.filter((a: any) => a.status === "checked_in").length,
     completed: filtered.filter((a: any) => a.status === "completed").length,
     noShow: filtered.filter((a: any) => a.status === "no_show").length,
   };
-
-  const avgWait = (() => {
-    const waitingApts = filtered.filter((a: any) => a.status === "checked_in" && a.checked_in_at);
-    if (!waitingApts.length) return 0;
-    const total = waitingApts.reduce((sum: number, a: any) => sum + differenceInMinutes(new Date(), parseISO(a.checked_in_at)), 0);
-    return Math.round(total / waitingApts.length);
-  })();
 
   return (
     <div className="space-y-5">
@@ -191,12 +160,7 @@ export default function FrontDesk() {
         <div className="flex items-center gap-2">
           <div className="relative">
             <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
-            <Input
-              placeholder="Search patients..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-8 h-9 w-48"
-            />
+            <Input placeholder="Search patients..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-8 h-9 w-48" />
           </div>
           <Button variant="outline" size="sm" onClick={() => queryClient.invalidateQueries({ queryKey: ["frontdesk-today"] })}>
             <RefreshCw className="h-3.5 w-3.5" />
@@ -246,37 +210,25 @@ export default function FrontDesk() {
         <Card className="p-3">
           <div className="flex items-center gap-2">
             <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center"><Users className="h-4 w-4 text-primary" /></div>
-            <div>
-              <p className="text-[10px] text-muted-foreground font-medium uppercase">Total</p>
-              <p className="text-lg font-bold">{stats.total}</p>
-            </div>
+            <div><p className="text-[10px] text-muted-foreground font-medium uppercase">Total</p><p className="text-lg font-bold">{stats.total}</p></div>
           </div>
         </Card>
         <Card className="p-3">
           <div className="flex items-center gap-2">
             <div className="h-8 w-8 rounded-lg bg-warning/10 flex items-center justify-center"><Clock className="h-4 w-4 text-warning" /></div>
-            <div>
-              <p className="text-[10px] text-muted-foreground font-medium uppercase">Waiting</p>
-              <p className="text-lg font-bold">{stats.waiting} <span className="text-xs font-normal text-muted-foreground">{avgWait > 0 && `(~${avgWait}m avg)`}</span></p>
-            </div>
+            <div><p className="text-[10px] text-muted-foreground font-medium uppercase">Waiting</p><p className="text-lg font-bold">{stats.waiting}</p></div>
           </div>
         </Card>
         <Card className="p-3">
           <div className="flex items-center gap-2">
             <div className="h-8 w-8 rounded-lg bg-success/10 flex items-center justify-center"><CheckCircle2 className="h-4 w-4 text-success" /></div>
-            <div>
-              <p className="text-[10px] text-muted-foreground font-medium uppercase">Completed</p>
-              <p className="text-lg font-bold">{stats.completed}</p>
-            </div>
+            <div><p className="text-[10px] text-muted-foreground font-medium uppercase">Completed</p><p className="text-lg font-bold">{stats.completed}</p></div>
           </div>
         </Card>
         <Card className="p-3">
           <div className="flex items-center gap-2">
             <div className="h-8 w-8 rounded-lg bg-destructive/10 flex items-center justify-center"><AlertTriangle className="h-4 w-4 text-destructive" /></div>
-            <div>
-              <p className="text-[10px] text-muted-foreground font-medium uppercase">No-Show</p>
-              <p className="text-lg font-bold">{stats.noShow}</p>
-            </div>
+            <div><p className="text-[10px] text-muted-foreground font-medium uppercase">No-Show</p><p className="text-lg font-bold">{stats.noShow}</p></div>
           </div>
         </Card>
       </div>
@@ -299,60 +251,14 @@ export default function FrontDesk() {
                   {colApts.length === 0 && (
                     <p className="text-[11px] text-muted-foreground/50 text-center py-6">No patients</p>
                   )}
-                  {colApts.map((apt: any) => {
-                    const action = nextAction(apt.status);
-                    const waitTime = getWaitTime(apt);
-                    return (
-                      <Card key={apt.id} className="shadow-sm">
-                        <CardContent className="p-3 space-y-2">
-                          <div className="flex items-start justify-between">
-                            <div>
-                              <p className="font-medium text-sm leading-tight">
-                                {apt.patients?.first_name} {apt.patients?.last_name}
-                              </p>
-                              <p className="text-[11px] text-muted-foreground">
-                                {format(parseISO(apt.scheduled_at), "h:mm a")}
-                                {apt.treatments?.name && ` · ${apt.treatments.name}`}
-                              </p>
-                            </div>
-                            {waitTime && (
-                              <Badge variant="outline" className="text-[10px] text-warning border-warning/30">
-                                <Clock className="h-2.5 w-2.5 mr-0.5" />{waitTime}
-                              </Badge>
-                            )}
-                          </div>
-                          {apt.providers && (
-                            <p className="text-[10px] text-muted-foreground">Dr. {apt.providers.last_name}</p>
-                          )}
-                          {apt.rooms && (
-                            <p className="text-[10px] text-muted-foreground">Room: {apt.rooms.name}</p>
-                          )}
-                          <div className="flex flex-wrap gap-1.5">
-                            {action && (
-                              <Button
-                                size="sm"
-                                variant="default"
-                                className="h-7 text-[11px] flex-1"
-                                onClick={() => updateStatus.mutate({ id: apt.id, status: action.nextStatus })}
-                              >
-                                <action.icon className="h-3 w-3 mr-1" />{action.label}
-                              </Button>
-                            )}
-                            {apt.status === "booked" && (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-7 text-[11px] text-destructive"
-                                onClick={() => markNoShow.mutate(apt.id)}
-                              >
-                                No-Show
-                              </Button>
-                            )}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
+                  {colApts.map((apt: any) => (
+                    <QueueCard
+                      key={apt.id}
+                      apt={apt}
+                      onStatusChange={(id, status) => updateStatus.mutate({ id, status })}
+                      onNoShow={(id) => markNoShow.mutate(id)}
+                    />
+                  ))}
                 </div>
               </div>
             );
