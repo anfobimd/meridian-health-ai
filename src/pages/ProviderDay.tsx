@@ -72,7 +72,7 @@ export default function ProviderDay() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("appointments")
-        .select("*, patients(id, first_name, last_name, date_of_birth, gender, allergies, medications, phone, last_visit_at), treatments(id, name, duration_minutes, category), rooms:room_id(id, name)")
+        .select("*, patients(id, first_name, last_name, date_of_birth, gender, allergies, medications, phone), treatments(id, name, duration_minutes, category), rooms:room_id(id, name)")
         .eq("provider_id", myProviderId!)
         .gte("scheduled_at", todayStart)
         .lt("scheduled_at", todayEnd)
@@ -264,26 +264,26 @@ export default function ProviderDay() {
           title="Patients Today"
           value={totalApts}
           icon={Calendar}
-          description={`${completedApts.length} completed`}
+          trend={`${completedApts.length} completed`}
         />
         <StatCard
           title="Completed"
           value={completedApts.length}
           icon={CheckCircle2}
-          description={`of ${totalApts}`}
+          trend={`of ${totalApts}`}
         />
         <StatCard
           title="Overdue Charts"
           value={overdueCharts?.length ?? 0}
           icon={ClipboardList}
-          description="unsigned from prior days"
+          trend="unsigned from prior days"
           className={overdueCharts?.length ? "border-destructive/30" : ""}
         />
         <StatCard
           title="MD Corrections"
           value={pendingCorrections?.length ?? 0}
           icon={MessageSquare}
-          description="action required"
+          trend="action required"
           className={pendingCorrections?.length ? "border-warning/30" : ""}
         />
       </div>
