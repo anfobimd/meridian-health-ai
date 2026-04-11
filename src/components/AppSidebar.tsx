@@ -22,6 +22,7 @@ const navSections = [
       { to: "/messages", icon: Mail, label: "Messages" },
       { to: "/time-off", icon: CalendarOff, label: "Time Off" },
       { to: "/my-profile", icon: UserCircle, label: "My Profile" },
+      { to: "/notifications", icon: Bell, label: "Notifications" },
       { to: "/settings", icon: Settings, label: "Settings" },
     ],
   },
