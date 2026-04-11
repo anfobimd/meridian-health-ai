@@ -11,7 +11,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Plus, Clock, CalendarOff, Trash2, CalendarIcon } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Plus, Clock, CalendarOff, Trash2, CalendarIcon, Sparkles, Loader2, AlertTriangle, TrendingUp, TrendingDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -21,6 +22,8 @@ const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", 
 export default function ClinicHours() {
   const [holidayDialogOpen, setHolidayDialogOpen] = useState(false);
   const [holidayDate, setHolidayDate] = useState<Date | undefined>();
+  const [aiAnalysis, setAiAnalysis] = useState<any>(null);
+  const [aiLoading, setAiLoading] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: hours, isLoading } = useQuery({
@@ -46,26 +49,20 @@ export default function ClinicHours() {
       const { error } = await supabase.from("clinic_hours").update(updates).eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["clinic-hours"] });
-      toast.success("Hours updated");
-    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["clinic-hours"] }); toast.success("Hours updated"); },
   });
 
   const addHoliday = useMutation({
     mutationFn: async (formData: FormData) => {
       if (!holidayDate) throw new Error("Date required");
       const { error } = await supabase.from("clinic_holidays").insert({
-        name: formData.get("name") as string,
-        holiday_date: format(holidayDate, "yyyy-MM-dd"),
-        is_full_day: true,
+        name: formData.get("name") as string, holiday_date: format(holidayDate, "yyyy-MM-dd"), is_full_day: true,
       });
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["clinic-holidays"] });
-      setHolidayDialogOpen(false);
-      setHolidayDate(undefined);
+      setHolidayDialogOpen(false); setHolidayDate(undefined);
       toast.success("Holiday added");
     },
     onError: (e: any) => toast.error(e.message?.includes("duplicate") ? "Date already added" : "Failed to add"),
@@ -76,18 +73,103 @@ export default function ClinicHours() {
       const { error } = await supabase.from("clinic_holidays").delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["clinic-holidays"] });
-      toast.success("Holiday removed");
-    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["clinic-holidays"] }); toast.success("Holiday removed"); },
   });
+
+  // ─── AI: Hours Analysis ───
+  const analyzeHours = async () => {
+    setAiLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("ai-catalog-advisor", {
+        body: { mode: "hours_analysis" },
+      });
+      if (error) throw error;
+      setAiAnalysis(data);
+    } catch { toast.error("AI analysis failed"); }
+    setAiLoading(false);
+  };
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Clinic Hours & Closures</h1>
-        <p className="text-muted-foreground">Configure operating hours and holiday schedule</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">Clinic Hours & Closures</h1>
+          <p className="text-muted-foreground">Configure operating hours and holiday schedule</p>
+        </div>
+        <Button variant="outline" size="sm" onClick={analyzeHours} disabled={aiLoading}>
+          {aiLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Sparkles className="h-3.5 w-3.5 mr-1.5" />}
+          AI Hours Analysis
+        </Button>
       </div>
+
+      {/* AI Analysis Panel */}
+      {aiAnalysis && (
+        <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-transparent">
+          <CardContent className="p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-primary" />
+                <span className="text-sm font-semibold">AI Hours Optimization</span>
+                {aiAnalysis.overall_score != null && (
+                  <div className="flex items-center gap-2 ml-2">
+                    <Progress value={aiAnalysis.overall_score} className="h-2 w-20" />
+                    <span className="text-xs font-mono">{aiAnalysis.overall_score}/100</span>
+                  </div>
+                )}
+              </div>
+              <Button variant="ghost" size="sm" className="text-xs h-6" onClick={() => setAiAnalysis(null)}>Dismiss</Button>
+            </div>
+            <p className="text-sm">{aiAnalysis.summary}</p>
+
+            {aiAnalysis.underutilized_windows?.length > 0 && (
+              <div>
+                <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1.5">Underutilized Windows</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {aiAnalysis.underutilized_windows.map((w: any, i: number) => (
+                    <div key={i} className="p-2.5 rounded-lg border bg-muted/30 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium">{w.day} · {w.time_range}</span>
+                        <div className="flex items-center gap-1">
+                          <TrendingDown className="h-3 w-3 text-warning" />
+                          <span className="text-warning font-mono">{w.utilization_pct}%</span>
+                        </div>
+                      </div>
+                      <p className="text-muted-foreground mt-1">{w.recommendation}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {aiAnalysis.coverage_gaps?.length > 0 && (
+              <div>
+                <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1.5">Coverage Gaps</p>
+                <div className="space-y-1.5">
+                  {aiAnalysis.coverage_gaps.map((g: any, i: number) => (
+                    <div key={i} className="flex items-center justify-between p-2 rounded border border-destructive/20 bg-destructive/5 text-xs">
+                      <div>
+                        <span className="font-medium">{g.day}{g.time_range ? ` · ${g.time_range}` : ""}</span>
+                        <Badge variant="outline" className="ml-2 text-[8px]">{g.demand_level} demand</Badge>
+                      </div>
+                      <span className="text-muted-foreground">{g.recommendation}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {aiAnalysis.closure_warnings?.length > 0 && (
+              <div className="space-y-1">
+                {aiAnalysis.closure_warnings.map((w: string, i: number) => (
+                  <div key={i} className="flex items-start gap-2 text-xs text-warning">
+                    <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />{w}
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Tabs defaultValue="hours">
         <TabsList>
@@ -115,34 +197,17 @@ export default function ClinicHours() {
                         <span className="text-sm font-medium">{DAYS[h.day_of_week]}</span>
                       </div>
                       <label className="flex items-center gap-2 text-sm cursor-pointer">
-                        <Switch
-                          checked={!h.is_closed}
-                          onCheckedChange={(open) => updateHours.mutate({ id: h.id, is_closed: !open })}
-                        />
+                        <Switch checked={!h.is_closed} onCheckedChange={(open) => updateHours.mutate({ id: h.id, is_closed: !open })} />
                         <span className="text-xs text-muted-foreground">{h.is_closed ? "Closed" : "Open"}</span>
                       </label>
                       {!h.is_closed && (
                         <div className="flex items-center gap-2 flex-1">
-                          <Input
-                            type="time"
-                            value={h.open_time}
-                            onChange={(e) => updateHours.mutate({ id: h.id, open_time: e.target.value })}
-                            className="w-32 text-sm"
-                          />
+                          <Input type="time" value={h.open_time} onChange={(e) => updateHours.mutate({ id: h.id, open_time: e.target.value })} className="w-32 text-sm" />
                           <span className="text-xs text-muted-foreground">to</span>
-                          <Input
-                            type="time"
-                            value={h.close_time}
-                            onChange={(e) => updateHours.mutate({ id: h.id, close_time: e.target.value })}
-                            className="w-32 text-sm"
-                          />
+                          <Input type="time" value={h.close_time} onChange={(e) => updateHours.mutate({ id: h.id, close_time: e.target.value })} className="w-32 text-sm" />
                         </div>
                       )}
-                      {h.is_closed && (
-                        <Badge variant="outline" className="text-muted-foreground">
-                          <CalendarOff className="h-3 w-3 mr-1" /> Closed
-                        </Badge>
-                      )}
+                      {h.is_closed && <Badge variant="outline" className="text-muted-foreground"><CalendarOff className="h-3 w-3 mr-1" /> Closed</Badge>}
                     </div>
                   ))}
                 </div>
@@ -164,26 +229,17 @@ export default function ClinicHours() {
                 <DialogContent>
                   <DialogHeader><DialogTitle>Add Holiday Closure</DialogTitle></DialogHeader>
                   <form onSubmit={(e) => { e.preventDefault(); addHoliday.mutate(new FormData(e.currentTarget)); }} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>Holiday Name *</Label>
-                      <Input name="name" required placeholder="e.g. New Year's Day" />
-                    </div>
+                    <div className="space-y-2"><Label>Holiday Name *</Label><Input name="name" required placeholder="e.g. New Year's Day" /></div>
                     <div className="space-y-2">
                       <Label>Date *</Label>
                       <Popover>
                         <PopoverTrigger asChild>
                           <Button variant="outline" className={cn("w-full justify-start text-left", !holidayDate && "text-muted-foreground")}>
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {holidayDate ? format(holidayDate, "PPP") : "Pick a date"}
+                            <CalendarIcon className="mr-2 h-4 w-4" />{holidayDate ? format(holidayDate, "PPP") : "Pick a date"}
                           </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={holidayDate}
-                            onSelect={setHolidayDate}
-                            className={cn("p-3 pointer-events-auto")}
-                          />
+                          <Calendar mode="single" selected={holidayDate} onSelect={setHolidayDate} className={cn("p-3 pointer-events-auto")} />
                         </PopoverContent>
                       </Popover>
                     </div>
