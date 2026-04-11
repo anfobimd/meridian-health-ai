@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,15 +7,21 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Save, UserCircle, Plus, X } from "lucide-react";
+import { Loader2, Save, UserCircle, Plus, X, Upload, Sparkles, CheckCircle2, AlertCircle } from "lucide-react";
 
 export default function ProviderProfile() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [aiDrafting, setAiDrafting] = useState(false);
   const [provider, setProvider] = useState<any>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   const [bio, setBio] = useState("");
   const [specialty, setSpecialty] = useState("");
@@ -29,9 +35,9 @@ export default function ProviderProfile() {
 
   useEffect(() => {
     if (!user) return;
-    const fetch = async () => {
+    const fetchProvider = async () => {
       setLoading(true);
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from("providers")
         .select("*")
         .eq("user_id", user.id)
@@ -46,11 +52,22 @@ export default function ProviderProfile() {
         setNpi(data.npi || "");
         setMarketplaceBio(data.marketplace_bio || "");
         setModalities(data.modalities || []);
+        setAvatarUrl(data.avatar_url || null);
       }
       setLoading(false);
     };
-    fetch();
+    fetchProvider();
   }, [user]);
+
+  const completeness = useMemo(() => {
+    const fields = [bio, specialty, credentials, phone, licenseNumber, npi, marketplaceBio];
+    const filled = fields.filter((f) => f.trim().length > 0).length;
+    const hasModalities = modalities.length > 0;
+    const hasAvatar = !!avatarUrl;
+    const total = fields.length + 2;
+    const filledTotal = filled + (hasModalities ? 1 : 0) + (hasAvatar ? 1 : 0);
+    return { percent: Math.round((filledTotal / total) * 100), filled: filledTotal, total };
+  }, [bio, specialty, credentials, phone, licenseNumber, npi, marketplaceBio, modalities, avatarUrl]);
 
   const handleSave = async () => {
     if (!provider) return;
@@ -58,16 +75,7 @@ export default function ProviderProfile() {
     try {
       const { error } = await supabase
         .from("providers")
-        .update({
-          bio,
-          specialty,
-          credentials,
-          phone,
-          license_number: licenseNumber,
-          npi,
-          marketplace_bio: marketplaceBio,
-          modalities,
-        })
+        .update({ bio, specialty, credentials, phone, license_number: licenseNumber, npi, marketplace_bio: marketplaceBio, modalities })
         .eq("id", provider.id);
       if (error) throw error;
       toast({ title: "Profile updated" });
@@ -75,6 +83,54 @@ export default function ProviderProfile() {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !provider) return;
+    setUploadingPhoto(true);
+    try {
+      const ext = file.name.split(".").pop();
+      const path = `avatars/${provider.id}.${ext}`;
+      const { error: uploadErr } = await supabase.storage.from("clinical-photos").upload(path, file, { upsert: true });
+      if (uploadErr) throw uploadErr;
+      const { data: urlData } = supabase.storage.from("clinical-photos").getPublicUrl(path);
+      const url = urlData.publicUrl;
+      await supabase.from("providers").update({ avatar_url: url }).eq("id", provider.id);
+      setAvatarUrl(url);
+      toast({ title: "Photo uploaded" });
+    } catch (err: any) {
+      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  const handleAiBioDraft = async () => {
+    if (!provider) return;
+    setAiDrafting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("ai-provider-coach", {
+        body: {
+          mode: "bio_draft",
+          provider_id: provider.id,
+          context: {
+            first_name: provider.first_name,
+            last_name: provider.last_name,
+            specialty,
+            credentials,
+            modalities,
+          },
+        },
+      });
+      if (error) throw error;
+      if (data?.bio) setMarketplaceBio(data.bio);
+      toast({ title: "AI bio drafted", description: "Review and edit the generated bio below." });
+    } catch (err: any) {
+      toast({ title: "AI draft failed", description: err.message, variant: "destructive" });
+    } finally {
+      setAiDrafting(false);
     }
   };
 
@@ -87,11 +143,7 @@ export default function ProviderProfile() {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <div className="flex items-center justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
   }
 
   if (!provider) {
@@ -111,12 +163,28 @@ export default function ProviderProfile() {
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">My Profile</h1>
-          <p className="text-sm text-muted-foreground">
-            {provider.first_name} {provider.last_name} — Edit your professional information
-          </p>
+        <div className="flex items-center gap-4">
+          <div className="relative group">
+            <Avatar className="h-16 w-16 border-2 border-border">
+              <AvatarImage src={avatarUrl || undefined} />
+              <AvatarFallback className="text-lg">{provider.first_name?.[0]}{provider.last_name?.[0]}</AvatarFallback>
+            </Avatar>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+              {uploadingPhoto ? <Loader2 className="h-5 w-5 animate-spin text-white" /> : <Upload className="h-5 w-5 text-white" />}
+            </button>
+            <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
+          </div>
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">My Profile</h1>
+            <p className="text-sm text-muted-foreground">
+              {provider.first_name} {provider.last_name} — Edit your professional information
+            </p>
+          </div>
         </div>
         <Button onClick={handleSave} disabled={saving}>
           {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
@@ -124,11 +192,29 @@ export default function ProviderProfile() {
         </Button>
       </div>
 
+      {/* Completeness bar */}
+      <Card>
+        <CardContent className="p-4 flex items-center gap-4">
+          {completeness.percent === 100 ? (
+            <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
+          ) : (
+            <AlertCircle className="h-5 w-5 text-amber-500 shrink-0" />
+          )}
+          <div className="flex-1">
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-sm font-medium">Profile completeness</p>
+              <span className="text-sm font-bold">{completeness.percent}%</span>
+            </div>
+            <Progress value={completeness.percent} className="h-2" />
+          </div>
+          <p className="text-xs text-muted-foreground shrink-0">{completeness.filled}/{completeness.total} fields</p>
+        </CardContent>
+      </Card>
+
       <div className="grid gap-6 md:grid-cols-2">
+        {/* Professional Details */}
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Professional Details</CardTitle>
-          </CardHeader>
+          <CardHeader><CardTitle className="text-base">Professional Details</CardTitle></CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-1.5">
               <Label>Specialty</Label>
@@ -153,17 +239,22 @@ export default function ProviderProfile() {
           </CardContent>
         </Card>
 
+        {/* Bio & Marketplace */}
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Bio & Marketplace</CardTitle>
-          </CardHeader>
+          <CardHeader><CardTitle className="text-base">Bio & Marketplace</CardTitle></CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-1.5">
               <Label>Bio</Label>
               <Textarea value={bio} onChange={(e) => setBio(e.target.value)} placeholder="Professional bio…" rows={3} />
             </div>
             <div className="space-y-1.5">
-              <Label>Marketplace Bio</Label>
+              <div className="flex items-center justify-between">
+                <Label>Marketplace Bio</Label>
+                <Button variant="ghost" size="sm" onClick={handleAiBioDraft} disabled={aiDrafting} className="h-7 text-xs gap-1">
+                  {aiDrafting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                  AI Draft
+                </Button>
+              </div>
               <Textarea value={marketplaceBio} onChange={(e) => setMarketplaceBio(e.target.value)} placeholder="Public-facing bio for the marketplace…" rows={3} />
             </div>
             <div className="space-y-1.5">
@@ -172,9 +263,7 @@ export default function ProviderProfile() {
                 {modalities.map((m) => (
                   <Badge key={m} variant="secondary" className="gap-1">
                     {m}
-                    <button onClick={() => setModalities(modalities.filter((x) => x !== m))}>
-                      <X className="h-3 w-3" />
-                    </button>
+                    <button onClick={() => setModalities(modalities.filter((x) => x !== m))}><X className="h-3 w-3" /></button>
                   </Badge>
                 ))}
               </div>
@@ -185,9 +274,7 @@ export default function ProviderProfile() {
                   placeholder="Add modality"
                   onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addModality())}
                 />
-                <Button variant="outline" size="sm" onClick={addModality} type="button">
-                  <Plus className="h-4 w-4" />
-                </Button>
+                <Button variant="outline" size="sm" onClick={addModality} type="button"><Plus className="h-4 w-4" /></Button>
               </div>
             </div>
           </CardContent>
