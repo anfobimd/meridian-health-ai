@@ -4,6 +4,7 @@ import {
   Activity, FlaskConical, FileText, Pill, DollarSign, ClipboardPlus, ShieldCheck, DoorOpen, Store, Package,
   CreditCard, TrendingUp, Calculator, MonitorCheck, Briefcase, Search, LogOut, CalendarClock, TrendingDown,
   Settings, UserCircle, CalendarOff, MessageSquare, ClipboardCheck, Mail, Clock, ListChecks,
+  Building2, BarChart3, Zap, BookOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -66,6 +67,16 @@ const navSections = [
       { to: "/proforma", icon: Calculator, label: "Proforma" },
       { to: "/reports", icon: FileText, label: "Reports" },
       { to: "/templates", icon: FileText, label: "Templates" },
+    ],
+  },
+  {
+    label: "PLATFORM",
+    items: [
+      { to: "/contracts", icon: Building2, label: "Contracts" },
+      { to: "/md-coverage", icon: ShieldCheck, label: "MD Coverage" },
+      { to: "/master-catalog", icon: BookOpen, label: "Master Catalog" },
+      { to: "/benchmarks", icon: BarChart3, label: "Benchmarks" },
+      { to: "/automation-rules", icon: Zap, label: "Automations" },
     ],
   },
 ];

@@ -52,6 +52,11 @@ import OutstandingCharts from "./pages/OutstandingCharts";
 import ChartCompleteness from "./pages/ChartCompleteness";
 import ProviderDrillDown from "./pages/ProviderDrillDown";
 import Reports from "./pages/Reports";
+import ContractsAdmin from "./pages/ContractsAdmin";
+import MdCoverage from "./pages/MdCoverage";
+import MasterCatalog from "./pages/MasterCatalog";
+import Benchmarks from "./pages/Benchmarks";
+import AutomationRules from "./pages/AutomationRules";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -109,6 +114,11 @@ const App = () => (
                 <Route path="/chart-completeness" element={<ChartCompleteness />} />
                 <Route path="/provider-performance" element={<ProviderDrillDown />} />
                 <Route path="/reports" element={<Reports />} />
+                <Route path="/contracts" element={<ContractsAdmin />} />
+                <Route path="/md-coverage" element={<MdCoverage />} />
+                <Route path="/master-catalog" element={<MasterCatalog />} />
+                <Route path="/benchmarks" element={<Benchmarks />} />
+                <Route path="/automation-rules" element={<AutomationRules />} />
               </Route>
             </Route>
             {/* Public routes — no auth required */}
