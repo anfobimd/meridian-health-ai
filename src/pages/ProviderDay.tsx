@@ -241,10 +241,8 @@ export default function ProviderDay() {
     navigate(`/encounters/${newEnc.id}/chart`);
   };
 
-  const isLapsed = (patient: any) => {
-    if (!patient?.last_visit_at) return false;
-    return differenceInDays(new Date(), parseISO(patient.last_visit_at)) > 90;
-  };
+  // Lapse detection removed — last_visit_at not on patients table yet
+  const isLapsed = (_patient: any) => false;
 
   // Greeting
   const hour = today.getHours();
