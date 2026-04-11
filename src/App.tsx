@@ -59,6 +59,7 @@ import Benchmarks from "./pages/Benchmarks";
 import AutomationRules from "./pages/AutomationRules";
 import NotificationCenter from "./pages/NotificationCenter";
 import MultiProviderCalendar from "./pages/MultiProviderCalendar";
+import PatientInbox from "./pages/PatientInbox";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -123,6 +124,7 @@ const App = () => (
                 <Route path="/automation-rules" element={<AutomationRules />} />
                 <Route path="/notifications" element={<NotificationCenter />} />
                 <Route path="/calendar-grid" element={<MultiProviderCalendar />} />
+                <Route path="/patient-inbox" element={<PatientInbox />} />
               </Route>
             </Route>
             {/* Public routes — no auth required */}

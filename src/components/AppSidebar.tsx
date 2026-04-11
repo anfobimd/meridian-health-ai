@@ -20,6 +20,7 @@ const navSections = [
       { to: "/my-marketplace", icon: Store, label: "My Marketplace" },
       { to: "/md-feedback", icon: MessageSquare, label: "MD Feedback" },
       { to: "/messages", icon: Mail, label: "Messages" },
+      { to: "/patient-inbox", icon: Inbox, label: "Patient Inbox" },
       { to: "/time-off", icon: CalendarOff, label: "Time Off" },
       { to: "/my-profile", icon: UserCircle, label: "My Profile" },
       { to: "/notifications", icon: Bell, label: "Notifications" },
