@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Users, Calendar, Stethoscope, ClipboardList, UserCog,
   Activity, FlaskConical, FileText, Pill, DollarSign, ClipboardPlus, ShieldCheck, DoorOpen, Store, Package,
   CreditCard, TrendingUp, Calculator, MonitorCheck, Briefcase, Search, LogOut, CalendarClock, TrendingDown,
-  Settings, UserCircle, CalendarOff, MessageSquare, ClipboardCheck,
+  Settings, UserCircle, CalendarOff, MessageSquare, ClipboardCheck, Mail,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -18,6 +18,7 @@ const navSections = [
       { to: "/check-in", icon: ClipboardCheck, label: "Check-In" },
       { to: "/my-marketplace", icon: Store, label: "My Marketplace" },
       { to: "/md-feedback", icon: MessageSquare, label: "MD Feedback" },
+      { to: "/messages", icon: Mail, label: "Messages" },
       { to: "/time-off", icon: CalendarOff, label: "Time Off" },
       { to: "/my-profile", icon: UserCircle, label: "My Profile" },
       { to: "/settings", icon: Settings, label: "Settings" },
