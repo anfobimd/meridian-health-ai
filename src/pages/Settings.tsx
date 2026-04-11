@@ -117,9 +117,9 @@ export default function Settings() {
               {verifiedFactors.length > 0 ? (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <ShieldCheck className="h-4 w-4 text-green-500" />
+                    <ShieldCheck className="h-4 w-4 text-primary" />
                     <span className="text-sm font-medium">MFA is enabled</span>
-                    <Badge variant="outline" className="text-green-600 border-green-200">Active</Badge>
+                    <Badge variant="outline" className="text-primary border-primary/20">Active</Badge>
                   </div>
                   {verifiedFactors.map((f) => (
                     <div key={f.id} className="flex items-center justify-between rounded-md border p-3">

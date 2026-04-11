@@ -3,6 +3,7 @@ import {
   LayoutDashboard, Users, Calendar, Stethoscope, ClipboardList, UserCog,
   Activity, FlaskConical, FileText, Pill, DollarSign, ClipboardPlus, ShieldCheck, DoorOpen, Store, Package,
   CreditCard, TrendingUp, Calculator, MonitorCheck, Briefcase, Search, LogOut, CalendarClock, TrendingDown,
+  Settings, UserCircle, FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -15,6 +16,8 @@ const navSections = [
       { to: "/front-desk", icon: MonitorCheck, label: "Front Desk" },
       { to: "/provider-day", icon: Briefcase, label: "My Day" },
       { to: "/my-marketplace", icon: Store, label: "My Marketplace" },
+      { to: "/my-profile", icon: UserCircle, label: "My Profile" },
+      { to: "/settings", icon: Settings, label: "Settings" },
     ],
   },
   {
@@ -51,6 +54,7 @@ const navSections = [
       { to: "/membership-billing", icon: CreditCard, label: "Memberships" },
       { to: "/earnings", icon: TrendingUp, label: "Earnings" },
       { to: "/proforma", icon: Calculator, label: "Proforma" },
+      { to: "/templates", icon: FileText, label: "Templates" },
     ],
   },
 ];
