@@ -1,75 +1,68 @@
 
 
-# RLS Security Audit and Fix
+# Provider User Stories: Memory Save + Implementation Workflow
 
-## Audit Summary
+## Step 1: Save Audit to Project Memory
 
-After scanning all 63 tables and 177 RLS policies, I found 4 issues to fix. The vast majority of policies are correctly implemented using `is_staff()` and `has_role()` security definer functions.
+Write the gap analysis (28 stories, 6 epics — 6 built, 10 partial, 12 missing) to `mem://features/provider-stories-audit` and update `mem://index.md` with a reference.
 
-## Findings
+## Step 2: Implementation Workflow (4 Batches)
 
-### Issue 1: Overly Permissive Anon INSERT on `e_consents` (WARN)
-**Current**: `WITH CHECK (true)` for anon role -- any anonymous user can insert any consent record with any `patient_id`, potentially creating fake consent records for real patients.
-**Fix**: Restrict to only allow inserts where the `patient_id` matches an existing patient record (basic validation). This is needed for the Remote Intake flow where unauthenticated patients sign consents.
+### Batch A — Clinical Must-Haves (Legal/HIPAA)
+Priority: highest. These are compliance requirements.
 
-### Issue 2: Overly Permissive Anon INSERT on `intake_forms` (WARN)
-**Current**: `WITH CHECK (true)` for anon role -- same issue. Any anonymous user can insert intake forms for any patient.
-**Fix**: Same approach -- validate `patient_id` exists in the patients table.
+1. **Vitals table + UI** (US-012)
+   - Migration: `vitals` table (patient_id, encounter_id, bp, hr, temp, weight, height, o2sat, recorded_by, recorded_at)
+   - Staff-only RLS policies
+   - Vitals capture panel in EncounterChart.tsx
 
-### Issue 3: Missing Storage UPDATE Policy on `clinical-photos` (WARN)
-**Current**: INSERT, SELECT, DELETE policies exist but no UPDATE policy. Staff can't update/replace photo metadata.
-**Fix**: Add UPDATE policy restricted to `is_staff(auth.uid())`.
+2. **Addendum model** (US-014)
+   - Migration: `clinical_note_addenda` table (note_id, author_id, content, created_at)
+   - RLS: author can insert, staff can read
+   - Addendum UI below signed notes in ClinicalNotes
 
-### Issue 4: `profiles` Policies Use `{public}` Role (LOW)
-**Current**: INSERT, UPDATE, SELECT policies on `profiles` apply to `{public}` (includes anon). While the USING/WITH CHECK clauses require `auth.uid() = user_id` (which would be null for anon, so no actual data leak), the role should be `{authenticated}` for correctness.
-**Fix**: Drop and recreate the 3 profiles policies targeting `{authenticated}` instead of `{public}`.
+3. **Photo consent type** (US-019)
+   - Add `photo_release` to consent types enum
+   - Wire into PhotoUpload flow — require consent before upload
 
-## What's NOT an Issue (Intentional Design)
-- **AI tables** (ai_api_calls, ai_chart_analysis, etc.) have SELECT-only policies -- they're written by edge functions using service_role key
-- **treatments, treatment_categories, marketplace_config** have public SELECT (`USING true`) -- intentional for marketplace/patient-facing features
-- **All patient-facing tables** (appointments, clinical_notes, hormone_visits, etc.) correctly use `patient_id IN (SELECT ... WHERE auth_user_id = auth.uid()) OR is_staff(auth.uid())`
+### Batch B — Security & Profile
+4. **MFA UI** (US-004)
+   - Settings page with TOTP enrollment using Supabase MFA API
+   - QR code display, verification step
 
-## Migration
+5. **Provider profile self-edit** (US-002)
+   - Profile page for providers to update bio, specialties, credentials, headshot
+   - RLS: users can only edit own profile
 
-Single migration with:
-1. Drop + recreate `e_consents` anon INSERT policy with patient_id validation
-2. Drop + recreate `intake_forms` anon INSERT policy with patient_id validation
-3. Add UPDATE policy for `clinical-photos` storage bucket
-4. Drop + recreate 3 `profiles` policies to target `authenticated` instead of `public`
+6. **Template CRUD UI** (US-015)
+   - Management page for clinical_note_templates
+   - Create, edit, delete, preview templates
 
-## Technical Details
+### Batch C — Scheduling & Workflow
+7. **Time-off blocking** (US-008)
+   - Migration: `provider_time_off` table
+   - Calendar UI to request/manage blocked dates
+   - Conflict detection in scheduling logic
 
-```sql
--- Fix 1: e_consents - validate patient exists
-DROP POLICY "Anon insert consents" ON public.e_consents;
-CREATE POLICY "Anon insert consents" ON public.e_consents
-  FOR INSERT TO anon
-  WITH CHECK (patient_id IN (SELECT id FROM public.patients));
+8. **MD feedback inbox** (US-021)
+   - Leverage existing `chart_review_items` with status tracking
+   - Inbox view filtered to provider's charts with MD comments
 
--- Fix 2: intake_forms - validate patient exists
-DROP POLICY "Anon can submit intake_forms" ON public.intake_forms;
-CREATE POLICY "Anon can submit intake_forms" ON public.intake_forms
-  FOR INSERT TO anon
-  WITH CHECK (patient_id IN (SELECT id FROM public.patients));
+9. **Provider check-in view** (US-009)
+   - Provider-side panel showing today's patients with check-in status
 
--- Fix 3: storage UPDATE policy
-CREATE POLICY "Staff can update clinical photos"
-  ON storage.objects FOR UPDATE TO authenticated
-  USING (bucket_id = 'clinical-photos' AND is_staff(auth.uid()));
+### Batch D — Communication & Analytics
+10. **Secure messaging** (US-020)
+    - `messages` table with realtime subscriptions
+    - Simple inbox UI between providers and MD
 
--- Fix 4: profiles - change from public to authenticated
-DROP POLICY "Users can view own profile" ON public.profiles;
-DROP POLICY "Users can update own profile" ON public.profiles;
-DROP POLICY "Users can insert own profile" ON public.profiles;
-CREATE POLICY "Users can view own profile" ON public.profiles
-  FOR SELECT TO authenticated USING (auth.uid() = user_id);
-CREATE POLICY "Users can update own profile" ON public.profiles
-  FOR UPDATE TO authenticated USING (auth.uid() = user_id);
-CREATE POLICY "Users can insert own profile" ON public.profiles
-  FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
-```
+11. **Revenue breakdown** (US-025)
+    - Procedure-level earnings in Earnings.tsx
 
-After migration, security scan findings will be marked as fixed.
+12. **Remaining nice-to-haves** — Photo annotation, waitlist, patient satisfaction, goal tracking (can be scoped later)
 
-No code changes needed -- all fixes are database-level.
+## Recommended Approach
+Build **Batch A first** (3 items, all clinical compliance), then proceed through B → C → D. Each batch is independently shippable.
+
+Shall I proceed with Batch A?
 
