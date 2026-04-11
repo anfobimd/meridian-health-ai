@@ -25,7 +25,7 @@ function getPasswordStrength(pw: string): { score: number; label: string; color:
 }
 
 export default function Settings() {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const { toast } = useToast();
   const [mfaFactors, setMfaFactors] = useState<any[]>([]);
   const [enrolling, setEnrolling] = useState(false);
