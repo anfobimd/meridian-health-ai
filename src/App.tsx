@@ -12,6 +12,7 @@ import Patients from "./pages/Patients";
 import PatientRecord from "./pages/PatientRecord";
 import Appointments from "./pages/Appointments";
 import Treatments from "./pages/Treatments";
+import Medications from "./pages/Medications";
 import ClinicalNotes from "./pages/ClinicalNotes";
 import Providers from "./pages/Providers";
 import HormoneVisits from "./pages/HormoneVisits";
@@ -76,6 +77,7 @@ const App = () => (
                 <Route path="/protocols" element={<Protocols />} />
                 <Route path="/rooms-devices" element={<RoomsDevices />} />
                 <Route path="/treatments" element={<Treatments />} />
+                <Route path="/medications" element={<Medications />} />
                 <Route path="/providers" element={<Providers />} />
                 <Route path="/billing" element={<Billing />} />
                 <Route path="/md-oversight" element={<MdOversight />} />
