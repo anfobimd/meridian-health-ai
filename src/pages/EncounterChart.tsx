@@ -15,6 +15,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { ChevronDown, ChevronRight, Sparkles, FileText, Save, CheckCircle2, ArrowLeft, Loader2, ClipboardList } from "lucide-react";
+import { VitalsPanel } from "@/components/encounter/VitalsPanel";
 
 type FieldConfig = {
   options?: string[];
@@ -597,6 +598,11 @@ export default function EncounterChart() {
 
         {/* Sidebar - Orders & Billing */}
         <div className="space-y-4">
+          {/* Vitals */}
+          {encounter && (
+            <VitalsPanel encounterId={encounterId!} patientId={encounter.patient_id} />
+          )}
+
           {/* Patient Summary */}
           <Card>
             <CardContent className="p-4">

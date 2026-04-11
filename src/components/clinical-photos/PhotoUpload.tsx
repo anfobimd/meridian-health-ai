@@ -7,8 +7,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Upload, X, ImagePlus } from "lucide-react";
+import { Upload, X, ImagePlus, ShieldCheck } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const BODY_AREAS = ["face", "neck", "chest", "abdomen", "arms", "back", "legs", "hands", "other"];
 const PHOTO_TYPES = ["before", "after", "progress"];
@@ -28,6 +29,7 @@ export function PhotoUpload({ patientId, open, onOpenChange }: PhotoUploadProps)
   const [treatmentId, setTreatmentId] = useState<string>("");
   const [takenAt, setTakenAt] = useState(new Date().toISOString().split("T")[0]);
   const [notes, setNotes] = useState("");
+  const [photoConsent, setPhotoConsent] = useState(false);
 
   const { data: treatments } = useQuery({
     queryKey: ["treatments-list"],
@@ -40,6 +42,17 @@ export function PhotoUpload({ patientId, open, onOpenChange }: PhotoUploadProps)
   const upload = useMutation({
     mutationFn: async () => {
       if (files.length === 0) throw new Error("No files selected");
+      if (!photoConsent) throw new Error("Photo release consent required");
+
+      const user = (await supabase.auth.getUser()).data.user;
+
+      // Record photo release consent
+      await supabase.from("e_consents").insert({
+        patient_id: patientId,
+        consent_type: "photo_release" as any,
+        consent_text: "Patient consents to the capture and storage of clinical photographs for treatment documentation purposes.",
+        signed_at: new Date().toISOString(),
+      });
 
       for (const file of files) {
         const ext = file.name.split(".").pop();
@@ -171,7 +184,20 @@ export function PhotoUpload({ patientId, open, onOpenChange }: PhotoUploadProps)
           <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional notes..." rows={2} />
         </div>
 
-        <Button onClick={() => upload.mutate()} disabled={files.length === 0 || upload.isPending}>
+        <div className="flex items-start gap-2 bg-muted/50 rounded-md p-3">
+          <Checkbox
+            id="photo-consent"
+            checked={photoConsent}
+            onCheckedChange={(v) => setPhotoConsent(v === true)}
+            className="mt-0.5"
+          />
+          <label htmlFor="photo-consent" className="text-xs text-muted-foreground cursor-pointer">
+            <ShieldCheck className="h-3.5 w-3.5 inline mr-1 text-primary" />
+            Patient has provided photo release consent for clinical documentation purposes.
+          </label>
+        </div>
+
+        <Button onClick={() => upload.mutate()} disabled={files.length === 0 || !photoConsent || upload.isPending}>
           <Upload className="h-4 w-4 mr-1" />
           {upload.isPending ? "Uploading…" : `Upload ${files.length} Photo${files.length !== 1 ? "s" : ""}`}
         </Button>
