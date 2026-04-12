@@ -1,118 +1,92 @@
 
 
-# Telehealth Video Visit & Prescribing Workflow — UX/UI Plan
+# Send Intake Link with Full Tracking — Implementation Plan
 
-## Current State
+## Overview
+Build a tracked invitation system: staff sends an SMS/email link to a patient, the intake form pre-fills from query params, and submissions auto-link to the existing patient record. A new `intake_invitations` table tracks sent → opened → completed status.
 
-The system has strong building blocks but no end-to-end telehealth workflow:
+## Database Migration
 
-- **RemoteIntake** (patient-facing, public) collects demographics, symptoms, labs, consents — submits to DB
-- **prescriptions table** exists in DB (medication_name, dosage, route, pharmacy, refills) but has zero UI
-- **appointments table** has no `visit_type` field to distinguish telehealth from in-person
-- **encounters table** has `encounter_type` (free text) but no telehealth flag
-- **PatientPortal** shows appointments/packages/records but no video join capability
-- **No video call UI** exists anywhere
-- **No prescribing page** exists — providers cannot write, review, or manage prescriptions
+**New table: `intake_invitations`**
+- `id` uuid PK
+- `patient_id` uuid REFERENCES patients(id) — existing or null for new patients
+- `token` text UNIQUE NOT NULL — short unique token for URL
+- `focus_areas` text[] — pre-selected focus (e.g. `['hormone_male']`)
+- `channel` text — 'sms', 'email', 'manual'
+- `sent_at` timestamptz DEFAULT now()
+- `sent_by` uuid REFERENCES auth.users(id) — staff who sent it
+- `opened_at` timestamptz — set when patient opens the link
+- `completed_at` timestamptz — set when intake submitted
+- `intake_form_id` uuid REFERENCES intake_forms(id) — linked after submission
+- `status` text DEFAULT 'sent' — sent, opened, completed, expired
+- `expires_at` timestamptz — optional expiry
+- `phone` text, `email` text — delivery address used
 
-## Proposed Workflow
+RLS: staff roles (admin, provider, front_desk) can SELECT/INSERT/UPDATE.
 
-```text
-PATIENT FLOW                          PROVIDER FLOW
-───────────                          ──────────────
-1. /intake — fill remote form         
-   (demographics, symptoms,          
-    labs, consents, signature)        
-        ↓                            
-2. Submission creates patient +       Front Desk books telehealth apt
-   hormone_visit + e_consents         (visit_type = "telehealth")
-        ↓                            
-3. /portal — patient logs in,         Provider sees apt in queue
-   sees "Join Video" button           with "Intake Ready" badge
-   in waiting room                            ↓
-        ↓                            4. Provider opens Telehealth
-4. Video call connects                   Workspace:
-   (embedded or external link)           ├─ Left: Intake summary + labs
-        ↓                               ├─ Center: Video call
-5. Patient stays on call                 └─ Right: Prescribe + chart
-        ↓                                       ↓
-6. Call ends → patient sees           5. Provider writes Rx from
-   aftercare + next steps                AI-suggested protocol
-                                             ↓
-                                     6. Signs encounter → Rx saved
-                                        → aftercare sent
-```
+Enable realtime so front desk sees status changes live.
 
-## Implementation — 3 Batches
+## Edge Function: `send-intake-invite`
 
-### Batch 1: Schema + Telehealth Appointment Type + Prescribing UI
-**Database changes:**
-- Add `visit_type text DEFAULT 'in_person'` to `appointments` (values: `in_person`, `telehealth`, `phone`)
-- Add `video_room_url text` to `appointments` for external video link storage
-- Add `intake_form_id uuid REFERENCES intake_forms(id)` to `appointments` to link intake to appointment
+New edge function that:
+1. Accepts `{ patient_id, channel, focus_areas, phone?, email? }`
+2. Generates a short token (nanoid or crypto.randomUUID)
+3. Inserts row into `intake_invitations`
+4. Builds URL: `https://meridian-ai-care.lovable.app/intake?token=<TOKEN>&focus=<FOCUS>`
+5. If channel=sms: calls existing `send-sms` logic (Twilio gateway) with a templated message
+6. If channel=email: logs to `patient_communication_log` (email sending can be added later)
+7. Returns `{ success, token, url }`
 
-**New page: `TelehealthRx.tsx`** — Prescribing workspace (reusable for both telehealth and in-person)
-- Patient medication list from `prescriptions` table
-- New Rx form: medication search (against `medications` catalog), dosage, frequency, route, quantity, refills, pharmacy, notes
-- AI dosing suggestion button (reuse `ai-hormone-rec` data or new `ai-prescribe-check` mode in existing edge function)
-- Drug interaction check against patient's active medications
-- E-prescribe action (saves to `prescriptions` table, links to encounter)
-- Prescription history view per patient
+## Frontend Changes
 
-**Update `Appointments.tsx` booking dialog:**
-- Add visit type selector (In-Person / Telehealth / Phone)
-- When telehealth selected, auto-generate or accept video room URL
-- Show telehealth badge on appointment cards
+### 1. RemoteIntake.tsx — Query Param Pre-fill
+- Read `token`, `focus`, `ref` (patient_id) from `searchParams`
+- If `token` present: call `supabase.from('intake_invitations').update({ opened_at, status: 'opened' }).eq('token', token)` on mount
+- If `ref` present: fetch patient demographics and pre-fill firstName, lastName, email, phone, dob, sex
+- If `focus` present: pre-select matching focus areas
+- On submission: pass `invitation_token` to `submit-remote-intake`
 
-### Batch 2: Provider Telehealth Workspace + Patient Video Join
-**New page: `TelehealthVisit.tsx`** — 3-panel provider workspace for telehealth encounters
-- **Left panel**: Auto-loaded intake summary (from `intake_forms` + `hormone_visits` linked to this appointment). Shows demographics, symptoms, goals, lab values, contraindications, consent status. AI Patient Brief auto-loads.
-- **Center panel**: Video embed area. For MVP, this renders an iframe or external link launcher (Daily.co, Twilio Video, or Zoom link). Includes call controls (mute, camera, end call), call timer, and a "Start Call" button that transitions the appointment to `in_progress`.
-- **Right panel**: Tabbed interface:
-  - **Chart tab**: Slimmed EncounterChart (SOAP fields only, no template picker overhead)
-  - **Prescribe tab**: Embedded `TelehealthRx` component — write Rx during call
-  - **Orders tab**: Lab orders, follow-up scheduling
+### 2. submit-remote-intake Edge Function Update
+- Accept optional `invitation_token` field
+- If provided: update `intake_invitations` set `completed_at`, `status = 'completed'`, `intake_form_id`
+- If `ref` patient_id provided: skip creating a new patient — use existing patient_id instead
 
-**Update `PatientPortal.tsx`:**
-- Add "Telehealth" tab alongside Appointments/Packages/Records
-- Show upcoming telehealth appointments with "Join Video" button (active 15 min before scheduled time)
-- Waiting room state: "Your provider will connect shortly" with animated indicator
-- Post-call: show aftercare instructions, prescription summary, next appointment
+### 3. SendIntakeLinkDialog Component
+Reusable dialog with:
+- Patient name + phone pre-filled from patient record
+- Focus area multi-select (hormone_male, hormone_female, peptides, etc.)
+- Channel toggle: SMS / Copy Link
+- Send button → invokes `send-intake-invite`
+- Shows generated link for manual copy
 
-**Update `ProviderDay.tsx`:**
-- Telehealth appointments get a distinct icon (Video camera) and "Join Telehealth" action button
-- Badge showing "Intake Complete" when linked intake form is submitted
+### 4. FrontDesk.tsx — "Send Intake Link" Button
+- Add to the QuickDock or ActionBar
+- Opens SendIntakeLinkDialog with optional patient selector
 
-### Batch 3: AI Integration + Workflow Automation
-**Extend `ai-checkout-review` edge function** with `telehealth_summary` mode:
-- Auto-generate visit summary from SOAP + prescriptions written during call
-- Suggest follow-up timing based on medication protocol
+### 5. PatientRecord.tsx — "Send Intake Link" Button
+- Add button in patient header area
+- Opens SendIntakeLinkDialog pre-filled with that patient's data
 
-**Extend `ai-hormone-rec` edge function** with `prescribe_check` mode:
-- Given patient labs + symptoms + selected medication, validate dosing against protocols
-- Flag contraindications, suggest monitoring labs
-- Recommend titration schedule
+### 6. Invitation Tracking Panel (FrontDesk)
+- Small card/section showing recent invitations with status badges (Sent → Opened → Completed)
+- Real-time updates via Supabase realtime subscription
 
-**New component: `IntakeReviewPanel.tsx`** — shared component used by:
-- TelehealthVisit (left panel)
-- EncounterChart (sidebar, when intake form linked)
-- Shows structured intake data with AI-highlighted risk flags
+## Files to Create/Modify
 
-**Workflow automation:**
-- When patient submits RemoteIntake, auto-create a "pending telehealth" task in front desk queue
-- Front desk books telehealth apt → links intake form → patient gets portal notification with video join link
-- On encounter sign, auto-trigger aftercare message with Rx summary to patient
+| File | Action |
+|------|--------|
+| Migration SQL | Create `intake_invitations` table + RLS + realtime |
+| `supabase/functions/send-intake-invite/index.ts` | New edge function |
+| `supabase/functions/submit-remote-intake/index.ts` | Add invitation_token + existing patient linking |
+| `src/components/front-desk/SendIntakeLinkDialog.tsx` | New component |
+| `src/components/front-desk/InvitationTracker.tsx` | New component — status tracker |
+| `src/pages/RemoteIntake.tsx` | Read query params, mark opened, pre-fill |
+| `src/pages/FrontDesk.tsx` | Add send link button + invitation tracker |
+| `src/pages/PatientRecord.tsx` | Add send link button |
 
-## Technical Details
-
-**Video integration approach:** External link model (not embedded video). Provider and patient each click a link to join a third-party video room (Daily.co, Doxy.me, or Zoom). The `video_room_url` field on the appointment stores this link. This avoids WebRTC complexity while delivering the full workflow. Can upgrade to embedded video later.
-
-**Code reuse:**
-- `TelehealthRx` prescribing component is used standalone AND embedded in TelehealthVisit
-- `IntakeReviewPanel` is used in TelehealthVisit AND EncounterChart sidebar
-- Existing edge functions extended with new modes (no new functions needed)
-- PatientPortal auth/linking already built — just adding a tab
-
-**New routes:**
-- `/telehealth/:appointmentId` — provider telehealth workspace
-- PatientPortal gets internal tab (no new route needed)
+## Technical Notes
+- Twilio connector already wired (`send-sms` function works via gateway)
+- `send-intake-invite` will reuse the same Twilio gateway pattern
+- Token-based URL avoids exposing patient UUIDs in links
+- The existing `submit-remote-intake` already creates patients — we add a branch to skip creation when `ref` patient exists
 
