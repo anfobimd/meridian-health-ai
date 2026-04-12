@@ -619,7 +619,7 @@ export default function EncounterChart() {
   };
 
   const activeTemplate = templates?.find((t: any) => t.id === templateId) as any;
-  const isSigned = encounter?.status === "signed";
+  const isSigned = encounter?.status === "signed" || isReadOnly;
   const patientMeds = encounter?.patients?.medications || [];
   const patientAllergies = encounter?.patients?.allergies || [];
   const procedureType = activeTemplate?.name || encounter?.chief_complaint || "";
