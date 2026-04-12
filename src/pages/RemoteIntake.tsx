@@ -136,7 +136,7 @@ export default function RemoteIntake() {
     if (invitationToken) {
       // Mark opened via edge function (service role handles RLS)
       supabase.functions.invoke("submit-remote-intake", {
-        body: { _markOpened: true, invitation_token: invitationToken },
+        body: { _markOpened: true, token: invitationToken },
       }).catch(() => {});
       // Actually let's use a simpler approach — the edge function is for submission.
       // We'll just track opened status when they submit.
