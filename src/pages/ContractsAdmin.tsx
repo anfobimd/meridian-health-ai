@@ -20,7 +20,7 @@ export default function ContractsAdmin() {
   const [contractOpen, setContractOpen] = useState(false);
   const [clinicOpen, setClinicOpen] = useState(false);
   const [form, setForm] = useState({ name: "", start_date: "", end_date: "", notes: "" });
-  const [clinicForm, setClinicForm] = useState({ name: "", address: "", contract_id: "" });
+  const [clinicForm, setClinicForm] = useState({ name: "", address: "", contract_id: "", phone: "", city: "", state: "", timezone: "America/New_York" });
 
   const { data: contracts = [] } = useQuery({
     queryKey: ["contracts"],
@@ -59,10 +59,14 @@ export default function ContractsAdmin() {
         name: clinicForm.name,
         address: clinicForm.address || null,
         contract_id: clinicForm.contract_id || null,
+        phone: clinicForm.phone || null,
+        city: clinicForm.city || null,
+        state: clinicForm.state || null,
+        timezone: clinicForm.timezone || "America/New_York",
       });
       if (error) throw error;
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["clinics"] }); setClinicOpen(false); setClinicForm({ name: "", address: "", contract_id: "" }); toast.success("Clinic created"); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["clinics"] }); setClinicOpen(false); setClinicForm({ name: "", address: "", contract_id: "", phone: "", city: "", state: "", timezone: "America/New_York" }); toast.success("Clinic created"); },
   });
 
   const toggleContract = useMutation({
@@ -108,6 +112,19 @@ export default function ContractsAdmin() {
               <div className="space-y-3">
                 <div><Label>Name</Label><Input value={clinicForm.name} onChange={e => setClinicForm(p => ({ ...p, name: e.target.value }))} /></div>
                 <div><Label>Address</Label><Input value={clinicForm.address} onChange={e => setClinicForm(p => ({ ...p, address: e.target.value }))} /></div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div><Label>City</Label><Input value={clinicForm.city} onChange={e => setClinicForm(p => ({ ...p, city: e.target.value }))} /></div>
+                  <div><Label>State</Label><Input value={clinicForm.state} onChange={e => setClinicForm(p => ({ ...p, state: e.target.value }))} placeholder="e.g. FL" /></div>
+                </div>
+                <div><Label>Phone</Label><Input value={clinicForm.phone} onChange={e => setClinicForm(p => ({ ...p, phone: e.target.value }))} placeholder="(555) 123-4567" /></div>
+                <div><Label>Timezone</Label>
+                  <Select value={clinicForm.timezone} onValueChange={v => setClinicForm(p => ({ ...p, timezone: v }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {["America/New_York","America/Chicago","America/Denver","America/Los_Angeles","America/Phoenix","Pacific/Honolulu"].map(tz => <SelectItem key={tz} value={tz}>{tz.replace("America/","").replace("Pacific/","").replace(/_/g," ")}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div>
                   <Label>Contract</Label>
                   <Select value={clinicForm.contract_id} onValueChange={v => setClinicForm(p => ({ ...p, contract_id: v }))}>
