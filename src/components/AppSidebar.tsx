@@ -5,7 +5,7 @@ import {
   Activity, FlaskConical, FileText, Pill, DollarSign, ClipboardPlus, ShieldCheck, DoorOpen, Store, Package,
   CreditCard, TrendingUp, Calculator, MonitorCheck, Briefcase, Search, LogOut, CalendarClock, TrendingDown,
   Settings, UserCircle, CalendarOff, MessageSquare, ClipboardCheck, Mail, Clock, ListChecks,
-  Building2, BarChart3, Zap, BookOpen, Bell, CalendarDays, Inbox,
+  Building2, BarChart3, Zap, BookOpen, Bell, CalendarDays, Inbox, Video,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -58,6 +58,7 @@ const navSections: NavSection[] = [
     items: [
       { to: "/clinical-notes", icon: ClipboardList, label: "Clinical Notes" },
       { to: "/encounters", icon: FileText, label: "Encounters" },
+      { to: "/prescriptions", icon: Pill, label: "Prescriptions", roles: ["admin", "provider"] },
       { to: "/hormone-visits", icon: FlaskConical, label: "Hormone Labs", roles: ["admin", "provider"] },
       { to: "/hormone-intake", icon: ClipboardPlus, label: "Hormone Intake", roles: ["admin", "provider"] },
       { to: "/physician-approval", icon: ShieldCheck, label: "Approvals", roles: ["admin", "provider"] },

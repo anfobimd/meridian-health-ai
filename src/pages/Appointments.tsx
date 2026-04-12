@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Calendar, Sparkles, Loader2, DoorOpen, Cpu, AlertTriangle, Brain, Clock, Check, XCircle, Ban, ShieldAlert, Timer, UserCheck } from "lucide-react";
+import { Plus, Calendar, Sparkles, Loader2, DoorOpen, Cpu, AlertTriangle, Brain, Clock, Check, XCircle, Ban, ShieldAlert, Timer, UserCheck, Video, Phone } from "lucide-react";
 import { toast } from "sonner";
 import { format, parseISO, addMinutes } from "date-fns";
 import { Calendar as CalendarWidget } from "@/components/ui/calendar";
@@ -53,6 +53,8 @@ export default function Appointments() {
   const [bookNotes, setBookNotes] = useState("");
   const [bookRoomId, setBookRoomId] = useState("");
   const [bookDeviceId, setBookDeviceId] = useState("");
+  const [bookVisitType, setBookVisitType] = useState("in_person");
+  const [bookVideoUrl, setBookVideoUrl] = useState("");
 
   // AI scheduling intelligence state
   const [noShowRisk, setNoShowRisk] = useState<any>(null);
@@ -187,7 +189,7 @@ export default function Appointments() {
         throw new Error("Conflict detected: " + result.conflicts.map((c) => c.label).join("; "));
       }
 
-      const apt = {
+      const apt: any = {
         patient_id: bookPatientId,
         provider_id: bookProviderId || null,
         treatment_id: bookTreatmentId || null,
@@ -196,6 +198,8 @@ export default function Appointments() {
         notes: bookNotes || null,
         room_id: bookRoomId || null,
         device_id: bookDeviceId || null,
+        visit_type: bookVisitType,
+        video_room_url: bookVisitType === "telehealth" ? (bookVideoUrl || null) : null,
       };
       const { error } = await supabase.from("appointments").insert(apt);
       if (error) throw error;
@@ -214,6 +218,7 @@ export default function Appointments() {
     setBookPatientId(""); setBookTreatmentId(""); setBookProviderId("");
     setBookDate(undefined); setAvailableSlots([]); setSelectedSlot(null);
     setConflictResult(null); setBookNotes(""); setBookRoomId(""); setBookDeviceId("");
+    setBookVisitType("in_person"); setBookVideoUrl("");
     setAiSuggestion(null); setNoShowRisk(null); setDurationEstimate(null);
     setProviderMatch(null); setContraindicationCheck(null);
   };
@@ -407,6 +412,32 @@ export default function Appointments() {
             {/* Step 0: Patient + Treatment + AI Insights */}
             {bookingStep === 0 && (
               <div className="space-y-4">
+                {/* Visit Type Selector */}
+                <div className="space-y-2">
+                  <Label>Visit Type</Label>
+                  <div className="flex gap-2">
+                    {[
+                      { value: "in_person", label: "In-Person", icon: Calendar },
+                      { value: "telehealth", label: "Telehealth", icon: Video },
+                      { value: "phone", label: "Phone", icon: Phone },
+                    ].map(({ value, label, icon: Icon }) => (
+                      <button key={value} type="button"
+                        onClick={() => setBookVisitType(value)}
+                        className={`flex-1 flex items-center justify-center gap-1.5 rounded-md border px-3 py-2 text-xs font-medium transition-colors ${
+                          bookVisitType === value ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-primary/40 text-muted-foreground"
+                        }`}>
+                        <Icon className="h-3.5 w-3.5" />{label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {bookVisitType === "telehealth" && (
+                  <div className="space-y-2">
+                    <Label>Video Room URL <span className="text-muted-foreground text-[10px]">(optional — auto-generated if blank)</span></Label>
+                    <Input value={bookVideoUrl} onChange={(e) => setBookVideoUrl(e.target.value)} placeholder="https://meet.example.com/room-id" />
+                  </div>
+                )}
                 <div className="space-y-2">
                   <Label>Patient *</Label>
                   <select value={bookPatientId} onChange={(e) => setBookPatientId(e.target.value)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
@@ -758,6 +789,8 @@ export default function Appointments() {
                       {apt.treatments?.name ?? "General"} • Dr. {apt.providers?.last_name ?? "Unassigned"} • {format(parseISO(apt.scheduled_at), "MMM d, yyyy 'at' h:mm a")}
                     </p>
                     <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      {apt.visit_type === "telehealth" && <Badge className="bg-blue-500/10 text-blue-600 text-[10px] gap-1"><Video className="h-2.5 w-2.5" />Telehealth</Badge>}
+                      {apt.visit_type === "phone" && <Badge className="bg-amber-500/10 text-amber-600 text-[10px] gap-1"><Phone className="h-2.5 w-2.5" />Phone</Badge>}
                       {apt.rooms && <Badge variant="outline" className="text-[10px] gap-1"><DoorOpen className="h-2.5 w-2.5" />{apt.rooms.name}</Badge>}
                       {apt.devices && <Badge variant="outline" className="text-[10px] gap-1"><Cpu className="h-2.5 w-2.5" />{apt.devices.name}</Badge>}
                     </div>

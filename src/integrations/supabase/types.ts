@@ -478,6 +478,7 @@ export type Database = {
           device_id: string | null
           duration_minutes: number | null
           id: string
+          intake_form_id: string | null
           notes: string | null
           patient_id: string
           provider_id: string | null
@@ -487,6 +488,8 @@ export type Database = {
           status: Database["public"]["Enums"]["appointment_status"]
           treatment_id: string | null
           updated_at: string
+          video_room_url: string | null
+          visit_type: string
         }
         Insert: {
           cancellation_reason?: string | null
@@ -497,6 +500,7 @@ export type Database = {
           device_id?: string | null
           duration_minutes?: number | null
           id?: string
+          intake_form_id?: string | null
           notes?: string | null
           patient_id: string
           provider_id?: string | null
@@ -506,6 +510,8 @@ export type Database = {
           status?: Database["public"]["Enums"]["appointment_status"]
           treatment_id?: string | null
           updated_at?: string
+          video_room_url?: string | null
+          visit_type?: string
         }
         Update: {
           cancellation_reason?: string | null
@@ -516,6 +522,7 @@ export type Database = {
           device_id?: string | null
           duration_minutes?: number | null
           id?: string
+          intake_form_id?: string | null
           notes?: string | null
           patient_id?: string
           provider_id?: string | null
@@ -525,6 +532,8 @@ export type Database = {
           status?: Database["public"]["Enums"]["appointment_status"]
           treatment_id?: string | null
           updated_at?: string
+          video_room_url?: string | null
+          visit_type?: string
         }
         Relationships: [
           {
@@ -532,6 +541,13 @@ export type Database = {
             columns: ["device_id"]
             isOneToOne: false
             referencedRelation: "devices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_intake_form_id_fkey"
+            columns: ["intake_form_id"]
+            isOneToOne: false
+            referencedRelation: "intake_forms"
             referencedColumns: ["id"]
           },
           {
