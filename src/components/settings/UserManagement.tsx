@@ -36,7 +36,7 @@ export function UserManagement() {
     const [profilesRes, rolesRes, providersRes] = await Promise.all([
       supabase.from("profiles").select("user_id, display_name"),
       supabase.from("user_roles").select("user_id, role"),
-      supabase.from("providers").select("id, name, user_id"),
+      supabase.from("providers").select("id, first_name, last_name, user_id"),
     ]);
 
     const profiles = profilesRes.data ?? [];
@@ -53,7 +53,7 @@ export function UserManagement() {
     setProviders(
       (providersRes.data ?? []).map((p) => ({
         id: p.id,
-        name: p.name,
+        name: `${p.first_name} ${p.last_name}`,
         user_id: p.user_id,
       }))
     );
@@ -69,9 +69,8 @@ export function UserManagement() {
         const { error } = await supabase.from("user_roles").delete().eq("user_id", userId);
         if (error) throw error;
       } else {
-        // Upsert: delete then insert (no upsert on composite key easily)
         await supabase.from("user_roles").delete().eq("user_id", userId);
-        const { error } = await supabase.from("user_roles").insert({ user_id: userId, role: newRole });
+        const { error } = await supabase.from("user_roles").insert({ user_id: userId, role: newRole as "admin" | "provider" | "front_desk" });
         if (error) throw error;
       }
       toast({ title: "Role updated" });
