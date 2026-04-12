@@ -55,7 +55,7 @@ export function CheckInPanel({ appointment, open, onOpenChange }: {
     enabled: !!appointment?.patients?.id,
     queryFn: async () => {
       const { data } = await supabase.from("patient_package_purchases")
-        .select("id, package_name, sessions_total, sessions_used, expires_at")
+        .select("id, sessions_total, sessions_used, expires_at, packages:package_id(name)")
         .eq("patient_id", appointment.patients.id)
         .eq("status", "active");
       return (data ?? []).filter((p: any) => (p.sessions_total - (p.sessions_used || 0)) > 0);
