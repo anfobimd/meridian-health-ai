@@ -473,6 +473,7 @@ export type Database = {
           cancellation_reason: string | null
           cancelled_at: string | null
           checked_in_at: string | null
+          clinic_id: string | null
           completed_at: string | null
           created_at: string
           device_id: string | null
@@ -495,6 +496,7 @@ export type Database = {
           cancellation_reason?: string | null
           cancelled_at?: string | null
           checked_in_at?: string | null
+          clinic_id?: string | null
           completed_at?: string | null
           created_at?: string
           device_id?: string | null
@@ -517,6 +519,7 @@ export type Database = {
           cancellation_reason?: string | null
           cancelled_at?: string | null
           checked_in_at?: string | null
+          clinic_id?: string | null
           completed_at?: string | null
           created_at?: string
           device_id?: string | null
@@ -536,6 +539,13 @@ export type Database = {
           visit_type?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "appointments_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "appointments_device_id_fkey"
             columns: ["device_id"]
@@ -1252,32 +1262,44 @@ export type Database = {
       clinics: {
         Row: {
           address: string | null
+          city: string | null
           contract_id: string | null
           created_at: string
           id: string
           is_active: boolean
           manager_user_id: string | null
           name: string
+          phone: string | null
+          state: string | null
+          timezone: string | null
           updated_at: string
         }
         Insert: {
           address?: string | null
+          city?: string | null
           contract_id?: string | null
           created_at?: string
           id?: string
           is_active?: boolean
           manager_user_id?: string | null
           name: string
+          phone?: string | null
+          state?: string | null
+          timezone?: string | null
           updated_at?: string
         }
         Update: {
           address?: string | null
+          city?: string | null
           contract_id?: string | null
           created_at?: string
           id?: string
           is_active?: boolean
           manager_user_id?: string | null
           name?: string
+          phone?: string | null
+          state?: string | null
+          timezone?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -1635,6 +1657,7 @@ export type Database = {
         Row: {
           appointment_id: string | null
           chief_complaint: string | null
+          clinic_id: string | null
           completed_at: string | null
           created_at: string
           encounter_type: string | null
@@ -1651,6 +1674,7 @@ export type Database = {
         Insert: {
           appointment_id?: string | null
           chief_complaint?: string | null
+          clinic_id?: string | null
           completed_at?: string | null
           created_at?: string
           encounter_type?: string | null
@@ -1667,6 +1691,7 @@ export type Database = {
         Update: {
           appointment_id?: string | null
           chief_complaint?: string | null
+          clinic_id?: string | null
           completed_at?: string | null
           created_at?: string
           encounter_type?: string | null
@@ -1686,6 +1711,13 @@ export type Database = {
             columns: ["appointment_id"]
             isOneToOne: false
             referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encounters_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
             referencedColumns: ["id"]
           },
           {
