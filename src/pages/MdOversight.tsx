@@ -12,10 +12,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { toast } from "sonner";
 import {
   Shield, AlertTriangle, CheckCircle, Clock, Brain, FileText, XCircle,
   Loader2, FlaskConical, User, Edit3, ChevronDown, ChevronUp, Sparkles, Building2,
+  Target, Activity, Pill, Beaker,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 
@@ -42,6 +44,38 @@ const approvalBadge: Record<string, { label: string; class: string }> = {
   rejected: { label: "Rejected", class: "bg-red-100 text-red-800 border-red-200" },
 };
 
+const LAB_REFS: Record<string, { label: string; unit: string; low: number; high: number }> = {
+  lab_tt: { label: "Total Testosterone", unit: "ng/dL", low: 300, high: 1000 },
+  lab_ft: { label: "Free Testosterone", unit: "pg/mL", low: 8.7, high: 25.1 },
+  lab_e2: { label: "Estradiol", unit: "pg/mL", low: 10, high: 40 },
+  lab_p4: { label: "Progesterone", unit: "ng/mL", low: 0.2, high: 1.4 },
+  lab_lh: { label: "LH", unit: "mIU/mL", low: 1.7, high: 8.6 },
+  lab_fsh: { label: "FSH", unit: "mIU/mL", low: 1.5, high: 12.4 },
+  lab_shbg: { label: "SHBG", unit: "nmol/L", low: 16.5, high: 55.9 },
+  lab_prl: { label: "Prolactin", unit: "ng/mL", low: 4, high: 15 },
+  lab_psa: { label: "PSA", unit: "ng/mL", low: 0, high: 4 },
+  lab_dhea: { label: "DHEA-S", unit: "mcg/dL", low: 80, high: 560 },
+  lab_tsh: { label: "TSH", unit: "mIU/L", low: 0.4, high: 4.0 },
+  lab_ft3: { label: "Free T3", unit: "pg/mL", low: 2.0, high: 4.4 },
+  lab_ft4: { label: "Free T4", unit: "ng/dL", low: 0.8, high: 1.7 },
+  lab_hgb: { label: "Hemoglobin", unit: "g/dL", low: 13.5, high: 17.5 },
+  lab_hct: { label: "Hematocrit", unit: "%", low: 38.3, high: 48.6 },
+  lab_rbc: { label: "RBC", unit: "M/uL", low: 4.5, high: 5.5 },
+  lab_glc: { label: "Glucose", unit: "mg/dL", low: 70, high: 100 },
+  lab_a1c: { label: "HbA1c", unit: "%", low: 4, high: 5.6 },
+  lab_alt: { label: "ALT", unit: "U/L", low: 7, high: 56 },
+  lab_ast: { label: "AST", unit: "U/L", low: 10, high: 40 },
+  lab_crt: { label: "Creatinine", unit: "mg/dL", low: 0.7, high: 1.3 },
+  lab_igf1: { label: "IGF-1", unit: "ng/mL", low: 100, high: 300 },
+  lab_fins: { label: "Fasting Insulin", unit: "µIU/mL", low: 2, high: 20 },
+  lab_crp: { label: "hs-CRP", unit: "mg/L", low: 0, high: 3 },
+  lab_b12: { label: "Vitamin B12", unit: "pg/mL", low: 200, high: 900 },
+  lab_folate: { label: "Folate", unit: "ng/mL", low: 3, high: 20 },
+  lab_vitd: { label: "Vitamin D", unit: "ng/mL", low: 30, high: 100 },
+  lab_igfbp3: { label: "IGF-BP3", unit: "mg/L", low: 3.4, high: 7.8 },
+  lab_calcitonin: { label: "Calcitonin", unit: "pg/mL", low: 0, high: 10 },
+};
+
 export default function MdOversight() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("charts");
@@ -60,6 +94,7 @@ export default function MdOversight() {
   const [editedMonitoring, setEditedMonitoring] = useState("");
   const [approvalNotes, setApprovalNotes] = useState("");
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({ treatment: true, monitoring: true });
+  const [labsOpen, setLabsOpen] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const queryClient = useQueryClient();
 
@@ -94,7 +129,6 @@ export default function MdOversight() {
       const { data, error } = await query;
       if (error) throw error;
       let results = data || [];
-      // Client-side clinic filter (encounters.clinic_id)
       if (filterClinic !== "all") {
         results = results.filter((r: any) => r.encounters?.clinic_id === filterClinic);
       } else if (assignedClinicIds.length > 0) {
@@ -104,14 +138,13 @@ export default function MdOversight() {
     },
   });
 
-  // ── Hormone Approvals Query ──
+  // ── Hormone Approvals Query (removed NOT NULL filter on ai_recommendation) ──
   const { data: hormoneVisits, isLoading: hormonesLoading } = useQuery({
     queryKey: ["approval-visits", hormoneFilter],
     queryFn: async () => {
       let query = supabase
         .from("hormone_visits")
         .select("*, patients(first_name, last_name, date_of_birth, gender), providers(first_name, last_name, credentials)")
-        .not("ai_recommendation", "is", null)
         .order("created_at", { ascending: false });
       if (hormoneFilter !== "all") query = query.eq("approval_status", hormoneFilter);
       const { data, error } = await query;
@@ -153,6 +186,45 @@ export default function MdOversight() {
       return data;
     },
     onSuccess: (data) => { if (data?.comment) setMdComment(data.comment); },
+  });
+
+  // ── Generate AI Rec for hormone visit ──
+  const generateAiRecMutation = useMutation({
+    mutationFn: async (visit: any) => {
+      const pat = visit.patients;
+      const { data, error } = await supabase.functions.invoke("ai-hormone-rec", {
+        body: {
+          patient: {
+            first_name: pat?.first_name,
+            last_name: pat?.last_name,
+            gender: pat?.gender,
+            focus: visit.intake_focus || [],
+            symptoms: visit.intake_symptoms || [],
+            goals: visit.intake_goals || [],
+            contraindications: visit.peptide_contraindications || [],
+          },
+          visit,
+          priorVisits: [],
+        },
+      });
+      if (error) throw error;
+      // Save to hormone_visits
+      await supabase.from("hormone_visits").update({
+        ai_recommendation: data.summary || "AI recommendation generated",
+        ai_sections: {
+          summary: data.summary || "",
+          treatment_recommendation: data.treatment_recommendation || "",
+          monitoring_plan: data.monitoring_plan || "",
+          risk_flags: data.risk_flags || "",
+        },
+      }).eq("id", visit.id);
+      return data;
+    },
+    onSuccess: () => {
+      toast.success("AI recommendation generated");
+      queryClient.invalidateQueries({ queryKey: ["approval-visits"] });
+    },
+    onError: (e: any) => toast.error(e.message || "Failed to generate AI rec"),
   });
 
   // ── Submit Chart Review ──
@@ -228,6 +300,7 @@ export default function MdOversight() {
     setEditedTreatment(visit.edited_treatment || sections?.treatment_recommendation || "");
     setEditedMonitoring(visit.edited_monitoring || sections?.monitoring_plan || "");
     setApprovalNotes(visit.approval_notes || "");
+    setLabsOpen(false);
   };
 
   const handleChartAction = (action: string) => {
@@ -262,6 +335,19 @@ export default function MdOversight() {
   const encounter = selectedReview?.encounters;
   const patient = encounter?.patients;
   const threshold = selectedReview?.rubber_stamp_threshold_seconds || 30;
+
+  // Helper: get non-null lab values from a hormone visit
+  const getLabValues = (visit: any) => {
+    const labs: { key: string; label: string; value: number; unit: string; flag: "low" | "high" | "normal" }[] = [];
+    for (const [key, ref] of Object.entries(LAB_REFS)) {
+      const val = visit?.[key];
+      if (val != null) {
+        const flag = val < ref.low ? "low" : val > ref.high ? "high" : "normal";
+        labs.push({ key, label: ref.label, value: val, unit: ref.unit, flag });
+      }
+    }
+    return labs;
+  };
 
   return (
     <div className="space-y-6">
@@ -491,8 +577,9 @@ export default function MdOversight() {
                 const badge = approvalBadge[visit.approval_status] || approvalBadge.pending;
                 const pat = visit.patients;
                 const sections = visit.ai_sections as any;
+                const hasAiRec = !!visit.ai_recommendation;
                 return (
-                  <Card key={visit.id} className="cursor-pointer transition-all hover:shadow-md" onClick={() => openHormoneReview(visit)}>
+                  <Card key={visit.id} className="cursor-pointer transition-all hover:shadow-md" onClick={() => hasAiRec ? openHormoneReview(visit) : undefined}>
                     <CardContent className="py-4">
                       <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                         <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -513,7 +600,20 @@ export default function MdOversight() {
                         </div>
                         <div className="flex items-center gap-3 flex-shrink-0">
                           <span className="text-xs text-muted-foreground">{format(parseISO(visit.visit_date), "MMM d, yyyy")}</span>
-                          <Badge className={`${badge.class} border text-[10px]`}>{badge.label}</Badge>
+                          {hasAiRec ? (
+                            <Badge className={`${badge.class} border text-[10px]`}>{badge.label}</Badge>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-xs h-7"
+                              onClick={(e) => { e.stopPropagation(); generateAiRecMutation.mutate(visit); }}
+                              disabled={generateAiRecMutation.isPending}
+                            >
+                              {generateAiRecMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Sparkles className="h-3 w-3 mr-1" />}
+                              Generate AI Rec
+                            </Button>
+                          )}
                         </div>
                       </div>
                       {sections?.summary && <p className="text-xs text-muted-foreground mt-2 line-clamp-2 pl-12">{sections.summary}</p>}
@@ -652,9 +752,12 @@ export default function MdOversight() {
       {/* ═══════ HORMONE REVIEW DIALOG ═══════ */}
       <Dialog open={!!selectedHormone} onOpenChange={(o) => { if (!o) setSelectedHormone(null); }}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-          {selectedHormone && (selectedHormone.ai_sections as any) && (() => {
+          {selectedHormone && (() => {
             const aiSections = selectedHormone.ai_sections as any;
             const hPatient = selectedHormone.patients as any;
+            const labValues = getLabValues(selectedHormone);
+            const abnormalLabs = labValues.filter(l => l.flag !== "normal");
+
             return (
               <>
                 <DialogHeader>
@@ -667,6 +770,68 @@ export default function MdOversight() {
                 </DialogHeader>
 
                 <div className="space-y-4 mt-2">
+                  {/* ── Intake Context Section ── */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {(selectedHormone.intake_focus as string[] || []).length > 0 && (
+                      <div className="p-3 bg-muted/50 rounded-lg">
+                        <div className="flex items-center gap-1.5 mb-1.5">
+                          <Target className="h-3.5 w-3.5 text-primary" />
+                          <p className="text-[10px] font-bold text-primary uppercase tracking-wider">Focus Areas</p>
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {(selectedHormone.intake_focus as string[]).map((f: string) => (
+                            <Badge key={f} variant="secondary" className="text-[10px]">
+                              {f.replace("hormone_", "").replace("peptide_", "").replace(/_/g, " ")}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {(selectedHormone.intake_symptoms as string[] || []).length > 0 && (
+                      <div className="p-3 bg-muted/50 rounded-lg">
+                        <div className="flex items-center gap-1.5 mb-1.5">
+                          <Activity className="h-3.5 w-3.5 text-primary" />
+                          <p className="text-[10px] font-bold text-primary uppercase tracking-wider">Reported Symptoms</p>
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {(selectedHormone.intake_symptoms as string[]).map((s: string) => (
+                            <Badge key={s} variant="outline" className="text-[10px]">{s}</Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {(selectedHormone.intake_goals as string[] || []).length > 0 && (
+                      <div className="p-3 bg-muted/50 rounded-lg">
+                        <div className="flex items-center gap-1.5 mb-1.5">
+                          <CheckCircle className="h-3.5 w-3.5 text-primary" />
+                          <p className="text-[10px] font-bold text-primary uppercase tracking-wider">Patient Goals</p>
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {(selectedHormone.intake_goals as string[]).map((g: string) => (
+                            <Badge key={g} variant="outline" className="text-[10px]">{g}</Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {(selectedHormone.peptide_categories as string[] || []).length > 0 && (
+                      <div className="p-3 bg-muted/50 rounded-lg">
+                        <div className="flex items-center gap-1.5 mb-1.5">
+                          <Pill className="h-3.5 w-3.5 text-primary" />
+                          <p className="text-[10px] font-bold text-primary uppercase tracking-wider">Peptide Categories</p>
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {(selectedHormone.peptide_categories as string[]).map((c: string) => (
+                            <Badge key={c} variant="secondary" className="text-[10px]">{c.replace("peptide_", "").replace(/_/g, " ")}</Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* ── Contraindications ── */}
                   {(selectedHormone.peptide_contraindications as string[] || []).length > 0 && (
                     <div className="p-3 bg-destructive/10 rounded-lg border border-destructive/30">
                       <div className="flex items-center gap-2 mb-1">
@@ -681,48 +846,108 @@ export default function MdOversight() {
                     </div>
                   )}
 
-                  <div className="p-3 bg-primary/5 rounded-lg">
-                    <p className="text-[10px] font-bold text-primary uppercase tracking-wider mb-1">Clinical Summary</p>
-                    <p className="text-sm">{aiSections.summary}</p>
-                  </div>
+                  {/* ── Lab Values Panel ── */}
+                  {labValues.length > 0 && (
+                    <Collapsible open={labsOpen} onOpenChange={setLabsOpen}>
+                      <CollapsibleTrigger asChild>
+                        <button className="flex items-center justify-between w-full p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors">
+                          <div className="flex items-center gap-2">
+                            <Beaker className="h-4 w-4 text-primary" />
+                            <span className="text-sm font-medium">Lab Values ({labValues.length})</span>
+                            {abnormalLabs.length > 0 && (
+                              <Badge variant="destructive" className="text-[9px] px-1.5 py-0">{abnormalLabs.length} abnormal</Badge>
+                            )}
+                          </div>
+                          {labsOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                        </button>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
+                          {labValues.map((lab) => (
+                            <div key={lab.key} className={`p-2 rounded border text-xs ${lab.flag === "low" ? "border-blue-300 bg-blue-50" : lab.flag === "high" ? "border-red-300 bg-red-50" : "border-border bg-background"}`}>
+                              <p className="text-muted-foreground text-[10px]">{lab.label}</p>
+                              <p className="font-bold">
+                                {lab.value} <span className="font-normal text-muted-foreground">{lab.unit}</span>
+                                {lab.flag !== "normal" && (
+                                  <span className={`ml-1 font-bold ${lab.flag === "low" ? "text-blue-600" : "text-red-600"}`}>
+                                    {lab.flag === "low" ? "↓" : "↑"}
+                                  </span>
+                                )}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
+                  )}
 
-                  {/* Editable Treatment */}
-                  <div className="border rounded-lg overflow-hidden">
-                    <button onClick={() => setExpandedSections(p => ({ ...p, treatment: !p.treatment }))} className="flex items-center justify-between w-full p-3 bg-muted/50 hover:bg-muted transition-colors">
-                      <div className="flex items-center gap-2"><FileText className="h-4 w-4 text-primary" /><span className="text-sm font-medium">Treatment Plan</span><Badge variant="outline" className="text-[9px] ml-1">editable</Badge></div>
-                      {expandedSections.treatment ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                    </button>
-                    {expandedSections.treatment && (
-                      <div className="p-3">
-                        <Textarea value={editedTreatment} onChange={(e) => setEditedTreatment(e.target.value)} className="min-h-[180px] text-sm font-mono" />
-                        {editedTreatment !== (aiSections.treatment_recommendation || "") && (
-                          <div className="flex items-center gap-2 mt-2">
-                            <Edit3 className="h-3 w-3 text-amber-600" /><span className="text-[10px] text-amber-600 font-medium">Modified from AI original</span>
-                            <Button variant="ghost" size="sm" className="text-[10px] h-6 ml-auto" onClick={() => setEditedTreatment(aiSections.treatment_recommendation || "")}>Reset to AI version</Button>
+                  {/* ── AI Recommendation Sections ── */}
+                  {aiSections ? (
+                    <>
+                      <div className="p-3 bg-primary/5 rounded-lg">
+                        <p className="text-[10px] font-bold text-primary uppercase tracking-wider mb-1">Clinical Summary</p>
+                        <p className="text-sm">{aiSections.summary}</p>
+                      </div>
+
+                      {aiSections.risk_flags && (
+                        <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                          <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wider mb-1">Risk Flags</p>
+                          <p className="text-sm text-amber-900">{aiSections.risk_flags}</p>
+                        </div>
+                      )}
+
+                      {/* Editable Treatment */}
+                      <div className="border rounded-lg overflow-hidden">
+                        <button onClick={() => setExpandedSections(p => ({ ...p, treatment: !p.treatment }))} className="flex items-center justify-between w-full p-3 bg-muted/50 hover:bg-muted transition-colors">
+                          <div className="flex items-center gap-2"><FileText className="h-4 w-4 text-primary" /><span className="text-sm font-medium">Treatment Plan</span><Badge variant="outline" className="text-[9px] ml-1">editable</Badge></div>
+                          {expandedSections.treatment ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                        </button>
+                        {expandedSections.treatment && (
+                          <div className="p-3">
+                            <Textarea value={editedTreatment} onChange={(e) => setEditedTreatment(e.target.value)} className="min-h-[180px] text-sm font-mono" />
+                            {editedTreatment !== (aiSections.treatment_recommendation || "") && (
+                              <div className="flex items-center gap-2 mt-2">
+                                <Edit3 className="h-3 w-3 text-amber-600" /><span className="text-[10px] text-amber-600 font-medium">Modified from AI original</span>
+                                <Button variant="ghost" size="sm" className="text-[10px] h-6 ml-auto" onClick={() => setEditedTreatment(aiSections.treatment_recommendation || "")}>Reset to AI version</Button>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
-                    )}
-                  </div>
 
-                  {/* Editable Monitoring */}
-                  <div className="border rounded-lg overflow-hidden">
-                    <button onClick={() => setExpandedSections(p => ({ ...p, monitoring: !p.monitoring }))} className="flex items-center justify-between w-full p-3 bg-muted/50 hover:bg-muted transition-colors">
-                      <div className="flex items-center gap-2"><FlaskConical className="h-4 w-4 text-primary" /><span className="text-sm font-medium">Monitoring Plan</span><Badge variant="outline" className="text-[9px] ml-1">editable</Badge></div>
-                      {expandedSections.monitoring ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                    </button>
-                    {expandedSections.monitoring && (
-                      <div className="p-3">
-                        <Textarea value={editedMonitoring} onChange={(e) => setEditedMonitoring(e.target.value)} className="min-h-[120px] text-sm font-mono" />
-                        {editedMonitoring !== (aiSections.monitoring_plan || "") && (
-                          <div className="flex items-center gap-2 mt-2">
-                            <Edit3 className="h-3 w-3 text-amber-600" /><span className="text-[10px] text-amber-600 font-medium">Modified from AI original</span>
-                            <Button variant="ghost" size="sm" className="text-[10px] h-6 ml-auto" onClick={() => setEditedMonitoring(aiSections.monitoring_plan || "")}>Reset to AI version</Button>
+                      {/* Editable Monitoring */}
+                      <div className="border rounded-lg overflow-hidden">
+                        <button onClick={() => setExpandedSections(p => ({ ...p, monitoring: !p.monitoring }))} className="flex items-center justify-between w-full p-3 bg-muted/50 hover:bg-muted transition-colors">
+                          <div className="flex items-center gap-2"><FlaskConical className="h-4 w-4 text-primary" /><span className="text-sm font-medium">Monitoring Plan</span><Badge variant="outline" className="text-[9px] ml-1">editable</Badge></div>
+                          {expandedSections.monitoring ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                        </button>
+                        {expandedSections.monitoring && (
+                          <div className="p-3">
+                            <Textarea value={editedMonitoring} onChange={(e) => setEditedMonitoring(e.target.value)} className="min-h-[120px] text-sm font-mono" />
+                            {editedMonitoring !== (aiSections.monitoring_plan || "") && (
+                              <div className="flex items-center gap-2 mt-2">
+                                <Edit3 className="h-3 w-3 text-amber-600" /><span className="text-[10px] text-amber-600 font-medium">Modified from AI original</span>
+                                <Button variant="ghost" size="sm" className="text-[10px] h-6 ml-auto" onClick={() => setEditedMonitoring(aiSections.monitoring_plan || "")}>Reset to AI version</Button>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
-                    )}
-                  </div>
+                    </>
+                  ) : (
+                    <div className="p-6 text-center border rounded-lg border-dashed">
+                      <Sparkles className="h-8 w-8 text-muted-foreground/30 mx-auto mb-2" />
+                      <p className="text-sm text-muted-foreground mb-3">AI recommendation not yet generated</p>
+                      <Button
+                        size="sm"
+                        onClick={() => generateAiRecMutation.mutate(selectedHormone)}
+                        disabled={generateAiRecMutation.isPending}
+                      >
+                        {generateAiRecMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Sparkles className="h-4 w-4 mr-1" />}
+                        Generate AI Recommendation
+                      </Button>
+                    </div>
+                  )}
 
                   <div>
                     <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Physician Notes</p>
@@ -733,7 +958,7 @@ export default function MdOversight() {
                     <Button variant="destructive" size="sm" onClick={() => hormoneApprovalMutation.mutate({ status: "rejected", visitId: selectedHormone.id })} disabled={hormoneApprovalMutation.isPending}>
                       <XCircle className="h-4 w-4 mr-1" /> Reject
                     </Button>
-                    <Button size="sm" onClick={() => handleHormoneApprove(selectedHormone.id)} disabled={hormoneApprovalMutation.isPending}>
+                    <Button size="sm" onClick={() => handleHormoneApprove(selectedHormone.id)} disabled={hormoneApprovalMutation.isPending || !aiSections}>
                       {hormoneApprovalMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <CheckCircle className="h-4 w-4 mr-1" />}
                       Approve
                     </Button>

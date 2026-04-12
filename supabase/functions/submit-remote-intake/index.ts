@@ -35,7 +35,6 @@ Deno.serve(async (req) => {
       contraindications, allergies, labValues,
       generalSig, telehealthSig, generalConsentText, telehealthConsentText,
       userAgent,
-      // New fields for invitation linking
       invitation_token, existing_patient_id,
     } = body;
 
@@ -54,7 +53,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Email format validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       return new Response(JSON.stringify({ error: "Invalid email format" }), {
@@ -70,9 +68,7 @@ Deno.serve(async (req) => {
 
     let patientId: string;
 
-    // If existing_patient_id provided (from invitation), use that instead of creating new
     if (existing_patient_id) {
-      // Verify patient exists
       const { data: existingPatient, error: epErr } = await supabaseAdmin
         .from("patients")
         .select("id")
@@ -80,7 +76,6 @@ Deno.serve(async (req) => {
         .single();
 
       if (epErr || !existingPatient) {
-        // Fallback: create new patient
         const { data: patient, error: pErr } = await supabaseAdmin.from("patients").insert({
           first_name: firstName.trim(),
           last_name: lastName.trim(),
@@ -94,7 +89,6 @@ Deno.serve(async (req) => {
         patientId = patient.id;
       } else {
         patientId = existingPatient.id;
-        // Update patient demographics with latest info
         await supabaseAdmin.from("patients").update({
           phone: phone?.trim() || undefined,
           date_of_birth: dob || undefined,
@@ -102,7 +96,6 @@ Deno.serve(async (req) => {
         }).eq("id", patientId);
       }
     } else {
-      // Create patient (original flow)
       const { data: patient, error: pErr } = await supabaseAdmin.from("patients").insert({
         first_name: firstName.trim(),
         last_name: lastName.trim(),
@@ -151,7 +144,7 @@ Deno.serve(async (req) => {
     if (ifErr) console.error("Intake form error:", ifErr);
 
     // Create hormone visit with labs
-    await supabaseAdmin.from("hormone_visits").insert({
+    const { data: hormoneVisit, error: hvErr } = await supabaseAdmin.from("hormone_visits").insert({
       patient_id: patientId,
       ...labData,
       intake_symptoms: symptoms || [],
@@ -159,7 +152,9 @@ Deno.serve(async (req) => {
       intake_focus: focus || [],
       peptide_categories: (focus || []).filter((f: string) => f.startsWith("peptide_")),
       peptide_contraindications: contraindications || [],
-    });
+    }).select("id").single();
+
+    if (hvErr) console.error("Hormone visit error:", hvErr);
 
     // Save e-consents
     const consents = [];
@@ -200,7 +195,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Auto-create front desk notification/task for telehealth booking
+    // Auto-create front desk notification
     try {
       await supabaseAdmin.from("patient_communication_log").insert({
         patient_id: patientId,
@@ -212,6 +207,76 @@ Deno.serve(async (req) => {
       });
     } catch (e) {
       console.error("Auto-task creation error:", e);
+    }
+
+    // ── Auto-trigger AI hormone recommendation (fire-and-forget) ──
+    if (hormoneVisit?.id) {
+      const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+      const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+      const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
+
+      if (LOVABLE_API_KEY && SUPABASE_URL && SUPABASE_ANON_KEY) {
+        // Fire-and-forget: call ai-hormone-rec in background
+        (async () => {
+          try {
+            const visitPayload = {
+              ...labData,
+              intake_symptoms: symptoms || [],
+              intake_goals: goals || [],
+              intake_focus: focus || [],
+              peptide_categories: (focus || []).filter((f: string) => f.startsWith("peptide_")),
+              peptide_contraindications: contraindications || [],
+              visit_date: new Date().toISOString(),
+            };
+
+            const patientPayload = {
+              first_name: firstName.trim(),
+              last_name: lastName.trim(),
+              gender: sex || null,
+              sex: sex || null,
+              weight_lbs: weightLbs || null,
+              height_in: heightIn || null,
+              focus: focus || [],
+              symptoms: symptoms || [],
+              goals: goals || [],
+              contraindications: contraindications || [],
+              medications: medications || "",
+            };
+
+            const aiRes = await fetch(`${SUPABASE_URL}/functions/v1/ai-hormone-rec`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+              },
+              body: JSON.stringify({
+                patient: patientPayload,
+                visit: visitPayload,
+                priorVisits: [],
+              }),
+            });
+
+            if (aiRes.ok) {
+              const rec = await aiRes.json();
+              // Save AI recommendation and sections to the hormone visit
+              await supabaseAdmin.from("hormone_visits").update({
+                ai_recommendation: rec.summary || "AI recommendation generated",
+                ai_sections: {
+                  summary: rec.summary || "",
+                  treatment_recommendation: rec.treatment_recommendation || "",
+                  monitoring_plan: rec.monitoring_plan || "",
+                  risk_flags: rec.risk_flags || "",
+                },
+              }).eq("id", hormoneVisit.id);
+              console.log("AI hormone rec auto-generated for visit", hormoneVisit.id);
+            } else {
+              console.error("AI hormone rec failed:", aiRes.status, await aiRes.text());
+            }
+          } catch (aiErr) {
+            console.error("AI hormone rec error:", aiErr);
+          }
+        })();
+      }
     }
 
     return new Response(JSON.stringify({ success: true, patientId, intakeFormId: intakeForm?.id || null }), {
