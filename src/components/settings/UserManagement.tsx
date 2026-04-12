@@ -53,7 +53,7 @@ export function UserManagement() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     const [profilesRes, rolesRes, providersRes] = await Promise.all([
-      supabase.from("profiles").select("user_id, display_name, email"),
+      supabase.from("profiles").select("user_id, display_name"),
       supabase.from("user_roles").select("user_id, role"),
       supabase.from("providers").select("id, first_name, last_name, user_id"),
     ]);
@@ -66,7 +66,7 @@ export function UserManagement() {
       profiles.map((p) => ({
         user_id: p.user_id,
         display_name: p.display_name,
-        email: (p as any).email ?? null,
+        email: null,
         role: roleMap.get(p.user_id) ?? null,
       }))
     );
