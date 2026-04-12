@@ -304,29 +304,29 @@ export default function MdOversightDashboard() {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {report.narrative && <p className="text-sm">{report.narrative}</p>}
-                  {(report.highlights as any[])?.length > 0 && (
+                  {Array.isArray(report.highlights) && report.highlights.length > 0 && (
                     <div>
                       <p className="text-xs font-bold text-primary mb-1">Highlights</p>
                       <ul className="text-sm list-disc pl-4 space-y-1">
-                        {(report.highlights as any[]).map((h: string, i: number) => (
+                        {report.highlights.map((h: string, i: number) => (
                           <li key={i}>{h}</li>
                         ))}
                       </ul>
                     </div>
                   )}
-                  {(report.alerts as any[])?.length > 0 && (
+                  {Array.isArray(report.alerts) && report.alerts.length > 0 && (
                     <div>
-                      <p className="text-xs font-bold text-red-600 mb-1">Alerts</p>
-                      {(report.alerts as any[]).map((a: string, i: number) => (
+                      <p className="text-xs font-bold text-destructive mb-1">Alerts</p>
+                      {report.alerts.map((a: string, i: number) => (
                         <Badge key={i} variant="destructive" className="mr-1 mb-1">{a}</Badge>
                       ))}
                     </div>
                   )}
-                  {(report.recommendations as any[])?.length > 0 && (
+                  {Array.isArray(report.recommendations) && report.recommendations.length > 0 && (
                     <div>
                       <p className="text-xs font-bold text-primary mb-1">Recommendations</p>
                       <ul className="text-sm list-disc pl-4 space-y-1">
-                        {(report.recommendations as any[]).map((r: string, i: number) => (
+                        {report.recommendations.map((r: string, i: number) => (
                           <li key={i}>{r}</li>
                         ))}
                       </ul>
