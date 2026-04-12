@@ -189,6 +189,20 @@ export default function Appointments() {
         throw new Error("Conflict detected: " + result.conflicts.map((c) => c.label).join("; "));
       }
 
+      // Auto-link most recent intake form for telehealth bookings
+      let intakeFormId: string | null = null;
+      if (bookVisitType === "telehealth" && bookPatientId) {
+        const { data: recentIntake } = await supabase
+          .from("intake_forms")
+          .select("id")
+          .eq("patient_id", bookPatientId)
+          .not("submitted_at", "is", null)
+          .order("submitted_at", { ascending: false })
+          .limit(1)
+          .single();
+        if (recentIntake) intakeFormId = recentIntake.id;
+      }
+
       const apt: any = {
         patient_id: bookPatientId,
         provider_id: bookProviderId || null,
@@ -200,6 +214,7 @@ export default function Appointments() {
         device_id: bookDeviceId || null,
         visit_type: bookVisitType,
         video_room_url: bookVisitType === "telehealth" ? (bookVideoUrl || null) : null,
+        intake_form_id: intakeFormId,
       };
       const { error } = await supabase.from("appointments").insert(apt);
       if (error) throw error;

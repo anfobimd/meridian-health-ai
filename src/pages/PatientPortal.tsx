@@ -381,8 +381,12 @@ function TelehealthTab({ patientId }: { patientId: string }) {
                       )}
                     </div>
                   </div>
-                  {canJoin(apt) && !apt.video_room_url && (
-                    <p className="text-xs text-muted-foreground mt-2 ml-13">Your provider will connect shortly. Please wait here.</p>
+                  {!apt.video_room_url && (
+                    <p className="text-xs text-muted-foreground mt-2 ml-13">
+                      {canJoin(apt)
+                        ? "Your provider will connect shortly. Please wait here."
+                        : "Video link will be available shortly before your appointment."}
+                    </p>
                   )}
                   {canJoin(apt) && (
                     <div className="mt-3 ml-13 p-3 bg-muted/50 rounded-md">

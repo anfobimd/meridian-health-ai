@@ -12,6 +12,22 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
+
+    // Handle "mark opened" ping — early return
+    if (body._markOpened && body.token) {
+      const supabaseAdmin = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      );
+      await supabaseAdmin.from("intake_invitations").update({
+        opened_at: new Date().toISOString(),
+        status: "opened",
+      }).eq("token", body.token).eq("status", "sent");
+      return new Response(JSON.stringify({ success: true, opened: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const {
       firstName, lastName, email, phone, dob, sex,
       weightLbs, heightIn, menoStatus,
