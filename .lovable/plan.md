@@ -1,58 +1,56 @@
 
 
-# Facility-Scoped MD Dashboard — Implementation Plan
+# Labs + AI Hormone/Peptide Recommendations for Doctors — Implementation Plan
 
-## Why start here
+## Current State
 
-The contracts and clinics tables exist, and MD coverage assignments link MDs to clinics. But **encounters and appointments have no `clinic_id` column** — so there's no way to scope what an MD sees by facility. This is the structural fix that unlocks everything else.
+The intake → labs → doctor review pipeline is **mostly wired** but has these gaps:
 
-## What we'll build
+1. **`_markOpened` bug**: `RemoteIntake.tsx` sends `{ _markOpened: true, invitation_token: token }` but the edge function checks `body.token`, not `body.invitation_token`. Invitation never gets marked "opened."
 
-### 1. Database: Add `clinic_id` to appointments and encounters
+2. **Intake form lab data not visible to MD on the Hormone Approvals tab**: When a remote intake creates a `hormone_visit`, the MD Oversight "Hormone Approvals" tab shows it — but only if someone manually triggers "AI Rec" first (since the query filters `NOT ai_recommendation IS NULL`). Remote intakes don't auto-generate the AI recommendation.
 
-- Add `clinic_id` (uuid, nullable, FK → clinics) to `appointments` and `encounters`
-- When booking, front desk selects clinic; encounter inherits from appointment on creation
+3. **No AI recommendation auto-triggered on intake submission**: The `submit-remote-intake` edge function creates a `hormone_visit` with lab values, symptoms, goals, and focus areas — but never calls `ai-hormone-rec`. The doctor has to manually click "AI Rec" on the HormoneVisits page first.
 
-### 2. Enrich clinics table
+4. **Intake lab values use different key mapping**: The `ai-extract-labs` function returns keys like `tt`, `ft`, `e2` — the intake form maps them to `lab_tt`, `lab_ft`, etc. The `submit-remote-intake` function stores them correctly in `hormone_visits`. This works.
 
-- Add `phone`, `timezone`, `city`, `state` columns to `clinics` for better facility cards
-- Update `ContractsAdmin.tsx` clinic form to capture these fields
+5. **MD Oversight hormone tab doesn't show intake context**: The hormone review dialog shows AI recommendation sections (summary, treatment, monitoring, risk flags) but doesn't show the intake form's focus areas, symptoms, goals, or contraindications — critical for peptide/hormone review.
 
-### 3. Clinic selector in booking flow
+## What We'll Build
 
-- Add a clinic dropdown to the appointment booking dialog in `Appointments.tsx`
-- Default to the provider's primary clinic if one exists (via `md_coverage_assignments` or a new `provider_clinic_assignments` table — we'll use a simple approach: let front desk pick)
+### Fix 1: Fix `_markOpened` token field mismatch
+- In `RemoteIntake.tsx`, change `invitation_token` to `token` in the markOpened call to match the edge function's expected field.
 
-### 4. Encounter inherits clinic_id
+### Fix 2: Auto-trigger AI recommendation on remote intake submission
+- In `submit-remote-intake` edge function, after creating the `hormone_visit`, call `ai-hormone-rec` with the patient data, visit labs, symptoms, goals, and focus areas.
+- Save the AI response to `hormone_visits.ai_recommendation` and `ai_sections`.
+- This means the visit immediately appears in the MD's Hormone Approvals queue with a recommendation ready for review.
 
-- When `TelehealthVisit.tsx` and `EncounterChart.tsx` auto-create encounters, copy `clinic_id` from the appointment
+### Fix 3: Show intake context in MD hormone review
+- In `MdOversight.tsx` hormone review dialog, add a section showing:
+  - Focus areas (e.g., "Male TRT", "GLP-1", "BPC-157")
+  - Reported symptoms
+  - Patient goals
+  - Contraindication flags (with severity highlighting for absolute contraindications)
+  - Medications and prior therapy
+- These fields already exist on `hormone_visits` (`intake_symptoms`, `intake_goals`, `intake_focus`, `peptide_categories`, `peptide_contraindications`).
 
-### 5. Facility-scoped MD Oversight views
+### Fix 4: Show all lab values in MD review (not just TT/E2/TSH)
+- The hormone review dialog currently shows the AI sections but not the actual lab values. Add a collapsible lab panel showing all non-null lab values with reference range flags (using the same `LAB_REFS` from the edge function).
 
-- **MdOversight.tsx**: On load, fetch the logged-in MD's `md_coverage_assignments` to get their assigned `clinic_id`s. Add a clinic filter dropdown (defaulting to "All My Clinics"). Filter `chart_review_records` and `hormone_visits` queries by joining through encounters → clinic_id.
-- **MdOversightDashboard.tsx**: Same clinic scoping for stats, provider intelligence, and reports. Add a facility summary card showing each assigned clinic with pending review counts.
+### Fix 5: Remove `NOT ai_recommendation IS NULL` filter
+- Update the hormone approvals query in `MdOversight.tsx` to also show visits that have no AI recommendation yet (in case the auto-trigger fails), with a "Generate AI Rec" button inline.
 
-### 6. MD "My Facilities" overview card
-
-- New section at top of MdOversightDashboard showing assigned clinics as cards with: clinic name, contract name, pending charts count, last review date. Clicking a card filters the entire dashboard to that facility.
-
-## Files to create/modify
+## Files to Modify
 
 | File | Change |
 |------|--------|
-| Migration SQL | Add `clinic_id` to appointments + encounters; add phone/timezone/city/state to clinics |
-| `src/pages/Appointments.tsx` | Add clinic selector to booking dialog |
-| `src/pages/EncounterChart.tsx` | Copy clinic_id from appointment when creating encounter |
-| `src/pages/TelehealthVisit.tsx` | Same — copy clinic_id |
-| `src/pages/MdOversight.tsx` | Fetch MD's assigned clinics, add clinic filter, scope all queries |
-| `src/pages/MdOversightDashboard.tsx` | Add facility cards, scope stats by clinic |
-| `src/pages/ContractsAdmin.tsx` | Add phone/timezone/city/state to clinic form |
-| `src/pages/MdCoverage.tsx` | No changes needed (already works) |
+| `src/pages/RemoteIntake.tsx` | Fix `_markOpened` call: send `token` not `invitation_token` |
+| `supabase/functions/submit-remote-intake/index.ts` | After creating hormone_visit, call `ai-hormone-rec` and save result |
+| `src/pages/MdOversight.tsx` | Add intake context, lab values panel, remove null-recommendation filter, add inline AI Rec button |
 
-## Technical notes
-
-- `clinic_id` is nullable so existing data isn't broken
-- MD clinic scoping uses: `SELECT clinic_id FROM md_coverage_assignments WHERE md_provider_id = (SELECT id FROM providers WHERE auth_user_id = current_user_id)`
-- No new tables needed — leverages existing `md_coverage_assignments`
-- After this batch, the second feature (enriching contracts structure, adding provider-to-clinic assignments for non-MDs) becomes straightforward
+## Technical Notes
+- The `submit-remote-intake` edge function already has `SUPABASE_URL` and `LOVABLE_API_KEY` available, so it can call `ai-hormone-rec` internally via fetch.
+- No database changes needed — all fields already exist on `hormone_visits`.
+- The auto-AI-rec call is fire-and-forget (non-blocking) so the patient's submission response isn't delayed.
 
