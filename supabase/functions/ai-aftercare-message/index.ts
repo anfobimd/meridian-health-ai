@@ -11,10 +11,16 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { patient_id, procedure_type, custom_instructions } = await req.json();
+    const { patient_id, procedure_type, custom_instructions, encounter_id, patient_name, auto_send } = await req.json();
 
-    if (!patient_id) {
-      return new Response(JSON.stringify({ error: "patient_id is required" }), {
+    // Allow either patient_id or encounter_id
+    let resolvedPatientId = patient_id;
+    if (!resolvedPatientId && encounter_id) {
+      const { data: enc } = await supabaseAdmin.from("encounters").select("patient_id").eq("id", encounter_id).single();
+      resolvedPatientId = enc?.patient_id;
+    }
+    if (!resolvedPatientId) {
+      return new Response(JSON.stringify({ error: "patient_id or encounter_id required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -33,14 +39,14 @@ Deno.serve(async (req) => {
 
     // Get patient info
     const { data: patient } = await supabaseAdmin.from("patients")
-      .select("first_name, last_name, allergies")
-      .eq("id", patient_id)
+      .select("first_name, last_name, allergies, phone, email")
+      .eq("id", resolvedPatientId)
       .single();
 
     // Get recent appointment/treatment info
     const { data: recentApt } = await supabaseAdmin.from("appointments")
       .select("treatments(name), completed_at, notes")
-      .eq("patient_id", patient_id)
+      .eq("patient_id", resolvedPatientId)
       .eq("status", "completed" as any)
       .order("completed_at", { ascending: false })
       .limit(1)
@@ -59,6 +65,7 @@ Deno.serve(async (req) => {
     }
 
     const treatmentName = procedure_type || recentApt?.treatments?.name || "general visit";
+    const patientFirstName = patient_name?.split(" ")[0] || patient?.first_name || "the patient";
 
     const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -84,7 +91,7 @@ ${patient?.allergies?.length ? `Patient allergies: ${patient.allergies.join(", "
 ${custom_instructions ? `Additional instructions: ${custom_instructions}` : ""}`
         }, {
           role: "user",
-          content: `Generate aftercare instructions for ${patient?.first_name || "the patient"} after their ${treatmentName} procedure.`,
+          content: `Generate aftercare instructions for ${patientFirstName} after their ${treatmentName} procedure.`,
         }],
         response_format: { type: "json_object" },
         temperature: 0.3,
@@ -110,12 +117,26 @@ ${custom_instructions ? `Additional instructions: ${custom_instructions}` : ""}`
     }
 
     const aiData = await aiRes.json();
-    let result = {};
+    let result: any = {};
     try {
       result = JSON.parse(aiData.choices?.[0]?.message?.content || "{}");
     } catch { result = { error: "Failed to parse AI response" }; }
 
-    return new Response(JSON.stringify(result), {
+    // Auto-send: log to patient communication
+    if (auto_send && resolvedPatientId && result.body) {
+      try {
+        await supabaseAdmin.from("patient_communication_log").insert({
+          patient_id: resolvedPatientId,
+          direction: "outbound",
+          channel: "sms",
+          subject: `Aftercare: ${treatmentName}`,
+          body: result.body,
+          is_read: false,
+        });
+      } catch (e) { console.error("Failed to log aftercare communication:", e); }
+    }
+
+    return new Response(JSON.stringify({ ...result, auto_sent: !!auto_send }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
