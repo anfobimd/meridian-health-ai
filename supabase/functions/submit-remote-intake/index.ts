@@ -19,6 +19,8 @@ Deno.serve(async (req) => {
       contraindications, allergies, labValues,
       generalSig, telehealthSig, generalConsentText, telehealthConsentText,
       userAgent,
+      // New fields for invitation linking
+      invitation_token, existing_patient_id,
     } = body;
 
     // Basic validation
@@ -50,18 +52,53 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    // Create patient
-    const { data: patient, error: pErr } = await supabaseAdmin.from("patients").insert({
-      first_name: firstName.trim(),
-      last_name: lastName.trim(),
-      email: email.trim().toLowerCase(),
-      phone: phone?.trim() || null,
-      date_of_birth: dob || null,
-      gender: sex || null,
-      is_active: true,
-    }).select("id").single();
+    let patientId: string;
 
-    if (pErr) throw pErr;
+    // If existing_patient_id provided (from invitation), use that instead of creating new
+    if (existing_patient_id) {
+      // Verify patient exists
+      const { data: existingPatient, error: epErr } = await supabaseAdmin
+        .from("patients")
+        .select("id")
+        .eq("id", existing_patient_id)
+        .single();
+
+      if (epErr || !existingPatient) {
+        // Fallback: create new patient
+        const { data: patient, error: pErr } = await supabaseAdmin.from("patients").insert({
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
+          email: email.trim().toLowerCase(),
+          phone: phone?.trim() || null,
+          date_of_birth: dob || null,
+          gender: sex || null,
+          is_active: true,
+        }).select("id").single();
+        if (pErr) throw pErr;
+        patientId = patient.id;
+      } else {
+        patientId = existingPatient.id;
+        // Update patient demographics with latest info
+        await supabaseAdmin.from("patients").update({
+          phone: phone?.trim() || undefined,
+          date_of_birth: dob || undefined,
+          gender: sex || undefined,
+        }).eq("id", patientId);
+      }
+    } else {
+      // Create patient (original flow)
+      const { data: patient, error: pErr } = await supabaseAdmin.from("patients").insert({
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
+        email: email.trim().toLowerCase(),
+        phone: phone?.trim() || null,
+        date_of_birth: dob || null,
+        gender: sex || null,
+        is_active: true,
+      }).select("id").single();
+      if (pErr) throw pErr;
+      patientId = patient.id;
+    }
 
     // Build lab data
     const labData: Record<string, number | null> = {};
@@ -79,7 +116,7 @@ Deno.serve(async (req) => {
 
     // Create intake form
     const { data: intakeForm, error: ifErr } = await supabaseAdmin.from("intake_forms").insert({
-      patient_id: patient.id,
+      patient_id: patientId,
       form_type: "remote_hormone",
       responses: {
         focus: focus || [],
@@ -99,7 +136,7 @@ Deno.serve(async (req) => {
 
     // Create hormone visit with labs
     await supabaseAdmin.from("hormone_visits").insert({
-      patient_id: patient.id,
+      patient_id: patientId,
       ...labData,
       intake_symptoms: symptoms || [],
       intake_goals: goals || [],
@@ -112,7 +149,7 @@ Deno.serve(async (req) => {
     const consents = [];
     if (generalSig) {
       consents.push({
-        patient_id: patient.id,
+        patient_id: patientId,
         consent_type: "general",
         consent_text: generalConsentText || "General consent",
         signature_data: generalSig,
@@ -122,7 +159,7 @@ Deno.serve(async (req) => {
     }
     if (telehealthSig) {
       consents.push({
-        patient_id: patient.id,
+        patient_id: patientId,
         consent_type: "telehealth",
         consent_text: telehealthConsentText || "Telehealth consent",
         signature_data: telehealthSig,
@@ -134,10 +171,23 @@ Deno.serve(async (req) => {
       await supabaseAdmin.from("e_consents").insert(consents);
     }
 
+    // Update invitation if token provided
+    if (invitation_token) {
+      try {
+        await supabaseAdmin.from("intake_invitations").update({
+          status: "completed",
+          completed_at: new Date().toISOString(),
+          intake_form_id: intakeForm?.id || null,
+        }).eq("token", invitation_token);
+      } catch (e) {
+        console.error("Invitation update error:", e);
+      }
+    }
+
     // Auto-create front desk notification/task for telehealth booking
     try {
       await supabaseAdmin.from("patient_communication_log").insert({
-        patient_id: patient.id,
+        patient_id: patientId,
         direction: "inbound",
         channel: "portal",
         subject: "Remote Intake Submitted — Book Telehealth",
@@ -148,7 +198,7 @@ Deno.serve(async (req) => {
       console.error("Auto-task creation error:", e);
     }
 
-    return new Response(JSON.stringify({ success: true, patientId: patient.id, intakeFormId: intakeForm?.id || null }), {
+    return new Response(JSON.stringify({ success: true, patientId, intakeFormId: intakeForm?.id || null }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
