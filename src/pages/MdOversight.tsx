@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,7 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import {
   Shield, AlertTriangle, CheckCircle, Clock, Brain, FileText, XCircle,
-  Loader2, FlaskConical, User, Edit3, ChevronDown, ChevronUp, Sparkles,
+  Loader2, FlaskConical, User, Edit3, ChevronDown, ChevronUp, Sparkles, Building2,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 
@@ -42,11 +43,13 @@ const approvalBadge: Record<string, { label: string; class: string }> = {
 };
 
 export default function MdOversight() {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("charts");
   const [selectedReview, setSelectedReview] = useState<any>(null);
   const [selectedHormone, setSelectedHormone] = useState<any>(null);
   const [filterTier, setFilterTier] = useState("all");
   const [filterStatus, setFilterStatus] = useState("pending_review");
+  const [filterClinic, setFilterClinic] = useState("all");
   const [hormoneFilter, setHormoneFilter] = useState("pending");
   const [mdComment, setMdComment] = useState("");
   const [reviewStartTime, setReviewStartTime] = useState<number | null>(null);
@@ -59,6 +62,25 @@ export default function MdOversight() {
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({ treatment: true, monitoring: true });
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const queryClient = useQueryClient();
+
+  // ── MD's assigned clinics ──
+  const { data: assignedClinics = [] } = useQuery({
+    queryKey: ["md-assigned-clinics", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const { data: provider } = await supabase.from("providers").select("id").eq("auth_user_id", user.id).single();
+      if (!provider) return [];
+      const { data } = await supabase
+        .from("md_coverage_assignments")
+        .select("clinic_id, clinics(id, name, contract_id, contracts(name))")
+        .eq("md_provider_id", provider.id)
+        .eq("is_active", true);
+      return data?.map((d: any) => ({ id: d.clinic_id, name: d.clinics?.name, contractName: d.clinics?.contracts?.name })) || [];
+    },
+    enabled: !!user?.id,
+  });
+
+  const assignedClinicIds = assignedClinics.map((c: any) => c.id);
 
   // ── Chart Reviews Query ──
   const { data: reviews, isLoading: reviewsLoading } = useQuery({
