@@ -14,7 +14,7 @@ import {
   Stethoscope, Clock, FileText, User, AlertTriangle,
   Package, Sparkles, Loader2, CheckCircle2, Play, ChevronRight,
   ChevronDown, Send, Calendar, ClipboardList, MessageSquare,
-  RefreshCw, TrendingUp,
+  RefreshCw, TrendingUp, Video, Phone,
 } from "lucide-react";
 import { StatCard } from "@/components/StatCard";
 
@@ -333,6 +333,8 @@ export default function ProviderDay() {
                     <p className="text-sm text-muted-foreground truncate">
                       {currentApt.treatments?.name || "General"} · {format(parseISO(currentApt.scheduled_at), "h:mm a")}
                       {currentApt.rooms && ` · ${(currentApt.rooms as any).name}`}
+                      {currentApt.visit_type === "telehealth" && " · 📹 Telehealth"}
+                      {currentApt.visit_type === "phone" && " · 📞 Phone"}
                     </p>
                     {currentApt.patients?.allergies?.length > 0 && (
                       <div className="flex items-center gap-1 mt-1">
@@ -347,9 +349,16 @@ export default function ProviderDay() {
                     )}
                   </div>
                 </div>
-                <Button className="shrink-0" onClick={() => openChart(currentApt)}>
-                  <FileText className="h-4 w-4 mr-1.5" /> Open Chart
-                </Button>
+                <div className="flex items-center gap-2 shrink-0">
+                  {currentApt.visit_type === "telehealth" && (
+                    <Button variant="outline" className="shrink-0 gap-1 border-primary/30 text-primary" onClick={() => navigate(`/telehealth/${currentApt.id}`)}>
+                      <Video className="h-4 w-4" /> Join Telehealth
+                    </Button>
+                  )}
+                  <Button className="shrink-0" onClick={() => openChart(currentApt)}>
+                    <FileText className="h-4 w-4 mr-1.5" /> Open Chart
+                  </Button>
+                </div>
               </div>
               {/* AI brief inline - auto-loaded */}
               {aiBrief[currentApt.id] ? (
@@ -398,6 +407,21 @@ export default function ProviderDay() {
                         </div>
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
+                        {apt.visit_type === "telehealth" && (
+                          <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">
+                            <Video className="h-2.5 w-2.5 mr-0.5" />Video
+                          </Badge>
+                        )}
+                        {apt.visit_type === "phone" && (
+                          <Badge variant="outline" className="text-[10px]">
+                            <Phone className="h-2.5 w-2.5 mr-0.5" />Phone
+                          </Badge>
+                        )}
+                        {apt.intake_form_id && (
+                          <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">
+                            <ClipboardList className="h-2.5 w-2.5 mr-0.5" />Intake ✓
+                          </Badge>
+                        )}
                         {lapsed && (
                           <Badge variant="outline" className="text-[10px] border-warning/30 text-warning">
                             <Clock className="h-2.5 w-2.5 mr-0.5" />Lapsed
@@ -419,7 +443,12 @@ export default function ProviderDay() {
                         <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => loadAiBrief(apt)} disabled={briefLoading[apt.id]} title="AI Brief">
                           {briefLoading[apt.id] ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openChart(apt)} title="Open Chart">
+                        {apt.visit_type === "telehealth" && (
+                          <Button variant="outline" size="sm" className="h-7 text-xs text-primary border-primary/30" onClick={() => navigate(`/telehealth/${apt.id}`)}>
+                            <Video className="h-3 w-3 mr-0.5" /> Join
+                          </Button>
+                        )}
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => apt.visit_type === "telehealth" ? navigate(`/telehealth/${apt.id}`) : openChart(apt)} title="Open Chart">
                           <ChevronRight className="h-4 w-4" />
                         </Button>
                       </div>
@@ -461,7 +490,15 @@ export default function ProviderDay() {
                     <Button variant="ghost" size="sm" className="text-xs h-7" onClick={() => openChart(apt)}>
                       View Chart <ChevronRight className="h-3 w-3 ml-1" />
                     </Button>
-                    <Button variant="ghost" size="sm" className="text-xs h-7 text-primary" onClick={() => toast.info("Aftercare sending coming in Batch 3")}>
+                    <Button variant="ghost" size="sm" className="text-xs h-7 text-primary" onClick={async () => {
+                      try {
+                        const { data: enc } = await supabase.from("encounters").select("id").eq("appointment_id", apt.id).limit(1);
+                        await supabase.functions.invoke("ai-aftercare-message", {
+                          body: { encounter_id: enc?.[0]?.id, procedure_type: apt.treatments?.name || "Visit", patient_name: `${apt.patients?.first_name} ${apt.patients?.last_name}`, auto_send: true },
+                        });
+                        toast.success("Aftercare sent");
+                      } catch { toast.error("Failed to send aftercare"); }
+                    }}>
                       <Send className="h-3 w-3 mr-1" /> Aftercare
                     </Button>
                   </div>
