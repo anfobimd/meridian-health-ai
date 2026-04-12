@@ -13,6 +13,7 @@ import {
   Shield, ShieldCheck, Loader2, QrCode, Trash2, KeyRound, Check, X, UserCog,
   AlertTriangle, Lock, Sparkles, Copy,
 } from "lucide-react";
+import { UserManagement } from "@/components/settings/UserManagement";
 
 const MAX_ATTEMPTS = 3;
 const LOCKOUT_SECONDS = 60;
@@ -451,6 +452,9 @@ export default function Settings() {
 
       {/* Notification Preferences */}
       <NotificationPreferences />
+
+      {/* Admin: User & Role Management */}
+      {role === "admin" && <UserManagement />}
 
       {/* Admin: Reset User Password */}
       {role === "admin" && <AdminPasswordReset />}
