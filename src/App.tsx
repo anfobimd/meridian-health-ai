@@ -62,6 +62,7 @@ import NotificationCenter from "./pages/NotificationCenter";
 import MultiProviderCalendar from "./pages/MultiProviderCalendar";
 import PatientInbox from "./pages/PatientInbox";
 import Prescriptions from "./pages/Prescriptions";
+import TelehealthVisit from "./pages/TelehealthVisit";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -129,6 +130,7 @@ const App = () => (
                 <Route path="/calendar-grid" element={<MultiProviderCalendar />} />
                 <Route path="/patient-inbox" element={<PatientInbox />} />
                 <Route path="/prescriptions" element={<Prescriptions />} />
+                <Route path="/telehealth/:appointmentId" element={<TelehealthVisit />} />
               </Route>
             </Route>
             {/* Public routes — no auth required */}
