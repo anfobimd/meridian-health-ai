@@ -47,7 +47,6 @@ const navSections: NavSection[] = [
     label: "PATIENTS",
     items: [
       { to: "/patients", icon: Users, label: "Patients" },
-      { to: "/encounters", icon: FileText, label: "Encounters" },
       { to: "/messages", icon: Mail, label: "Messages", badgeKey: "unread_messages" },
       { to: "/patient-inbox", icon: Inbox, label: "Patient Inbox", roles: ["admin", "front_desk"] },
       { to: "/notifications", icon: Bell, label: "Notifications" },
@@ -55,13 +54,14 @@ const navSections: NavSection[] = [
   },
   {
     label: "CLINICAL",
-    roles: ["admin", "provider"],
+    roles: ["admin", "provider", "front_desk"],
     items: [
       { to: "/clinical-notes", icon: ClipboardList, label: "Clinical Notes" },
-      { to: "/hormone-visits", icon: FlaskConical, label: "Hormone Labs" },
-      { to: "/hormone-intake", icon: ClipboardPlus, label: "Hormone Intake" },
-      { to: "/physician-approval", icon: ShieldCheck, label: "Approvals" },
-      { to: "/protocols", icon: Pill, label: "Protocols" },
+      { to: "/encounters", icon: FileText, label: "Encounters" },
+      { to: "/hormone-visits", icon: FlaskConical, label: "Hormone Labs", roles: ["admin", "provider"] },
+      { to: "/hormone-intake", icon: ClipboardPlus, label: "Hormone Intake", roles: ["admin", "provider"] },
+      { to: "/physician-approval", icon: ShieldCheck, label: "Approvals", roles: ["admin", "provider"] },
+      { to: "/protocols", icon: Pill, label: "Protocols", roles: ["admin", "provider"] },
       { to: "/md-feedback", icon: MessageSquare, label: "MD Feedback", roles: ["provider"], badgeKey: "md_corrections" },
     ],
   },

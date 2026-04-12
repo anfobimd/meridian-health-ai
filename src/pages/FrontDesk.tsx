@@ -11,9 +11,11 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { QueueCard } from "@/components/front-desk/QueueCard";
+import { ActionBar } from "@/components/front-desk/ActionBar";
+import { QuickDock } from "@/components/front-desk/QuickDock";
 import {
   UserPlus, CheckCircle2, DoorOpen, Play, Flag, Clock, Users,
-  Loader2, AlertTriangle, Search, RefreshCw, Sparkles,
+  Loader2, AlertTriangle, Search, RefreshCw,
 } from "lucide-react";
 
 type QueueStatus = "booked" | "checked_in" | "roomed" | "in_progress" | "completed" | "no_show" | "cancelled";
@@ -82,11 +84,9 @@ export default function FrontDesk() {
 
   const markNoShow = useMutation({
     mutationFn: async (id: string) => {
-      // Get patient_id first
       const apt = appointments?.find((a: any) => a.id === id);
       const { error } = await supabase.from("appointments").update({ status: "no_show" as any }).eq("id", id);
       if (error) throw error;
-      // Increment no-show counter
       if (apt?.patients?.id) {
         await supabase.from("patients").update({
           no_show_count: (apt.patients.no_show_count || 0) + 1,
@@ -148,7 +148,10 @@ export default function FrontDesk() {
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4 pb-16">
+      {/* AI Action Bar */}
+      <ActionBar />
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
@@ -165,43 +168,6 @@ export default function FrontDesk() {
           <Button variant="outline" size="sm" onClick={() => queryClient.invalidateQueries({ queryKey: ["frontdesk-today"] })}>
             <RefreshCw className="h-3.5 w-3.5" />
           </Button>
-          <Dialog open={walkinOpen} onOpenChange={setWalkinOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm"><UserPlus className="h-3.5 w-3.5 mr-1.5" />Walk-In</Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader><DialogTitle>Quick Walk-In</DialogTitle></DialogHeader>
-              <form onSubmit={(e) => { e.preventDefault(); createWalkin.mutate(new FormData(e.currentTarget)); }} className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Existing Patient</Label>
-                  <select name="existing_patient_id" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
-                    <option value="">— New Patient —</option>
-                    {patients?.map((p) => <option key={p.id} value={p.id}>{p.last_name}, {p.first_name}</option>)}
-                  </select>
-                </div>
-                <Separator />
-                <p className="text-xs text-muted-foreground">Or create a new patient:</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1"><Label className="text-xs">First Name</Label><Input name="first_name" /></div>
-                  <div className="space-y-1"><Label className="text-xs">Last Name</Label><Input name="last_name" /></div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1"><Label className="text-xs">DOB</Label><Input name="dob" type="date" /></div>
-                  <div className="space-y-1"><Label className="text-xs">Phone</Label><Input name="phone" type="tel" /></div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Treatment</Label>
-                  <select name="treatment_id" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
-                    <option value="">General Visit</option>
-                    {treatments?.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                  </select>
-                </div>
-                <Button type="submit" className="w-full" disabled={createWalkin.isPending}>
-                  {createWalkin.isPending ? "Processing..." : "Check In Walk-In"}
-                </Button>
-              </form>
-            </DialogContent>
-          </Dialog>
         </div>
       </div>
 
@@ -265,6 +231,45 @@ export default function FrontDesk() {
           })}
         </div>
       )}
+
+      {/* Walk-In Dialog */}
+      <Dialog open={walkinOpen} onOpenChange={setWalkinOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Quick Walk-In</DialogTitle></DialogHeader>
+          <form onSubmit={(e) => { e.preventDefault(); createWalkin.mutate(new FormData(e.currentTarget)); }} className="space-y-4">
+            <div className="space-y-2">
+              <Label>Existing Patient</Label>
+              <select name="existing_patient_id" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                <option value="">— New Patient —</option>
+                {patients?.map((p) => <option key={p.id} value={p.id}>{p.last_name}, {p.first_name}</option>)}
+              </select>
+            </div>
+            <Separator />
+            <p className="text-xs text-muted-foreground">Or create a new patient:</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1"><Label className="text-xs">First Name</Label><Input name="first_name" /></div>
+              <div className="space-y-1"><Label className="text-xs">Last Name</Label><Input name="last_name" /></div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1"><Label className="text-xs">DOB</Label><Input name="dob" type="date" /></div>
+              <div className="space-y-1"><Label className="text-xs">Phone</Label><Input name="phone" type="tel" /></div>
+            </div>
+            <div className="space-y-2">
+              <Label>Treatment</Label>
+              <select name="treatment_id" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                <option value="">General Visit</option>
+                {treatments?.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            </div>
+            <Button type="submit" className="w-full" disabled={createWalkin.isPending}>
+              {createWalkin.isPending ? "Processing..." : "Check In Walk-In"}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Quick Action Dock */}
+      <QuickDock onWalkIn={() => setWalkinOpen(true)} />
     </div>
   );
 }

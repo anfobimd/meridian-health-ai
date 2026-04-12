@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,10 +19,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { toast } from "sonner";
 import {
   ChevronDown, ChevronRight, Sparkles, FileText, Save, CheckCircle2,
-  ArrowLeft, Loader2, ClipboardList, AlertTriangle, ShieldAlert, Send, X,
+  ArrowLeft, Loader2, ClipboardList, AlertTriangle, ShieldAlert, Send, X, Eye,
 } from "lucide-react";
 import { VitalsPanel } from "@/components/encounter/VitalsPanel";
 import { AddendumSection } from "@/components/clinical/AddendumSection";
+import { AdminNotesPanel } from "@/components/front-desk/AdminNotesPanel";
 
 type FieldConfig = {
   options?: string[];
@@ -229,6 +231,8 @@ export default function EncounterChart() {
   const { encounterId } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { role } = useAuth();
+  const isReadOnly = role === "front_desk";
 
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
   const [checkboxValues, setCheckboxValues] = useState<Record<string, string[]>>({});
@@ -615,7 +619,7 @@ export default function EncounterChart() {
   };
 
   const activeTemplate = templates?.find((t: any) => t.id === templateId) as any;
-  const isSigned = encounter?.status === "signed";
+  const isSigned = encounter?.status === "signed" || isReadOnly;
   const patientMeds = encounter?.patients?.medications || [];
   const patientAllergies = encounter?.patients?.allergies || [];
   const procedureType = activeTemplate?.name || encounter?.chief_complaint || "";
@@ -690,6 +694,16 @@ export default function EncounterChart() {
   // Active charting screen
   return (
     <div className="space-y-4">
+      {/* Read-only banner for front desk */}
+      {isReadOnly && (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardContent className="p-3 flex items-center gap-2">
+            <Eye className="h-4 w-4 text-primary shrink-0" />
+            <p className="text-xs text-primary font-medium">Read-only view — clinical fields cannot be edited by front desk staff</p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Header with completeness bar */}
       <div className="flex flex-col gap-3">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -701,7 +715,8 @@ export default function EncounterChart() {
               <h1 className="text-xl font-bold flex items-center gap-2">
                 <span className="text-2xl">{activeTemplate?.icon || "📋"}</span>
                 {activeTemplate?.name || "Chart"}
-                {isSigned && <Badge className="text-[10px] bg-green-600">Signed</Badge>}
+                {encounter?.status === "signed" && <Badge className="text-[10px] bg-green-600">Signed</Badge>}
+                {isReadOnly && <Badge variant="outline" className="text-[10px]"><Eye className="h-2.5 w-2.5 mr-0.5" />View Only</Badge>}
               </h1>
               <p className="text-sm text-muted-foreground">
                 {encounter?.patients?.first_name} {encounter?.patients?.last_name}
@@ -709,7 +724,7 @@ export default function EncounterChart() {
               </p>
             </div>
           </div>
-          {!isSigned && (
+          {!isSigned && !isReadOnly && (
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={() => saveEncounter(false)} disabled={saving}>
                 {saving ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />}
@@ -990,6 +1005,11 @@ export default function EncounterChart() {
                 </div>
               </CardContent>
             </Card>
+          )}
+
+          {/* Admin Notes Panel — visible for front_desk and admin */}
+          {encounter && (role === "front_desk" || role === "admin") && (
+            <AdminNotesPanel encounterId={encounterId!} patientId={encounter.patient_id} />
           )}
         </div>
       </div>

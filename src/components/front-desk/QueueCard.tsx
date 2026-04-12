@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { format, parseISO, differenceInMinutes } from "date-fns";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -7,6 +8,7 @@ import { CheckInPanel } from "./CheckInPanel";
 import { CheckoutPanel } from "./CheckoutPanel";
 import {
   CheckCircle2, DoorOpen, Play, Flag, Clock, CreditCard, UserCheck,
+  AlertTriangle, Eye,
 } from "lucide-react";
 
 const nextActionMap: Record<string, { label: string; nextStatus: string; icon: React.ElementType } | undefined> = {
@@ -23,13 +25,17 @@ export function QueueCard({ apt, onStatusChange, onNoShow }: {
 }) {
   const [checkInOpen, setCheckInOpen] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const navigate = useNavigate();
 
   const action = nextActionMap[apt.status];
   const waitTime = apt.status === "checked_in" && apt.checked_in_at
-    ? `${differenceInMinutes(new Date(), parseISO(apt.checked_in_at))}m`
+    ? differenceInMinutes(new Date(), parseISO(apt.checked_in_at))
     : null;
+  const waitStr = waitTime !== null ? `${waitTime}m` : null;
+  const isLongWait = waitTime !== null && waitTime >= 15;
 
   const isWalkin = apt.notes?.includes("Walk-in");
+  const noShowRisk = (apt.patients?.no_show_count || 0) >= 2;
 
   const handleAction = () => {
     if (apt.status === "booked") {
@@ -43,15 +49,20 @@ export function QueueCard({ apt, onStatusChange, onNoShow }: {
 
   return (
     <>
-      <Card className="shadow-sm">
+      <Card className={`shadow-sm ${isLongWait ? "ring-1 ring-warning/50" : ""}`}>
         <CardContent className="p-3 space-y-2">
           <div className="flex items-start justify-between">
-            <div>
-              <p className="font-medium text-sm leading-tight flex items-center gap-1">
-                {apt.patients?.first_name} {apt.patients?.last_name}
+            <div className="min-w-0 flex-1">
+              <p className="font-medium text-sm leading-tight flex items-center gap-1 flex-wrap">
+                <span className="truncate">{apt.patients?.first_name} {apt.patients?.last_name}</span>
                 {isWalkin && (
-                  <Badge variant="outline" className="text-[9px] h-4 px-1 border-accent text-accent-foreground ml-1">
+                  <Badge variant="outline" className="text-[9px] h-4 px-1 border-accent text-accent-foreground">
                     <UserCheck className="h-2.5 w-2.5 mr-0.5" />Walk-in
+                  </Badge>
+                )}
+                {noShowRisk && (
+                  <Badge variant="outline" className="text-[9px] h-4 px-1 border-destructive/50 text-destructive">
+                    <AlertTriangle className="h-2.5 w-2.5 mr-0.5" />{apt.patients.no_show_count}x NS
                   </Badge>
                 )}
               </p>
@@ -60,9 +71,9 @@ export function QueueCard({ apt, onStatusChange, onNoShow }: {
                 {apt.treatments?.name && ` · ${apt.treatments.name}`}
               </p>
             </div>
-            {waitTime && (
-              <Badge variant="outline" className="text-[10px] text-warning border-warning/30">
-                <Clock className="h-2.5 w-2.5 mr-0.5" />{waitTime}
+            {waitStr && (
+              <Badge variant="outline" className={`text-[10px] shrink-0 ${isLongWait ? "text-destructive border-destructive/30" : "text-warning border-warning/30"}`}>
+                <Clock className="h-2.5 w-2.5 mr-0.5" />{waitStr}
               </Badge>
             )}
           </div>
@@ -83,6 +94,20 @@ export function QueueCard({ apt, onStatusChange, onNoShow }: {
                 <action.icon className="h-3 w-3 mr-1" />{action.label}
               </Button>
             )}
+            {/* View chart button */}
+            {apt.status !== "booked" && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 text-[11px] px-2"
+                onClick={() => {
+                  // Navigate to encounter if one exists
+                  navigate(`/patients/${apt.patient_id}`);
+                }}
+              >
+                <Eye className="h-3 w-3" />
+              </Button>
+            )}
             {apt.status === "booked" && (
               <Button
                 size="sm"
@@ -97,10 +122,7 @@ export function QueueCard({ apt, onStatusChange, onNoShow }: {
         </CardContent>
       </Card>
 
-      {/* Enhanced Check-In Panel */}
       <CheckInPanel appointment={apt} open={checkInOpen} onOpenChange={setCheckInOpen} />
-
-      {/* Checkout Panel with AI Review */}
       <CheckoutPanel appointmentId={apt.id} open={checkoutOpen} onOpenChange={setCheckoutOpen} />
     </>
   );

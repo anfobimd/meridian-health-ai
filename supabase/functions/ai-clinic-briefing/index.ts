@@ -181,6 +181,65 @@ Return a structured briefing with narrative, priorities, alerts, and revenue for
       }];
       toolChoice = { type: "function", function: { name: "revenue_forecast" } };
 
+    } else if (mode === "front_desk_actions") {
+      // Front desk-specific proactive alerts
+      const today = new Date().toISOString().slice(0, 10);
+      const todayStart = `${today}T00:00:00.000Z`;
+      const todayEnd = `${today}T23:59:59.999Z`;
+
+      // Get today's appointments with patient data
+      const { data: todayApts } = await sb.from("appointments")
+        .select("id, status, scheduled_at, checked_in_at, patient_id, patients(first_name, last_name, no_show_count), treatments(name)")
+        .gte("scheduled_at", todayStart).lte("scheduled_at", todayEnd)
+        .order("scheduled_at");
+
+      // Get waitlist entries
+      const { data: waitlist } = await sb.from("appointment_waitlist")
+        .select("id, patients(first_name, last_name), treatments(name), preferred_date")
+        .eq("is_fulfilled", false).limit(5);
+
+      // Get unsigned notes count
+      const { count: unsignedCount } = await sb.from("clinical_notes")
+        .select("*", { count: "exact", head: true }).eq("status", "draft");
+
+      systemPrompt = `You are the AI front desk assistant for Meridian Wellness clinic. Analyze today's appointment queue and generate actionable alerts for front desk staff. Focus on: patient wait times, check-in reminders, no-show risks, waitlist opportunities, and consent needs. Be concise and action-oriented.`;
+
+      userPrompt = `Generate front desk action items for today (${today}).
+
+TODAY'S APPOINTMENTS: ${JSON.stringify(todayApts ?? [])}
+WAITLIST ENTRIES: ${JSON.stringify(waitlist ?? [])}
+UNSIGNED NOTES: ${unsignedCount ?? 0}
+
+Identify:
+1. Patients arriving in next 2 hours who need check-in preparation
+2. Patients with high no-show history (no_show_count >= 2) — suggest confirmation call
+3. Long-waiting patients (checked_in but not roomed)
+4. Waitlist matches if any cancellations today
+5. Any operational alerts`;
+
+      tools = [{
+        type: "function",
+        function: {
+          name: "front_desk_actions",
+          description: "Proactive front desk action items",
+          parameters: {
+            type: "object",
+            properties: {
+              items: { type: "array", items: { type: "object", properties: {
+                title: { type: "string" },
+                urgency: { type: "string", enum: ["critical", "high", "medium", "low"] },
+                category: { type: "string", enum: ["check_in", "wait_time", "no_show_risk", "waitlist", "consent", "general"] },
+                action_label: { type: "string" },
+                detail: { type: "string" }
+              }, required: ["title", "urgency", "category", "action_label", "detail"] } },
+              summary: { type: "string" }
+            },
+            required: ["items", "summary"]
+          }
+        }
+      }];
+      toolChoice = { type: "function", function: { name: "front_desk_actions" } };
+
     } else {
       return new Response(JSON.stringify({ error: `Unknown mode: ${mode}` }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
