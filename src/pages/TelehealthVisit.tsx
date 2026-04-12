@@ -120,7 +120,7 @@ export function IntakeReviewPanel({ appointmentId, patientId }: { appointmentId?
       ) : null}
 
       {/* Allergies & Meds */}
-      {(patient?.allergies?.length > 0 || patient?.current_medications) && (
+      {(patient?.allergies?.length > 0 || patient?.medications?.length > 0) && (
         <Card>
           <CardContent className="p-3 space-y-2">
             {patient?.allergies?.length > 0 && (
@@ -129,10 +129,10 @@ export function IntakeReviewPanel({ appointmentId, patientId }: { appointmentId?
                 <p className="text-xs">{patient.allergies.join(", ")}</p>
               </div>
             )}
-            {patient?.current_medications && (
+            {patient?.medications?.length > 0 && (
               <div>
                 <p className="text-xs font-semibold flex items-center gap-1"><Pill className="h-3 w-3 text-primary" /> Current Meds</p>
-                <p className="text-xs text-muted-foreground">{patient.current_medications}</p>
+                <p className="text-xs text-muted-foreground">{patient.medications.join(", ")}</p>
               </div>
             )}
           </CardContent>
@@ -257,11 +257,11 @@ function VideoPanel({ videoUrl, appointmentId, onCallEnd }: { videoUrl: string |
       ) : (
         <>
           <div className="text-center space-y-2">
-            <div className="h-16 w-16 mx-auto rounded-full bg-green-500/10 flex items-center justify-center animate-pulse">
-              <Video className="h-8 w-8 text-green-500" />
+            <div className="h-16 w-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center animate-pulse">
+              <Video className="h-8 w-8 text-primary" />
             </div>
             <p className="text-2xl font-mono font-bold text-primary">{formatTime(elapsed)}</p>
-            <Badge variant="outline" className="text-xs text-green-600 border-green-300">Call Active</Badge>
+            <Badge variant="outline" className="text-xs text-primary border-primary/30">Call Active</Badge>
           </div>
 
           {videoUrl && (
