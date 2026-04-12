@@ -4005,6 +4005,57 @@ export type Database = {
           },
         ]
       }
+      provider_clinic_assignments: {
+        Row: {
+          clinic_id: string
+          created_at: string
+          effective_from: string | null
+          effective_until: string | null
+          id: string
+          is_primary: boolean | null
+          provider_id: string
+          role_at_clinic: string | null
+          updated_at: string
+        }
+        Insert: {
+          clinic_id: string
+          created_at?: string
+          effective_from?: string | null
+          effective_until?: string | null
+          id?: string
+          is_primary?: boolean | null
+          provider_id: string
+          role_at_clinic?: string | null
+          updated_at?: string
+        }
+        Update: {
+          clinic_id?: string
+          created_at?: string
+          effective_from?: string | null
+          effective_until?: string | null
+          id?: string
+          is_primary?: boolean | null
+          provider_id?: string
+          role_at_clinic?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "provider_clinic_assignments_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "provider_clinic_assignments_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "providers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       provider_earnings: {
         Row: {
           appointment_id: string | null
