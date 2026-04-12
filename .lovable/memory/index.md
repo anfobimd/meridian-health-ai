@@ -12,3 +12,9 @@ Next: Phase 3 charting templates, Phase 4 scheduling engine, Phase 5 package tra
 ## Memories
 - [EHR Roadmap](mem://features/roadmap) — Full 10-phase plan including AI and package tracker
 - [Source Code Reference](mem://reference/source-archives) — Meridian schema, HCDSS hormone system, medspa marketplace
+- [Front Desk UX](mem://features/front-desk-ux) — 3-batch front desk redesign — All 3 batches complete
+- [Admin Stories Audit](mem://features/admin-stories-audit) — Gap analysis of 28 admin user stories — All complete
+- [Provider Stories Audit](mem://features/provider-stories-audit) — Gap analysis of 28 provider user stories
+- [UX Workflows](mem://features/ux-workflows) — Batch A-D plan for 7 persona workflows
+- [MD Oversight](mem://features/md-oversight) — Physician oversight with AI chart analysis and review queue
+- [Telehealth & Prescribing](mem://features/telehealth) — 3-batch telehealth video visit + prescribing — Batch 1 complete
