@@ -1,10 +1,12 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Sparkles, Loader2, CreditCard, TrendingUp } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
+import { Sparkles, Loader2, CreditCard, TrendingUp, DollarSign, CalendarDays } from "lucide-react";
 import { toast } from "sonner";
 
 const TIERS = [
@@ -25,6 +27,27 @@ export function MembershipEnrollPanel({ patientId, patientName, open, onOpenChan
   const [aiRec, setAiRec] = useState<any>(null);
   const [loadingAi, setLoadingAi] = useState(false);
 
+  // Fetch patient spend history for local projection
+  const { data: spendData } = useQuery({
+    queryKey: ["patient-spend-history", patientId],
+    enabled: !!patientId && open,
+    queryFn: async () => {
+      const sixMonthsAgo = new Date(Date.now() - 180 * 86400000).toISOString();
+      const { data } = await supabase.from("invoices")
+        .select("total_amount, created_at")
+        .eq("patient_id", patientId)
+        .gte("created_at", sixMonthsAgo);
+      const invoices = data ?? [];
+      const total = invoices.reduce((s, i: any) => s + (i.total_amount || 0), 0);
+      return {
+        total_6mo: Math.round(total),
+        visit_count: invoices.length,
+        avg_per_visit: invoices.length > 0 ? Math.round(total / invoices.length) : 0,
+        monthly_avg: Math.round(total / 6),
+      };
+    },
+  });
+
   const fetchRecommendation = async () => {
     setLoadingAi(true);
     try {
@@ -39,6 +62,18 @@ export function MembershipEnrollPanel({ patientId, patientName, open, onOpenChan
     setLoadingAi(false);
   };
 
+  // Local savings projection per tier
+  const projections = TIERS.map(tier => {
+    const monthlySpend = spendData?.monthly_avg || 0;
+    const annualSpendNoMembership = monthlySpend * 12;
+    const annualMemberCost = tier.price * 12;
+    // Assume ~15% avg member discount on services
+    const annualWithDiscount = annualSpendNoMembership * 0.85 + annualMemberCost;
+    const savings = annualSpendNoMembership - annualWithDiscount;
+    const breakEvenMonths = monthlySpend > 0 ? Math.ceil(tier.price / (monthlySpend * 0.15)) : 0;
+    return { ...tier, projected_savings: Math.max(0, Math.round(savings)), break_even_months: breakEvenMonths };
+  });
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
@@ -50,6 +85,24 @@ export function MembershipEnrollPanel({ patientId, patientName, open, onOpenChan
         </DialogHeader>
 
         <div className="space-y-4">
+          {/* Spend Summary */}
+          {spendData && spendData.total_6mo > 0 && (
+            <div className="grid grid-cols-3 gap-2">
+              <div className="text-center p-2 bg-muted/50 rounded-md border">
+                <p className="text-[10px] text-muted-foreground">6-Month Spend</p>
+                <p className="text-sm font-mono font-bold">${spendData.total_6mo}</p>
+              </div>
+              <div className="text-center p-2 bg-muted/50 rounded-md border">
+                <p className="text-[10px] text-muted-foreground">Monthly Avg</p>
+                <p className="text-sm font-mono font-bold">${spendData.monthly_avg}</p>
+              </div>
+              <div className="text-center p-2 bg-muted/50 rounded-md border">
+                <p className="text-[10px] text-muted-foreground">Avg/Visit</p>
+                <p className="text-sm font-mono font-bold">${spendData.avg_per_visit}</p>
+              </div>
+            </div>
+          )}
+
           <Button variant="outline" size="sm" className="w-full" onClick={fetchRecommendation} disabled={loadingAi}>
             {loadingAi ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5 mr-1.5" />}
             AI Recommend Optimal Tier
@@ -71,35 +124,42 @@ export function MembershipEnrollPanel({ patientId, patientName, open, onOpenChan
                   )}
                 </div>
                 <p className="text-xs">{aiRec.reasoning}</p>
-                {aiRec.spending_summary && (
-                  <div className="grid grid-cols-2 gap-2 mt-2">
-                    <div className="text-center p-1.5 bg-background rounded border">
-                      <p className="text-[10px] text-muted-foreground">6-Month Spend</p>
-                      <p className="text-sm font-mono font-bold">${aiRec.spending_summary.total_6mo}</p>
-                    </div>
-                    <div className="text-center p-1.5 bg-background rounded border">
-                      <p className="text-[10px] text-muted-foreground">Avg/Visit</p>
-                      <p className="text-sm font-mono font-bold">${Math.round(aiRec.spending_summary.avg_per_visit)}</p>
-                    </div>
-                  </div>
-                )}
               </CardContent>
             </Card>
           )}
 
-          {/* Tier Comparison */}
+          <Separator />
+
+          {/* Tier Comparison with Projections */}
           <div className="space-y-2">
-            {TIERS.map((tier) => (
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Tier Comparison</p>
+            {projections.map((tier) => (
               <Card key={tier.id} className={aiRec?.recommended_tier === tier.id ? "border-primary/50 bg-primary/5" : ""}>
-                <CardContent className="p-3 flex items-center justify-between">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium">{tier.label}</span>
-                      {aiRec?.recommended_tier === tier.id && <Badge className="text-[9px] bg-primary">Recommended</Badge>}
+                <CardContent className="p-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium">{tier.label}</span>
+                        {aiRec?.recommended_tier === tier.id && <Badge className="text-[9px] bg-primary">Recommended</Badge>}
+                      </div>
+                      <p className="text-[10px] text-muted-foreground">{tier.description}</p>
                     </div>
-                    <p className="text-[10px] text-muted-foreground">{tier.description}</p>
+                    <span className="text-lg font-mono font-bold">${tier.price}<span className="text-xs text-muted-foreground">/mo</span></span>
                   </div>
-                  <span className="text-lg font-mono font-bold">${tier.price}<span className="text-xs text-muted-foreground">/mo</span></span>
+                  {spendData && spendData.total_6mo > 0 && (
+                    <div className="flex items-center gap-3 mt-1.5">
+                      {tier.projected_savings > 0 && (
+                        <Badge variant="outline" className="text-[9px] text-success">
+                          <TrendingUp className="h-2.5 w-2.5 mr-0.5" />~${tier.projected_savings}/yr savings
+                        </Badge>
+                      )}
+                      {tier.break_even_months > 0 && tier.break_even_months <= 12 && (
+                        <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                          <CalendarDays className="h-2.5 w-2.5" />Break-even: {tier.break_even_months}mo
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             ))}

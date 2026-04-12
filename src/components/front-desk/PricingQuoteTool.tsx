@@ -7,7 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Sparkles, Loader2, DollarSign, Package, Send } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Separator } from "@/components/ui/separator";
+import { Sparkles, Loader2, DollarSign, Package, Send, Mail } from "lucide-react";
 import { toast } from "sonner";
 
 interface PricingQuoteToolProps {
@@ -20,11 +22,13 @@ export function PricingQuoteTool({ patientId, patientName }: PricingQuoteToolPro
   const [quote, setQuote] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
+  const [isMember, setIsMember] = useState(false);
+  const [sendingQuote, setSendingQuote] = useState(false);
 
   const { data: treatments } = useQuery({
     queryKey: ["treatments-pricing"],
     queryFn: async () => {
-      const { data } = await supabase.from("treatments").select("id, name, price, category, duration_minutes").eq("is_active", true).order("category").order("name");
+      const { data } = await supabase.from("treatments").select("id, name, price, category, duration_minutes, member_price").eq("is_active", true).order("category").order("name");
       return data ?? [];
     },
   });
@@ -41,14 +45,42 @@ export function PricingQuoteTool({ patientId, patientName }: PricingQuoteToolPro
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("ai-smart-schedule", {
-        body: { mode: "pricing_quote", data: { treatment_ids: selectedTreatments, patient_id: patientId } },
+        body: { mode: "pricing_quote", data: { treatment_ids: selectedTreatments, patient_id: patientId, is_member: isMember } },
       });
       if (error) throw error;
       setQuote(data);
     } catch {
-      toast.error("Failed to generate quote");
+      // Fallback: compute basic quote locally
+      const selected = treatments?.filter(t => selectedTreatments.includes(t.id)) ?? [];
+      const total = selected.reduce((s, t) => s + (isMember && (t as any).member_price ? (t as any).member_price : (t.price || 0)), 0);
+      setQuote({
+        line_items: selected.map(t => ({
+          name: t.name,
+          price: isMember && (t as any).member_price ? (t as any).member_price : t.price,
+          regular_price: t.price,
+        })),
+        a_la_carte_total: total,
+      });
     }
     setLoading(false);
+  };
+
+  const sendQuoteToPatient = async (channel: "email" | "sms") => {
+    if (!patientId || !quote) return;
+    setSendingQuote(true);
+    try {
+      // Log the quote send
+      await supabase.from("patient_communication_log").insert({
+        patient_id: patientId,
+        channel,
+        direction: "outbound",
+        content: `Price quote: ${quote.line_items?.map((i: any) => `${i.name} ($${i.price})`).join(", ")} — Total: $${quote.a_la_carte_total}`,
+      } as any);
+      toast.success(`Quote sent via ${channel}`);
+    } catch {
+      toast.error("Failed to send quote");
+    }
+    setSendingQuote(false);
   };
 
   const filtered = treatments?.filter((t) => {
@@ -57,6 +89,9 @@ export function PricingQuoteTool({ patientId, patientName }: PricingQuoteToolPro
   }) ?? [];
 
   const categories = [...new Set(filtered.map((t) => t.category || "General"))];
+
+  const selectedTotal = treatments?.filter(t => selectedTreatments.includes(t.id))
+    .reduce((s, t) => s + (isMember && (t as any).member_price ? (t as any).member_price : (t.price || 0)), 0) ?? 0;
 
   return (
     <div className="space-y-4">
@@ -69,6 +104,14 @@ export function PricingQuoteTool({ patientId, patientName }: PricingQuoteToolPro
           {loading ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5 mr-1.5" />}
           Build Quote
         </Button>
+      </div>
+
+      {/* Member Toggle */}
+      <div className="flex items-center justify-between bg-muted/50 rounded-md p-2">
+        <Label className="text-xs flex items-center gap-1.5">
+          <Package className="h-3 w-3" />Member Pricing
+        </Label>
+        <Switch checked={isMember} onCheckedChange={setIsMember} />
       </div>
 
       <Input placeholder="Search treatments..." value={search} onChange={(e) => setSearch(e.target.value)} className="h-8 text-xs" />
@@ -85,7 +128,16 @@ export function PricingQuoteTool({ patientId, patientName }: PricingQuoteToolPro
                     onCheckedChange={() => toggleTreatment(t.id)}
                   />
                   <span className="text-xs flex-1">{t.name}</span>
-                  <span className="text-xs font-mono text-muted-foreground">${t.price || 0}</span>
+                  <div className="text-right">
+                    <span className="text-xs font-mono text-muted-foreground">
+                      ${isMember && (t as any).member_price ? (t as any).member_price : t.price || 0}
+                    </span>
+                    {isMember && (t as any).member_price && (t as any).member_price < (t.price || 0) && (
+                      <span className="text-[9px] text-success ml-1">
+                        (save ${((t.price || 0) - (t as any).member_price).toFixed(0)})
+                      </span>
+                    )}
+                  </div>
                 </label>
               ))}
             </div>
@@ -95,7 +147,7 @@ export function PricingQuoteTool({ patientId, patientName }: PricingQuoteToolPro
 
       {selectedTreatments.length > 0 && !quote && (
         <div className="text-xs text-muted-foreground">
-          {selectedTreatments.length} treatment(s) selected — ${treatments?.filter((t) => selectedTreatments.includes(t.id)).reduce((s, t) => s + (t.price || 0), 0)} à la carte
+          {selectedTreatments.length} treatment(s) selected — ${selectedTotal.toFixed(0)} {isMember ? "(member)" : "à la carte"}
         </div>
       )}
 
@@ -104,6 +156,7 @@ export function PricingQuoteTool({ patientId, patientName }: PricingQuoteToolPro
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
               <DollarSign className="h-4 w-4 text-primary" />Quote Summary
+              {isMember && <Badge variant="secondary" className="text-[9px]">Member</Badge>}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -112,11 +165,16 @@ export function PricingQuoteTool({ patientId, patientName }: PricingQuoteToolPro
               {quote.line_items?.map((item: any, i: number) => (
                 <div key={i} className="flex justify-between text-xs">
                   <span>{item.name}</span>
-                  <span className="font-mono">${item.price}</span>
+                  <div className="flex items-center gap-1.5">
+                    {item.regular_price && item.regular_price > item.price && (
+                      <span className="text-[10px] text-muted-foreground line-through">${item.regular_price}</span>
+                    )}
+                    <span className="font-mono">${item.price}</span>
+                  </div>
                 </div>
               ))}
               <div className="flex justify-between text-xs font-bold border-t pt-1 mt-1">
-                <span>À la carte total</span>
+                <span>Total</span>
                 <span className="font-mono">${quote.a_la_carte_total}</span>
               </div>
             </div>
@@ -124,7 +182,9 @@ export function PricingQuoteTool({ patientId, patientName }: PricingQuoteToolPro
             {/* Package options */}
             {quote.package_options?.length > 0 && (
               <div className="space-y-2">
-                <p className="text-[10px] font-bold text-muted-foreground uppercase">Package Options</p>
+                <p className="text-[10px] font-bold text-muted-foreground uppercase flex items-center gap-1">
+                  <Sparkles className="h-2.5 w-2.5 text-primary" />AI Package Alternatives
+                </p>
                 {quote.package_options.map((pkg: any, i: number) => (
                   <div key={i} className="p-2 bg-success/5 border border-success/20 rounded">
                     <div className="flex items-center justify-between">
@@ -145,6 +205,20 @@ export function PricingQuoteTool({ patientId, patientName }: PricingQuoteToolPro
               <div className="p-2 bg-primary/5 border border-primary/20 rounded">
                 <p className="text-[10px] text-primary flex items-center gap-1 mb-0.5"><Sparkles className="h-2.5 w-2.5" />AI Recommendation</p>
                 <p className="text-xs">{quote.recommendation}</p>
+              </div>
+            )}
+
+            <Separator />
+
+            {/* Send Quote */}
+            {patientId && (
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" className="flex-1 text-xs" onClick={() => sendQuoteToPatient("email")} disabled={sendingQuote}>
+                  <Mail className="h-3 w-3 mr-1" />Email Quote
+                </Button>
+                <Button variant="outline" size="sm" className="flex-1 text-xs" onClick={() => sendQuoteToPatient("sms")} disabled={sendingQuote}>
+                  <Send className="h-3 w-3 mr-1" />SMS Quote
+                </Button>
               </div>
             )}
           </CardContent>
