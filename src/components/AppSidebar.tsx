@@ -239,7 +239,7 @@ export function AppSidebar() {
         ))}
       </nav>
 
-      <div className="px-3 py-3 border-t border-sidebar-border">
+      <div className="px-3 py-3 border-t border-sidebar-border space-y-2">
         <div className="flex items-center gap-2.5">
           <div className="w-7 h-7 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-[10px] font-bold text-sidebar-primary flex-shrink-0">
             {initials}
@@ -248,14 +248,14 @@ export function AppSidebar() {
             <p className="text-[11.5px] text-white truncate font-medium">{displayName}</p>
             <p className="text-[10px] text-sidebar-foreground/40 truncate">{user?.email}</p>
           </div>
-          <button
-            onClick={signOut}
-            className="p-1.5 rounded-md text-sidebar-foreground/30 hover:text-sidebar-foreground/70 hover:bg-white/5 transition-colors flex-shrink-0"
-            title="Sign out"
-          >
-            <LogOut className="h-3.5 w-3.5" />
-          </button>
         </div>
+        <button
+          onClick={signOut}
+          className="w-full flex items-center gap-2 rounded-md px-3 py-2 text-[12px] text-sidebar-foreground/70 hover:bg-white/10 hover:text-white transition-colors"
+        >
+          <LogOut className="h-4 w-4" />
+          <span>Sign Out</span>
+        </button>
       </div>
     </aside>
   );
