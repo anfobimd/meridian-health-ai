@@ -456,7 +456,19 @@ export default function TelehealthVisit() {
     if (!encounter?.id) return;
     await supabase.from("encounters").update({ status: "signed" as any, signed_at: new Date().toISOString() }).eq("id", encounter.id);
     await supabase.from("appointments").update({ status: "completed" as any, completed_at: new Date().toISOString() }).eq("id", appointmentId!);
-    await sendAutoAftercare();
+
+    // Run aftercare + telehealth summary in parallel
+    await Promise.allSettled([
+      sendAutoAftercare(),
+      supabase.functions.invoke("ai-checkout-review", {
+        body: { appointment_id: appointmentId, mode: "telehealth_summary" },
+      }).then(({ data }) => {
+        if (data?.visit_summary) {
+          toast.info(`Follow-up in ${data.follow_up_days || 14} days`, { description: data.follow_up_recommendation });
+        }
+      }),
+    ]);
+
     queryClient.invalidateQueries({ queryKey: ["telehealth-apt"] });
     toast.success("Encounter signed & closed");
     navigate("/provider-day");
