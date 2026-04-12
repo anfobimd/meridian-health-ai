@@ -11,16 +11,23 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Plus, Building2, FileText, Users } from "lucide-react";
+import { Plus, Building2, FileText, Users, UserPlus, X, MapPin, Phone as PhoneIcon } from "lucide-react";
 import { format } from "date-fns";
 
 export default function ContractsAdmin() {
   const qc = useQueryClient();
   const [contractOpen, setContractOpen] = useState(false);
   const [clinicOpen, setClinicOpen] = useState(false);
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [assignClinicId, setAssignClinicId] = useState("");
+  const [assignProviderId, setAssignProviderId] = useState("");
+  const [assignRole, setAssignRole] = useState("provider");
+  const [assignPrimary, setAssignPrimary] = useState(false);
   const [form, setForm] = useState({ name: "", start_date: "", end_date: "", notes: "" });
   const [clinicForm, setClinicForm] = useState({ name: "", address: "", contract_id: "", phone: "", city: "", state: "", timezone: "America/New_York" });
+  const [selectedClinicId, setSelectedClinicId] = useState<string | null>(null);
 
   const { data: contracts = [] } = useQuery({
     queryKey: ["contracts"],
@@ -35,6 +42,26 @@ export default function ContractsAdmin() {
     queryKey: ["clinics"],
     queryFn: async () => {
       const { data, error } = await supabase.from("clinics").select("*, contracts(name)").order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: providers = [] } = useQuery({
+    queryKey: ["all-providers-for-assign"],
+    queryFn: async () => {
+      const { data } = await supabase.from("providers").select("id, first_name, last_name, credentials, specialty").eq("is_active", true).order("last_name");
+      return data ?? [];
+    },
+  });
+
+  const { data: assignments = [] } = useQuery({
+    queryKey: ["provider-clinic-assignments"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("provider_clinic_assignments")
+        .select("*, providers(first_name, last_name, credentials, specialty), clinics(name)")
+        .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
     },
@@ -69,6 +96,36 @@ export default function ContractsAdmin() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["clinics"] }); setClinicOpen(false); setClinicForm({ name: "", address: "", contract_id: "", phone: "", city: "", state: "", timezone: "America/New_York" }); toast.success("Clinic created"); },
   });
 
+  const addAssignment = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from("provider_clinic_assignments").insert({
+        provider_id: assignProviderId,
+        clinic_id: assignClinicId,
+        role_at_clinic: assignRole,
+        is_primary: assignPrimary,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["provider-clinic-assignments"] });
+      setAssignOpen(false);
+      setAssignProviderId(""); setAssignClinicId(""); setAssignRole("provider"); setAssignPrimary(false);
+      toast.success("Provider assigned to clinic");
+    },
+    onError: (e: any) => toast.error(e.message?.includes("duplicate") ? "Provider already assigned to this clinic" : e.message),
+  });
+
+  const removeAssignment = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("provider_clinic_assignments").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["provider-clinic-assignments"] });
+      toast.success("Assignment removed");
+    },
+  });
+
   const toggleContract = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
       const next = status === "active" ? "suspended" : "active";
@@ -79,6 +136,7 @@ export default function ContractsAdmin() {
   });
 
   const statusColor = (s: string) => s === "active" ? "default" : s === "suspended" ? "destructive" : "secondary";
+  const clinicAssignments = (clinicId: string) => assignments.filter((a: any) => a.clinic_id === clinicId);
 
   return (
     <div className="space-y-6">
@@ -87,7 +145,7 @@ export default function ContractsAdmin() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Contracts & Clinics</h1>
-          <p className="text-sm text-muted-foreground">Manage organizational hierarchy</p>
+          <p className="text-sm text-muted-foreground">Manage organizational hierarchy & provider assignments</p>
         </div>
         <div className="flex gap-2">
           <Dialog open={contractOpen} onOpenChange={setContractOpen}>
@@ -138,56 +196,184 @@ export default function ContractsAdmin() {
               </div>
             </DialogContent>
           </Dialog>
+          <Dialog open={assignOpen} onOpenChange={setAssignOpen}>
+            <DialogTrigger asChild><Button size="sm" variant="outline"><UserPlus className="h-4 w-4 mr-1" />Assign Provider</Button></DialogTrigger>
+            <DialogContent>
+              <DialogHeader><DialogTitle>Assign Provider to Clinic</DialogTitle></DialogHeader>
+              <div className="space-y-3">
+                <div>
+                  <Label>Provider</Label>
+                  <Select value={assignProviderId} onValueChange={setAssignProviderId}>
+                    <SelectTrigger><SelectValue placeholder="Select provider" /></SelectTrigger>
+                    <SelectContent>
+                      {providers.map(p => <SelectItem key={p.id} value={p.id}>{p.last_name}, {p.first_name}{p.credentials ? ` (${p.credentials})` : ""}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Clinic</Label>
+                  <Select value={assignClinicId} onValueChange={setAssignClinicId}>
+                    <SelectTrigger><SelectValue placeholder="Select clinic" /></SelectTrigger>
+                    <SelectContent>
+                      {clinics.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Role at Clinic</Label>
+                  <Select value={assignRole} onValueChange={setAssignRole}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {["provider","injector","aesthetician","front_desk","manager","medical_director"].map(r => (
+                        <SelectItem key={r} value={r}>{r.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <label className="flex items-center gap-2 text-sm">
+                  <input type="checkbox" checked={assignPrimary} onChange={e => setAssignPrimary(e.target.checked)} className="rounded" />
+                  Primary clinic for this provider
+                </label>
+                <Button onClick={() => addAssignment.mutate()} disabled={!assignProviderId || !assignClinicId}>
+                  Assign
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <Card><CardContent className="pt-6 flex items-center gap-3"><FileText className="h-8 w-8 text-primary" /><div><p className="text-2xl font-bold">{contracts.length}</p><p className="text-xs text-muted-foreground">Contracts</p></div></CardContent></Card>
         <Card><CardContent className="pt-6 flex items-center gap-3"><Building2 className="h-8 w-8 text-primary" /><div><p className="text-2xl font-bold">{clinics.length}</p><p className="text-xs text-muted-foreground">Clinics</p></div></CardContent></Card>
-        <Card><CardContent className="pt-6 flex items-center gap-3"><Users className="h-8 w-8 text-primary" /><div><p className="text-2xl font-bold">{contracts.filter(c => c.status === "active").length}</p><p className="text-xs text-muted-foreground">Active Contracts</p></div></CardContent></Card>
+        <Card><CardContent className="pt-6 flex items-center gap-3"><Users className="h-8 w-8 text-primary" /><div><p className="text-2xl font-bold">{assignments.length}</p><p className="text-xs text-muted-foreground">Assignments</p></div></CardContent></Card>
+        <Card><CardContent className="pt-6 flex items-center gap-3"><FileText className="h-8 w-8 text-primary" /><div><p className="text-2xl font-bold">{contracts.filter(c => c.status === "active").length}</p><p className="text-xs text-muted-foreground">Active Contracts</p></div></CardContent></Card>
       </div>
 
-      <Card>
-        <CardHeader><CardTitle>Contracts</CardTitle></CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Start</TableHead><TableHead>End</TableHead><TableHead>Status</TableHead><TableHead>Clinics</TableHead><TableHead></TableHead></TableRow></TableHeader>
-            <TableBody>
-              {contracts.map(c => (
-                <TableRow key={c.id}>
-                  <TableCell className="font-medium">{c.name}</TableCell>
-                  <TableCell>{format(new Date(c.start_date), "MMM d, yyyy")}</TableCell>
-                  <TableCell>{c.end_date ? format(new Date(c.end_date), "MMM d, yyyy") : "—"}</TableCell>
-                  <TableCell><Badge variant={statusColor(c.status)}>{c.status}</Badge></TableCell>
-                  <TableCell>{clinics.filter(cl => cl.contract_id === c.id).length}</TableCell>
-                  <TableCell><Button size="sm" variant="ghost" onClick={() => toggleContract.mutate({ id: c.id, status: c.status })}>{c.status === "active" ? "Suspend" : "Activate"}</Button></TableCell>
-                </TableRow>
-              ))}
-              {contracts.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No contracts yet</TableCell></TableRow>}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      <Tabs defaultValue="contracts">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="contracts">Contracts</TabsTrigger>
+          <TabsTrigger value="clinics">Clinics & Staff</TabsTrigger>
+          <TabsTrigger value="assignments">All Assignments</TabsTrigger>
+        </TabsList>
 
-      <Card>
-        <CardHeader><CardTitle>Clinics</CardTitle></CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Address</TableHead><TableHead>Contract</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
-            <TableBody>
-              {clinics.map(c => (
-                <TableRow key={c.id}>
-                  <TableCell className="font-medium">{c.name}</TableCell>
-                  <TableCell>{c.address || "—"}</TableCell>
-                  <TableCell>{(c as any).contracts?.name || "—"}</TableCell>
-                  <TableCell><Badge variant={c.is_active ? "default" : "secondary"}>{c.is_active ? "Active" : "Inactive"}</Badge></TableCell>
-                </TableRow>
-              ))}
-              {clinics.length === 0 && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">No clinics yet</TableCell></TableRow>}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+        <TabsContent value="contracts">
+          <Card>
+            <CardHeader><CardTitle>Contracts</CardTitle></CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Start</TableHead><TableHead>End</TableHead><TableHead>Status</TableHead><TableHead>Clinics</TableHead><TableHead></TableHead></TableRow></TableHeader>
+                <TableBody>
+                  {contracts.map(c => (
+                    <TableRow key={c.id}>
+                      <TableCell className="font-medium">{c.name}</TableCell>
+                      <TableCell>{format(new Date(c.start_date), "MMM d, yyyy")}</TableCell>
+                      <TableCell>{c.end_date ? format(new Date(c.end_date), "MMM d, yyyy") : "—"}</TableCell>
+                      <TableCell><Badge variant={statusColor(c.status)}>{c.status}</Badge></TableCell>
+                      <TableCell>{clinics.filter(cl => cl.contract_id === c.id).length}</TableCell>
+                      <TableCell><Button size="sm" variant="ghost" onClick={() => toggleContract.mutate({ id: c.id, status: c.status })}>{c.status === "active" ? "Suspend" : "Activate"}</Button></TableCell>
+                    </TableRow>
+                  ))}
+                  {contracts.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No contracts yet</TableCell></TableRow>}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="clinics" className="space-y-4">
+          {clinics.map(c => {
+            const ca = clinicAssignments(c.id);
+            return (
+              <Card key={c.id}>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Building2 className="h-4 w-4 text-primary" />
+                        {c.name}
+                        <Badge variant={c.is_active ? "default" : "secondary"} className="text-[10px]">{c.is_active ? "Active" : "Inactive"}</Badge>
+                      </CardTitle>
+                      <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                        {((c as any).city || (c as any).state) && (
+                          <span className="flex items-center gap-0.5"><MapPin className="h-3 w-3" />{[(c as any).city, (c as any).state].filter(Boolean).join(", ")}</span>
+                        )}
+                        {(c as any).phone && (
+                          <span className="flex items-center gap-0.5"><PhoneIcon className="h-3 w-3" />{(c as any).phone}</span>
+                        )}
+                        {(c as any).contracts?.name && <span>Contract: {(c as any).contracts.name}</span>}
+                      </div>
+                    </div>
+                    <Button size="sm" variant="outline" onClick={() => { setAssignClinicId(c.id); setAssignOpen(true); }}>
+                      <UserPlus className="h-3 w-3 mr-1" />Add Staff
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  {ca.length === 0 ? (
+                    <p className="text-xs text-muted-foreground py-3 text-center">No providers assigned</p>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {ca.map((a: any) => (
+                        <div key={a.id} className="flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs">
+                          <span className="font-medium">{a.providers?.first_name} {a.providers?.last_name}</span>
+                          {a.providers?.credentials && <span className="text-muted-foreground">{a.providers.credentials}</span>}
+                          <Badge variant="outline" className="text-[9px] px-1">{a.role_at_clinic?.replace(/_/g, " ")}</Badge>
+                          {a.is_primary && <Badge className="text-[9px] px-1">Primary</Badge>}
+                          <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" onClick={() => removeAssignment.mutate(a.id)}>
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
+          {clinics.length === 0 && (
+            <Card><CardContent className="py-8 text-center text-muted-foreground">No clinics yet</CardContent></Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="assignments">
+          <Card>
+            <CardHeader><CardTitle>Provider Assignments</CardTitle></CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Provider</TableHead>
+                    <TableHead>Clinic</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Primary</TableHead>
+                    <TableHead></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {assignments.map((a: any) => (
+                    <TableRow key={a.id}>
+                      <TableCell className="font-medium">
+                        {a.providers?.first_name} {a.providers?.last_name}
+                        {a.providers?.credentials ? `, ${a.providers.credentials}` : ""}
+                      </TableCell>
+                      <TableCell>{a.clinics?.name || "—"}</TableCell>
+                      <TableCell><Badge variant="outline" className="text-[10px]">{a.role_at_clinic?.replace(/_/g, " ")}</Badge></TableCell>
+                      <TableCell>{a.is_primary ? <Badge className="text-[10px]">Primary</Badge> : "—"}</TableCell>
+                      <TableCell>
+                        <Button size="sm" variant="ghost" onClick={() => removeAssignment.mutate(a.id)}>
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {assignments.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No assignments yet</TableCell></TableRow>}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
