@@ -1,64 +1,42 @@
 
 
-# Admin User & Role Management Panel
+# Enhance User & Role Management Panel + Fix Runtime Error
 
-## Overview
-Add a "User Management" tab/section to the Settings page (visible only to admins) where admins can:
-1. View all registered users with their current roles
-2. Assign/change roles (admin, provider, front_desk)
-3. Link a user to a provider record
+Since the basic panel already exists, this plan covers **enhancements** to make it a more complete admin tool, plus a bug fix.
 
-## Database Changes
-**No schema changes needed.** Tables `profiles`, `user_roles`, and `providers` already have the required columns. The `providers` table has a `user_id` column for linking.
+## 1. Fix Runtime Error (MdOversightDashboard)
 
-**One new RLS policy needed:** Allow admins to read all profiles (currently profiles may be restricted). We'll use the existing `has_role()` security-definer function.
+**File:** `src/pages/MdOversightDashboard.tsx` (line ~693)
 
-```sql
--- Allow admins to read all profiles
-CREATE POLICY "Admins can read all profiles"
-  ON public.profiles FOR SELECT
-  TO authenticated
-  USING (public.has_role(auth.uid(), 'admin'));
-
--- Allow admins to read all user_roles
-CREATE POLICY "Admins can read all user_roles"
-  ON public.user_roles FOR SELECT
-  TO authenticated
-  USING (public.has_role(auth.uid(), 'admin'));
-
--- Allow admins to insert/update/delete user_roles
-CREATE POLICY "Admins can manage user_roles"
-  ON public.user_roles FOR ALL
-  TO authenticated
-  USING (public.has_role(auth.uid(), 'admin'))
-  WITH CHECK (public.has_role(auth.uid(), 'admin'));
-
--- Allow admins to update provider.user_id for linking
-CREATE POLICY "Admins can update providers"
-  ON public.providers FOR UPDATE
-  TO authenticated
-  USING (public.has_role(auth.uid(), 'admin'));
+`report.highlights` is not an array in some cases. Add a guard:
+```ts
+(Array.isArray(report.highlights) ? report.highlights : []).map(...)
 ```
 
-## New Component: `src/components/settings/UserManagement.tsx`
+## 2. Enhance Existing User Management Panel
 
-A panel that:
-- **User list table**: Fetches `profiles` joined with `user_roles` to show display_name, email (from auth metadata in profile), current role, and linked provider status
-- **Role assignment**: Dropdown per user to set role → upserts into `user_roles`
-- **Link to provider**: Dropdown of unlinked providers → updates `providers.user_id`
-- **Search/filter**: Text filter on name/email
+**File:** `src/components/settings/UserManagement.tsx`
 
-## Changes to `src/pages/Settings.tsx`
+Current gaps worth addressing:
 
-- Import `UserManagement` component
-- Add a conditional section at the top (only when `role === 'admin'`) with a card containing the user management panel
-- Guard with `useAuth().role === 'admin'`
+| Enhancement | Detail |
+|-------------|--------|
+| **Show user email** | Currently only shows `display_name` and `user_id`. Add email from `profiles` if available, or show truncated user ID more clearly. |
+| **Bulk role assignment** | Add checkboxes + bulk action bar to assign a role to multiple users at once. |
+| **Unlink provider** | Currently can link but not unlink a provider from a user. Add an "Unlink" action. |
+| **Confirmation dialogs** | Role changes (especially removing admin) and unlinking should require confirmation to prevent accidental changes. |
+| **Pagination** | If user count grows, add simple pagination or virtual scroll. |
 
-## File Summary
+## 3. Optionally: Promote to Dedicated Page
+
+If the Settings page is getting crowded, move User Management to its own route `/user-management` with a sidebar nav link visible only to admins.
+
+## Files to Change
 
 | File | Action |
 |------|--------|
-| Migration SQL | Add RLS policies for admin access to profiles, user_roles, providers |
-| `src/components/settings/UserManagement.tsx` | **New** — user table with role assignment and provider linking |
-| `src/pages/Settings.tsx` | Add admin-only User Management section |
+| `src/pages/MdOversightDashboard.tsx` | Fix `report.highlights.map` crash |
+| `src/components/settings/UserManagement.tsx` | Add email display, unlink provider, confirmation dialogs |
+
+No database or migration changes needed — all required RLS policies are already in place.
 
