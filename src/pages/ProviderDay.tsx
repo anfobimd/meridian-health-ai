@@ -14,7 +14,7 @@ import {
   Stethoscope, Clock, FileText, User, AlertTriangle,
   Package, Sparkles, Loader2, CheckCircle2, Play, ChevronRight,
   ChevronDown, Send, Calendar, ClipboardList, MessageSquare,
-  RefreshCw, TrendingUp,
+  RefreshCw, TrendingUp, Video, Phone,
 } from "lucide-react";
 import { StatCard } from "@/components/StatCard";
 
@@ -333,6 +333,8 @@ export default function ProviderDay() {
                     <p className="text-sm text-muted-foreground truncate">
                       {currentApt.treatments?.name || "General"} · {format(parseISO(currentApt.scheduled_at), "h:mm a")}
                       {currentApt.rooms && ` · ${(currentApt.rooms as any).name}`}
+                      {currentApt.visit_type === "telehealth" && " · 📹 Telehealth"}
+                      {currentApt.visit_type === "phone" && " · 📞 Phone"}
                     </p>
                     {currentApt.patients?.allergies?.length > 0 && (
                       <div className="flex items-center gap-1 mt-1">
@@ -347,9 +349,16 @@ export default function ProviderDay() {
                     )}
                   </div>
                 </div>
-                <Button className="shrink-0" onClick={() => openChart(currentApt)}>
-                  <FileText className="h-4 w-4 mr-1.5" /> Open Chart
-                </Button>
+                <div className="flex items-center gap-2 shrink-0">
+                  {currentApt.visit_type === "telehealth" && (
+                    <Button variant="outline" className="shrink-0 gap-1 border-primary/30 text-primary" onClick={() => navigate(`/telehealth/${currentApt.id}`)}>
+                      <Video className="h-4 w-4" /> Join Telehealth
+                    </Button>
+                  )}
+                  <Button className="shrink-0" onClick={() => openChart(currentApt)}>
+                    <FileText className="h-4 w-4 mr-1.5" /> Open Chart
+                  </Button>
+                </div>
               </div>
               {/* AI brief inline - auto-loaded */}
               {aiBrief[currentApt.id] ? (
@@ -398,6 +407,21 @@ export default function ProviderDay() {
                         </div>
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
+                        {apt.visit_type === "telehealth" && (
+                          <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">
+                            <Video className="h-2.5 w-2.5 mr-0.5" />Video
+                          </Badge>
+                        )}
+                        {apt.visit_type === "phone" && (
+                          <Badge variant="outline" className="text-[10px]">
+                            <Phone className="h-2.5 w-2.5 mr-0.5" />Phone
+                          </Badge>
+                        )}
+                        {apt.intake_form_id && (
+                          <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">
+                            <ClipboardList className="h-2.5 w-2.5 mr-0.5" />Intake ✓
+                          </Badge>
+                        )}
                         {lapsed && (
                           <Badge variant="outline" className="text-[10px] border-warning/30 text-warning">
                             <Clock className="h-2.5 w-2.5 mr-0.5" />Lapsed
