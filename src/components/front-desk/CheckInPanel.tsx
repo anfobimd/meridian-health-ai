@@ -163,9 +163,9 @@ export function CheckInPanel({ appointment, open, onOpenChange }: {
                 <Package className="h-3.5 w-3.5 text-primary mt-0.5 shrink-0" />
                 <div>
                   <p className="font-medium">Package Credits Available</p>
-                  {packageCredits!.map(p => (
+                  {packageCredits!.map((p: any) => (
                     <p key={p.id} className="text-muted-foreground">
-                      {p.package_name}: {p.sessions_total - (p.sessions_used || 0)} sessions remaining
+                      {(p.packages as any)?.name || "Package"}: {p.sessions_total - (p.sessions_used || 0)} sessions remaining
                     </p>
                   ))}
                 </div>
