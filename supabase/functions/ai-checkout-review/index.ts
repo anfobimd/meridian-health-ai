@@ -10,16 +10,17 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { appointment_id } = await req.json();
+    const body = await req.json();
+    const { appointment_id, mode } = body;
     if (!appointment_id) throw new Error("appointment_id required");
 
     const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
     const [aptRes, encounterRes, consentsRes, invoicesRes] = await Promise.all([
-      sb.from("appointments").select("*, patients(first_name, last_name), treatments(name)").eq("id", appointment_id).single(),
-      sb.from("encounters").select("id, status, signed_at, signed_by").eq("appointment_id", appointment_id).limit(1).maybeSingle(),
+      sb.from("appointments").select("*, patients(id, first_name, last_name, phone, email), treatments(name, price, category)").eq("id", appointment_id).single(),
+      sb.from("encounters").select("id, status, signed_at, signed_by, encounter_type").eq("appointment_id", appointment_id).limit(1).maybeSingle(),
       sb.from("patient_consents").select("id, status").eq("appointment_id", appointment_id),
-      sb.from("invoices").select("id, status, balance_due").eq("appointment_id", appointment_id),
+      sb.from("invoices").select("id, status, balance_due, total_amount").eq("appointment_id", appointment_id),
     ]);
 
     const apt = aptRes.data;
@@ -30,7 +31,6 @@ serve(async (req) => {
     // Build checklist
     const openItems: { item: string; severity: "warning" | "critical"; resolved: boolean }[] = [];
 
-    // Check unsigned encounter
     if (encounter && !encounter.signed_at) {
       openItems.push({ item: "Encounter chart not signed", severity: "critical", resolved: false });
     }
@@ -38,24 +38,74 @@ serve(async (req) => {
       openItems.push({ item: "No encounter record found for this appointment", severity: "warning", resolved: false });
     }
 
-    // Check unsigned consents
-    const pendingConsents = consents.filter(c => c.status === "pending");
+    const pendingConsents = consents.filter((c: any) => c.status === "pending");
     if (pendingConsents.length > 0) {
       openItems.push({ item: `${pendingConsents.length} consent form(s) pending signature`, severity: "critical", resolved: false });
     }
 
-    // Check unpaid invoices
-    const unpaidInvoices = invoices.filter(i => i.status !== "paid" && (i.balance_due ?? 0) > 0);
+    const unpaidInvoices = invoices.filter((i: any) => i.status !== "paid" && (i.balance_due ?? 0) > 0);
     if (unpaidInvoices.length > 0) {
-      const totalDue = unpaidInvoices.reduce((s, i) => s + (i.balance_due || 0), 0);
+      const totalDue = unpaidInvoices.reduce((s: number, i: any) => s + (i.balance_due || 0), 0);
       openItems.push({ item: `Outstanding balance: $${totalDue.toFixed(2)}`, severity: "warning", resolved: false });
     }
     if (invoices.length === 0) {
       openItems.push({ item: "No invoice created for this visit", severity: "warning", resolved: false });
     }
 
+    // ── payment_suggestions mode: check for applicable packages & memberships ──
+    let paymentSuggestions: any[] = [];
+    if (mode === "payment_suggestions" && apt?.patients?.id) {
+      const patientId = apt.patients.id;
+      const treatmentName = apt.treatments?.name || "";
+      const treatmentCategory = apt.treatments?.category || "";
+
+      // Check active packages with remaining sessions
+      const { data: packages } = await sb.from("patient_package_purchases")
+        .select("id, package_name, sessions_total, sessions_used, expires_at")
+        .eq("patient_id", patientId)
+        .eq("status", "active")
+        .gt("sessions_total", 0);
+
+      const applicablePackages = (packages || []).filter((p: any) => {
+        const remaining = p.sessions_total - (p.sessions_used || 0);
+        if (remaining <= 0) return false;
+        // Match by name similarity
+        const pkgName = p.package_name?.toLowerCase() || "";
+        return pkgName.includes(treatmentName.toLowerCase()) ||
+               pkgName.includes(treatmentCategory.toLowerCase()) ||
+               treatmentName.toLowerCase().includes(pkgName.split(" ")[0]);
+      });
+
+      for (const pkg of applicablePackages) {
+        const remaining = pkg.sessions_total - (pkg.sessions_used || 0);
+        paymentSuggestions.push({
+          type: "package_credit",
+          label: `Apply ${pkg.package_name} credit (${remaining} sessions remaining)`,
+          package_id: pkg.id,
+          remaining_sessions: remaining,
+          expires_at: pkg.expires_at,
+        });
+      }
+
+      // Check active memberships
+      const { data: memberships } = await sb.from("patient_memberships")
+        .select("id, membership_name, discount_percent, status")
+        .eq("patient_id", patientId)
+        .eq("status", "active");
+
+      for (const m of (memberships || [])) {
+        paymentSuggestions.push({
+          type: "membership_discount",
+          label: `Member discount: ${m.discount_percent || 10}% off (${m.membership_name})`,
+          membership_id: m.id,
+          discount_percent: m.discount_percent || 10,
+        });
+      }
+    }
+
     // AI follow-up suggestion
     let followUpSuggestion = "Schedule follow-up per treatment protocol";
+    let followUpDays: number | null = null;
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (LOVABLE_API_KEY && apt) {
       try {
@@ -66,13 +116,21 @@ serve(async (req) => {
             model: "google/gemini-2.5-flash-lite",
             messages: [{
               role: "user",
-              content: `Patient ${apt.patients?.first_name} ${apt.patients?.last_name} just completed a ${apt.treatments?.name || "general"} visit. Suggest a follow-up timeframe in one sentence (e.g. "Schedule follow-up in 2 weeks for re-evaluation"). Be specific to the treatment type.`,
+              content: `Patient ${apt.patients?.first_name} ${apt.patients?.last_name} just completed a ${apt.treatments?.name || "general"} visit. Respond in JSON: {"suggestion":"one sentence follow-up recommendation","days":number_of_days_until_followup}. Be specific to the treatment type.`,
             }],
+            response_format: { type: "json_object" },
           }),
         });
         if (aiRes.ok) {
           const d = await aiRes.json();
-          followUpSuggestion = d.choices?.[0]?.message?.content || followUpSuggestion;
+          const content = d.choices?.[0]?.message?.content || "";
+          try {
+            const parsed = JSON.parse(content);
+            followUpSuggestion = parsed.suggestion || followUpSuggestion;
+            followUpDays = parsed.days || null;
+          } catch {
+            followUpSuggestion = content || followUpSuggestion;
+          }
         }
       } catch { /* graceful degradation */ }
     }
@@ -83,7 +141,15 @@ serve(async (req) => {
       open_items: openItems,
       can_checkout: canCheckout,
       follow_up_suggestion: followUpSuggestion,
+      follow_up_days: followUpDays,
       patient_name: apt ? `${apt.patients?.first_name} ${apt.patients?.last_name}` : null,
+      patient_id: apt?.patients?.id || null,
+      payment_suggestions: paymentSuggestions,
+      invoice_summary: {
+        total: invoices.reduce((s: number, i: any) => s + (i.total_amount || 0), 0),
+        balance_due: unpaidInvoices.reduce((s: number, i: any) => s + (i.balance_due || 0), 0),
+        invoice_count: invoices.length,
+      },
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
