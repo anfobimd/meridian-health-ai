@@ -1,13 +1,11 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { UserPlus, CalendarPlus, Calculator, Package, ClipboardPlus } from "lucide-react";
+import { UserPlus, Calculator, Package, ClipboardPlus } from "lucide-react";
 import { PatientRegistrationDialog } from "./PatientRegistrationDialog";
 import { PricingQuoteTool } from "./PricingQuoteTool";
-import { PackageSalePanel } from "./PackageSalePanel";
 
-type DockAction = "walkin" | "book" | "quote" | "package" | "register" | null;
+type DockAction = "quote" | "register" | null;
 
 export function QuickDock({
   onWalkIn,
@@ -19,7 +17,6 @@ export function QuickDock({
   const actions = [
     { key: "walkin" as const, icon: UserPlus, label: "Walk-In", onClick: onWalkIn },
     { key: "quote" as const, icon: Calculator, label: "Quote" },
-    { key: "package" as const, icon: Package, label: "Package" },
     { key: "register" as const, icon: ClipboardPlus, label: "Register" },
   ];
 
@@ -33,7 +30,7 @@ export function QuickDock({
               variant="outline"
               size="sm"
               className="flex-1 max-w-[140px] h-9 text-xs gap-1.5"
-              onClick={() => a.onClick ? a.onClick() : setActive(a.key)}
+              onClick={() => a.onClick ? a.onClick() : setActive(a.key as DockAction)}
             >
               <a.icon className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">{a.label}</span>
@@ -48,16 +45,6 @@ export function QuickDock({
           <SheetHeader><SheetTitle>Pricing Quote</SheetTitle></SheetHeader>
           <div className="mt-4">
             <PricingQuoteTool />
-          </div>
-        </SheetContent>
-      </Sheet>
-
-      {/* Package Sale Sheet */}
-      <Sheet open={active === "package"} onOpenChange={(o) => !o && setActive(null)}>
-        <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
-          <SheetHeader><SheetTitle>Sell Package</SheetTitle></SheetHeader>
-          <div className="mt-4">
-            <PackageSalePanel />
           </div>
         </SheetContent>
       </Sheet>
