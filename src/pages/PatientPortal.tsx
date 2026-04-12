@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Activity, Calendar, Package, LogIn, LogOut, Loader2,
   Clock, CheckCircle, AlertCircle, User, FileText, Mail, KeyRound,
+  Video, PhoneOff,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -113,10 +114,12 @@ export default function PatientPortal() {
         <Tabs defaultValue="appointments">
           <TabsList className="mb-4">
             <TabsTrigger value="appointments"><Calendar className="h-3.5 w-3.5 mr-1" /> Appointments</TabsTrigger>
+            <TabsTrigger value="telehealth"><Video className="h-3.5 w-3.5 mr-1" /> Telehealth</TabsTrigger>
             <TabsTrigger value="packages"><Package className="h-3.5 w-3.5 mr-1" /> Packages</TabsTrigger>
             <TabsTrigger value="records"><FileText className="h-3.5 w-3.5 mr-1" /> Records</TabsTrigger>
           </TabsList>
           <TabsContent value="appointments"><AppointmentsTab patientId={patientId} /></TabsContent>
+          <TabsContent value="telehealth"><TelehealthTab patientId={patientId} /></TabsContent>
           <TabsContent value="packages"><PackagesTab patientId={patientId} /></TabsContent>
           <TabsContent value="records"><RecordsTab patientId={patientId} /></TabsContent>
         </Tabs>
