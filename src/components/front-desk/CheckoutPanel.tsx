@@ -6,9 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
+import { PaymentPanel } from "./PaymentPanel";
+import { FollowUpBooker } from "./FollowUpBooker";
 import {
-  CheckCircle2, AlertTriangle, Loader2, Sparkles, CalendarPlus,
-  CreditCard, XCircle, CircleCheck,
+  CheckCircle2, AlertTriangle, Loader2, Sparkles, CreditCard,
+  XCircle, CircleCheck, Send,
 } from "lucide-react";
 
 interface OpenItem {
@@ -27,18 +29,30 @@ export function CheckoutPanel({ appointmentId, open, onOpenChange }: {
   const [openItems, setOpenItems] = useState<OpenItem[]>([]);
   const [canCheckout, setCanCheckout] = useState(false);
   const [followUp, setFollowUp] = useState("");
+  const [followUpDays, setFollowUpDays] = useState<number | null>(null);
+  const [patientId, setPatientId] = useState<string | null>(null);
+  const [patientName, setPatientName] = useState<string | null>(null);
+  const [paymentSuggestions, setPaymentSuggestions] = useState<any[]>([]);
+  const [invoiceSummary, setInvoiceSummary] = useState<any>({ total: 0, balance_due: 0, invoice_count: 0 });
   const [reviewed, setReviewed] = useState(false);
+  const [paymentDone, setPaymentDone] = useState(false);
+  const [aftercareSent, setAftercareSent] = useState(false);
 
   const runReview = async () => {
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("ai-checkout-review", {
-        body: { appointment_id: appointmentId },
+        body: { appointment_id: appointmentId, mode: "payment_suggestions" },
       });
       if (error) throw error;
       setOpenItems(data.open_items || []);
       setCanCheckout(data.can_checkout);
       setFollowUp(data.follow_up_suggestion || "");
+      setFollowUpDays(data.follow_up_days || null);
+      setPatientId(data.patient_id || null);
+      setPatientName(data.patient_name || null);
+      setPaymentSuggestions(data.payment_suggestions || []);
+      setInvoiceSummary(data.invoice_summary || { total: 0, balance_due: 0, invoice_count: 0 });
       setReviewed(true);
     } catch (e: any) {
       toast.error(e.message || "Checkout review failed");
@@ -62,9 +76,22 @@ export function CheckoutPanel({ appointmentId, open, onOpenChange }: {
     }
   };
 
+  const sendAftercare = async () => {
+    // Trigger aftercare message
+    try {
+      await supabase.functions.invoke("ai-aftercare-message", {
+        body: { appointment_id: appointmentId },
+      });
+      setAftercareSent(true);
+      toast.success("Aftercare instructions sent");
+    } catch {
+      toast.error("Failed to send aftercare");
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <CreditCard className="h-4 w-4" />Checkout Review
@@ -74,7 +101,7 @@ export function CheckoutPanel({ appointmentId, open, onOpenChange }: {
         {!reviewed ? (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Run AI checkout review to check for open items before completing this visit.
+              Run AI checkout review to check for open items, apply credits, and complete this visit.
             </p>
             <Button onClick={runReview} disabled={loading} className="w-full">
               {loading ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Sparkles className="h-4 w-4 mr-1.5" />}
@@ -109,15 +136,44 @@ export function CheckoutPanel({ appointmentId, open, onOpenChange }: {
 
             <Separator />
 
-            {/* Follow-up Suggestion */}
-            {followUp && (
-              <div className="space-y-1.5">
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
-                  <CalendarPlus className="h-3 w-3" />AI Follow-Up Suggestion
-                </h4>
-                <p className="text-sm bg-muted/50 rounded-md p-2">{followUp}</p>
-              </div>
+            {/* Payment Panel */}
+            {(invoiceSummary.balance_due > 0 || paymentSuggestions.length > 0) && (
+              <>
+                <PaymentPanel
+                  invoiceSummary={invoiceSummary}
+                  paymentSuggestions={paymentSuggestions}
+                  onPaymentComplete={() => setPaymentDone(true)}
+                />
+                <Separator />
+              </>
             )}
+
+            {/* Follow-up Booking */}
+            {patientId && followUp && (
+              <>
+                <FollowUpBooker
+                  patientId={patientId}
+                  patientName={patientName || "Patient"}
+                  suggestion={followUp}
+                  suggestedDays={followUpDays}
+                />
+                <Separator />
+              </>
+            )}
+
+            {/* Aftercare */}
+            <div className="space-y-1.5">
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Aftercare</h4>
+              {aftercareSent ? (
+                <div className="flex items-center gap-2 text-xs text-success">
+                  <CheckCircle2 className="h-3.5 w-3.5" />Aftercare instructions sent
+                </div>
+              ) : (
+                <Button variant="outline" size="sm" className="w-full" onClick={sendAftercare}>
+                  <Send className="h-3.5 w-3.5 mr-1.5" />Send Aftercare Instructions
+                </Button>
+              )}
+            </div>
 
             <Separator />
 
