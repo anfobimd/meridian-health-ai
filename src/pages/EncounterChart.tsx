@@ -231,6 +231,8 @@ export default function EncounterChart() {
   const { encounterId } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { role } = useAuth();
+  const isReadOnly = role === "front_desk";
 
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
   const [checkboxValues, setCheckboxValues] = useState<Record<string, string[]>>({});
