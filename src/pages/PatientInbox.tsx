@@ -11,9 +11,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
+import { format } from "date-fns";
 import {
   Inbox, Search, Sparkles, Send, CheckCircle2, Clock, AlertTriangle,
-  MessageSquare, Loader2, Archive, Filter, RefreshCw,
+  MessageSquare, Loader2, Archive, RefreshCw, CalendarDays, Package, User,
 } from "lucide-react";
 
 const INTENT_COLORS: Record<string, string> = {
@@ -27,6 +28,117 @@ const INTENT_COLORS: Record<string, string> = {
   refill: "bg-primary/10 text-primary",
   general: "bg-muted text-muted-foreground",
 };
+
+/* ── Patient Context Sidebar ── */
+function PatientContextCard({ patientId }: { patientId: string }) {
+  const { data: nextApt } = useQuery({
+    queryKey: ["patient-next-apt", patientId],
+    queryFn: async () => {
+      const { data } = await supabase.from("appointments")
+        .select("scheduled_at, treatments(name), providers(first_name, last_name)")
+        .eq("patient_id", patientId)
+        .gte("scheduled_at", new Date().toISOString())
+        .eq("status", "booked" as any)
+        .order("scheduled_at")
+        .limit(1)
+        .maybeSingle();
+      return data;
+    },
+  });
+
+  const { data: lastVisit } = useQuery({
+    queryKey: ["patient-last-visit-inbox", patientId],
+    queryFn: async () => {
+      const { data } = await supabase.from("appointments")
+        .select("completed_at, treatments(name)")
+        .eq("patient_id", patientId)
+        .eq("status", "completed" as any)
+        .order("completed_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return data;
+    },
+  });
+
+  const { data: packageBalance } = useQuery({
+    queryKey: ["patient-pkg-balance-inbox", patientId],
+    queryFn: async () => {
+      const { data } = await supabase.from("patient_package_purchases")
+        .select("sessions_total, sessions_used, packages:package_id(name)")
+        .eq("patient_id", patientId)
+        .eq("status", "active");
+      return (data ?? []).filter((p: any) => (p.sessions_total - (p.sessions_used || 0)) > 0);
+    },
+  });
+
+  const { data: openItems } = useQuery({
+    queryKey: ["patient-open-items-inbox", patientId],
+    queryFn: async () => {
+      const { data } = await supabase.from("invoices")
+        .select("balance_due")
+        .eq("patient_id", patientId)
+        .neq("status", "paid")
+        .gt("balance_due", 0);
+      return data ?? [];
+    },
+  });
+
+  const totalOwed = openItems?.reduce((s, i: any) => s + (i.balance_due || 0), 0) || 0;
+
+  return (
+    <div className="space-y-3 p-3 bg-muted/30 rounded-lg border">
+      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+        <User className="h-3 w-3" />Patient Context
+      </p>
+
+      {/* Next Appointment */}
+      <div className="space-y-0.5">
+        <p className="text-[10px] text-muted-foreground flex items-center gap-1"><CalendarDays className="h-2.5 w-2.5" />Next Appointment</p>
+        {nextApt ? (
+          <p className="text-xs">
+            {format(new Date(nextApt.scheduled_at), "MMM d 'at' h:mm a")}
+            {(nextApt as any).treatments?.name && ` · ${(nextApt as any).treatments.name}`}
+          </p>
+        ) : (
+          <p className="text-xs text-muted-foreground italic">None scheduled</p>
+        )}
+      </div>
+
+      {/* Last Visit */}
+      <div className="space-y-0.5">
+        <p className="text-[10px] text-muted-foreground flex items-center gap-1"><Clock className="h-2.5 w-2.5" />Last Visit</p>
+        {lastVisit?.completed_at ? (
+          <p className="text-xs">
+            {format(new Date(lastVisit.completed_at), "MMM d, yyyy")}
+            {(lastVisit as any).treatments?.name && ` · ${(lastVisit as any).treatments.name}`}
+          </p>
+        ) : (
+          <p className="text-xs text-muted-foreground italic">No visits</p>
+        )}
+      </div>
+
+      {/* Package Balance */}
+      {(packageBalance?.length ?? 0) > 0 && (
+        <div className="space-y-0.5">
+          <p className="text-[10px] text-muted-foreground flex items-center gap-1"><Package className="h-2.5 w-2.5" />Package Credits</p>
+          {packageBalance!.map((p: any, i: number) => (
+            <p key={i} className="text-xs">
+              {(p.packages as any)?.name}: {p.sessions_total - (p.sessions_used || 0)} left
+            </p>
+          ))}
+        </div>
+      )}
+
+      {/* Outstanding Balance */}
+      {totalOwed > 0 && (
+        <div className="flex items-center gap-1.5">
+          <AlertTriangle className="h-3 w-3 text-warning" />
+          <p className="text-xs text-warning font-medium">Balance due: ${totalOwed.toFixed(2)}</p>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function PatientInbox() {
   const { user } = useAuth();
@@ -103,7 +215,6 @@ export default function PatientInbox() {
   const sendReply = async () => {
     if (!replyText.trim() || !selectedMsg) return;
     try {
-      // Log outbound message
       await supabase.from("patient_communication_log").insert({
         patient_id: selectedMsg.patient_id,
         channel: selectedMsg.channel,
@@ -112,14 +223,12 @@ export default function PatientInbox() {
         staff_user_id: user?.id,
       } as any);
 
-      // If SMS, send via Twilio
       if (selectedMsg.channel === "sms" && selectedMsg.patients?.phone) {
         await supabase.functions.invoke("send-sms", {
           body: { to: selectedMsg.patients.phone, body: replyText },
         });
       }
 
-      // Resolve the original message
       await resolveMessage.mutateAsync(selectedMsg.id);
       setReplyText("");
       toast.success("Reply sent");
@@ -221,9 +330,9 @@ export default function PatientInbox() {
         </Card>
       )}
 
-      {/* Message Detail / Reply Dialog */}
+      {/* Message Detail with Patient Context */}
       <Dialog open={!!selectedMsg} onOpenChange={(o) => { if (!o) setSelectedMsg(null); }}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <MessageSquare className="h-4 w-4 text-primary" />
@@ -231,65 +340,73 @@ export default function PatientInbox() {
             </DialogTitle>
           </DialogHeader>
           {selectedMsg && (
-            <div className="space-y-4">
-              {/* Original Message */}
-              <div className="p-3 rounded-lg bg-muted/50">
-                <div className="flex items-center gap-2 mb-1">
-                  <Badge variant="outline" className="text-[10px]">{selectedMsg.channel}</Badge>
-                  {selectedMsg.ai_intent && (
-                    <Badge className={`text-[10px] ${INTENT_COLORS[selectedMsg.ai_intent] || INTENT_COLORS.general}`}>
-                      <Sparkles className="h-2.5 w-2.5 mr-0.5" />{selectedMsg.ai_intent.replace("_", " ")}
-                    </Badge>
-                  )}
-                  <span className="text-[10px] text-muted-foreground ml-auto">
-                    {new Date(selectedMsg.created_at).toLocaleString()}
-                  </span>
+            <div className="flex gap-4">
+              {/* Main content */}
+              <div className="flex-1 space-y-4 min-w-0">
+                {/* Original Message */}
+                <div className="p-3 rounded-lg bg-muted/50">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Badge variant="outline" className="text-[10px]">{selectedMsg.channel}</Badge>
+                    {selectedMsg.ai_intent && (
+                      <Badge className={`text-[10px] ${INTENT_COLORS[selectedMsg.ai_intent] || INTENT_COLORS.general}`}>
+                        <Sparkles className="h-2.5 w-2.5 mr-0.5" />{selectedMsg.ai_intent.replace("_", " ")}
+                      </Badge>
+                    )}
+                    <span className="text-[10px] text-muted-foreground ml-auto">
+                      {new Date(selectedMsg.created_at).toLocaleString()}
+                    </span>
+                  </div>
+                  <p className="text-sm">{selectedMsg.content}</p>
                 </div>
-                <p className="text-sm">{selectedMsg.content}</p>
+
+                {/* AI Draft Reply */}
+                {selectedMsg.ai_draft_reply && (
+                  <div className="p-3 rounded-lg border border-primary/20 bg-primary/5">
+                    <p className="text-[10px] font-semibold text-primary uppercase tracking-wider mb-1 flex items-center gap-1">
+                      <Sparkles className="h-3 w-3" />AI Draft Reply
+                    </p>
+                    <p className="text-xs text-foreground">{selectedMsg.ai_draft_reply}</p>
+                  </div>
+                )}
+
+                {!selectedMsg.ai_intent && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => classifyMessage(selectedMsg)}
+                    disabled={!!classifying}
+                  >
+                    {classifying ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Sparkles className="h-3.5 w-3.5 mr-1" />}
+                    Classify with AI
+                  </Button>
+                )}
+
+                <Separator />
+
+                {/* Reply */}
+                <div className="space-y-2">
+                  <Label className="text-xs">Reply</Label>
+                  <Textarea
+                    value={replyText}
+                    onChange={e => setReplyText(e.target.value)}
+                    placeholder="Type your reply..."
+                    className="h-20 text-sm"
+                  />
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" className="flex-1" onClick={() => resolveMessage.mutate(selectedMsg.id)}>
+                      <Archive className="h-3.5 w-3.5 mr-1" />Resolve
+                    </Button>
+                    <Button size="sm" className="flex-1" onClick={sendReply} disabled={!replyText.trim()}>
+                      <Send className="h-3.5 w-3.5 mr-1" />Send Reply
+                    </Button>
+                  </div>
+                </div>
               </div>
 
-              {/* AI Draft Reply */}
-              {selectedMsg.ai_draft_reply && (
-                <div className="p-3 rounded-lg border border-primary/20 bg-primary/5">
-                  <p className="text-[10px] font-semibold text-primary uppercase tracking-wider mb-1 flex items-center gap-1">
-                    <Sparkles className="h-3 w-3" />AI Draft Reply
-                  </p>
-                  <p className="text-xs text-foreground">{selectedMsg.ai_draft_reply}</p>
-                </div>
-              )}
-
-              {!selectedMsg.ai_intent && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full"
-                  onClick={() => classifyMessage(selectedMsg)}
-                  disabled={!!classifying}
-                >
-                  {classifying ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Sparkles className="h-3.5 w-3.5 mr-1" />}
-                  Classify with AI
-                </Button>
-              )}
-
-              <Separator />
-
-              {/* Reply */}
-              <div className="space-y-2">
-                <Label className="text-xs">Reply</Label>
-                <Textarea
-                  value={replyText}
-                  onChange={e => setReplyText(e.target.value)}
-                  placeholder="Type your reply..."
-                  className="h-20 text-sm"
-                />
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" className="flex-1" onClick={() => resolveMessage.mutate(selectedMsg.id)}>
-                    <Archive className="h-3.5 w-3.5 mr-1" />Resolve
-                  </Button>
-                  <Button size="sm" className="flex-1" onClick={sendReply} disabled={!replyText.trim()}>
-                    <Send className="h-3.5 w-3.5 mr-1" />Send Reply
-                  </Button>
-                </div>
+              {/* Patient Context Sidebar */}
+              <div className="w-56 shrink-0 hidden md:block">
+                <PatientContextCard patientId={selectedMsg.patient_id} />
               </div>
             </div>
           )}

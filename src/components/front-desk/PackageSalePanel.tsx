@@ -6,9 +6,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Sparkles, Loader2, Package, DollarSign, TrendingUp } from "lucide-react";
+import { Sparkles, Loader2, Package, DollarSign, TrendingUp, History, CalendarDays } from "lucide-react";
 import { toast } from "sonner";
+import { format } from "date-fns";
 
 interface PackageSalePanelProps {
   patientId: string;
@@ -27,6 +29,20 @@ export function PackageSalePanel({ patientId, patientName, open, onOpenChange }:
     queryKey: ["service-packages-active"],
     queryFn: async () => {
       const { data } = await supabase.from("service_packages").select("*").eq("is_active", true).order("name");
+      return data ?? [];
+    },
+  });
+
+  // Purchase history
+  const { data: purchaseHistory } = useQuery({
+    queryKey: ["purchase-history", patientId],
+    enabled: !!patientId && open,
+    queryFn: async () => {
+      const { data } = await supabase.from("patient_package_purchases")
+        .select("id, sessions_total, sessions_used, status, purchased_at, price_paid, packages:package_id(name)")
+        .eq("patient_id", patientId)
+        .order("purchased_at", { ascending: false })
+        .limit(5);
       return data ?? [];
     },
   });
@@ -65,6 +81,7 @@ export function PackageSalePanel({ patientId, patientName, open, onOpenChange }:
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["package-purchases"] });
+      queryClient.invalidateQueries({ queryKey: ["purchase-history"] });
       onOpenChange(false);
       setSelectedPkg("");
       setAiRec(null);
@@ -84,6 +101,33 @@ export function PackageSalePanel({ patientId, patientName, open, onOpenChange }:
         </DialogHeader>
 
         <div className="space-y-4">
+          {/* Purchase History */}
+          {(purchaseHistory?.length ?? 0) > 0 && (
+            <div className="space-y-1.5">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                <History className="h-3 w-3" />Purchase History
+              </p>
+              {purchaseHistory!.map((p: any) => (
+                <div key={p.id} className="flex items-center justify-between text-xs bg-muted/50 rounded p-2">
+                  <div>
+                    <span className="font-medium">{(p.packages as any)?.name || "Package"}</span>
+                    <span className="text-muted-foreground ml-2">
+                      {p.sessions_used}/{p.sessions_total} used
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={p.status === "active" ? "default" : "secondary"} className="text-[9px]">{p.status}</Badge>
+                    <span className="text-[10px] text-muted-foreground">
+                      {format(new Date(p.purchased_at), "MMM d, yyyy")}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <Separator />
+
           {/* AI Recommendation */}
           <Button variant="outline" size="sm" className="w-full" onClick={fetchRecommendation} disabled={loadingAi}>
             {loadingAi ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5 mr-1.5" />}
@@ -139,6 +183,7 @@ export function PackageSalePanel({ patientId, patientName, open, onOpenChange }:
             const pkg = packages?.find((p: any) => p.id === selectedPkg);
             if (!pkg) return null;
             const savings = pkg.individual_price ? (pkg.individual_price * pkg.session_count) - pkg.price : 0;
+            const perSession = pkg.session_count > 0 ? pkg.price / pkg.session_count : 0;
             return (
               <Card>
                 <CardContent className="p-3 space-y-2">
@@ -146,9 +191,14 @@ export function PackageSalePanel({ patientId, patientName, open, onOpenChange }:
                     <span className="text-sm font-medium">{pkg.name}</span>
                     <span className="text-lg font-bold font-mono">${pkg.price}</span>
                   </div>
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
                     <span>{pkg.session_count} sessions</span>
-                    {pkg.valid_days && <span>Valid {pkg.valid_days} days</span>}
+                    <span className="font-mono">${perSession.toFixed(0)}/session</span>
+                    {pkg.valid_days && (
+                      <span className="flex items-center gap-0.5">
+                        <CalendarDays className="h-2.5 w-2.5" />Valid {pkg.valid_days} days
+                      </span>
+                    )}
                     {savings > 0 && <Badge variant="outline" className="text-success text-[9px]">
                       <TrendingUp className="h-2.5 w-2.5 mr-0.5" />Save ${savings}
                     </Badge>}
