@@ -1,32 +1,64 @@
 
 
-# Make Sign-Out Button More Visible
+# Admin User & Role Management Panel
 
-## Change
-In `src/components/AppSidebar.tsx`, replace the small icon-only logout button with a full-width "Sign Out" button that has a text label, higher contrast, and more padding.
+## Overview
+Add a "User Management" tab/section to the Settings page (visible only to admins) where admins can:
+1. View all registered users with their current roles
+2. Assign/change roles (admin, provider, front_desk)
+3. Link a user to a provider record
 
-## Details
-- Replace the current tiny `LogOut` icon button (14px, 30% opacity) with a styled button showing the icon + "Sign Out" text
-- Increase contrast: `text-sidebar-foreground/70` default, brighter on hover
-- Add `gap-2`, proper padding, and `w-full` so it's unmissable
-- Keep it in the same footer area next to the user info, but give it its own row below the user details
+## Database Changes
+**No schema changes needed.** Tables `profiles`, `user_roles`, and `providers` already have the required columns. The `providers` table has a `user_id` column for linking.
 
-### File: `src/components/AppSidebar.tsx` (bottom user section ~lines 170-185)
+**One new RLS policy needed:** Allow admins to read all profiles (currently profiles may be restricted). We'll use the existing `has_role()` security-definer function.
 
-Replace the current compact layout with:
+```sql
+-- Allow admins to read all profiles
+CREATE POLICY "Admins can read all profiles"
+  ON public.profiles FOR SELECT
+  TO authenticated
+  USING (public.has_role(auth.uid(), 'admin'));
+
+-- Allow admins to read all user_roles
+CREATE POLICY "Admins can read all user_roles"
+  ON public.user_roles FOR SELECT
+  TO authenticated
+  USING (public.has_role(auth.uid(), 'admin'));
+
+-- Allow admins to insert/update/delete user_roles
+CREATE POLICY "Admins can manage user_roles"
+  ON public.user_roles FOR ALL
+  TO authenticated
+  USING (public.has_role(auth.uid(), 'admin'))
+  WITH CHECK (public.has_role(auth.uid(), 'admin'));
+
+-- Allow admins to update provider.user_id for linking
+CREATE POLICY "Admins can update providers"
+  ON public.providers FOR UPDATE
+  TO authenticated
+  USING (public.has_role(auth.uid(), 'admin'));
 ```
-<div className="px-3 py-3 border-t border-sidebar-border space-y-2">
-  <div className="flex items-center gap-2.5">
-    <avatar>{initials}</avatar>
-    <div>
-      <p>{displayName}</p>
-      <p>{email}</p>
-    </div>
-  </div>
-  <button onClick={signOut} className="w-full flex items-center gap-2 rounded-md px-3 py-2 text-[12px] text-sidebar-foreground/70 hover:bg-white/10 hover:text-white transition-colors">
-    <LogOut className="h-4 w-4" />
-    <span>Sign Out</span>
-  </button>
-</div>
-```
+
+## New Component: `src/components/settings/UserManagement.tsx`
+
+A panel that:
+- **User list table**: Fetches `profiles` joined with `user_roles` to show display_name, email (from auth metadata in profile), current role, and linked provider status
+- **Role assignment**: Dropdown per user to set role → upserts into `user_roles`
+- **Link to provider**: Dropdown of unlinked providers → updates `providers.user_id`
+- **Search/filter**: Text filter on name/email
+
+## Changes to `src/pages/Settings.tsx`
+
+- Import `UserManagement` component
+- Add a conditional section at the top (only when `role === 'admin'`) with a card containing the user management panel
+- Guard with `useAuth().role === 'admin'`
+
+## File Summary
+
+| File | Action |
+|------|--------|
+| Migration SQL | Add RLS policies for admin access to profiles, user_roles, providers |
+| `src/components/settings/UserManagement.tsx` | **New** — user table with role assignment and provider linking |
+| `src/pages/Settings.tsx` | Add admin-only User Management section |
 
