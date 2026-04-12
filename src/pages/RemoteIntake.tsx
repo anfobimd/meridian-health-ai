@@ -141,19 +141,15 @@ export default function RemoteIntake() {
       // Actually let's use a simpler approach — the edge function is for submission.
       // We'll just track opened status when they submit.
     }
-    if (refPatientId) {
-      // Fetch patient demographics to pre-fill
+    if (invitationToken) {
+      // Fetch patient demographics via edge function (no anon table access needed)
       const fetchPatient = async () => {
         try {
-          // Use public anon read (RLS allows anon select on intake_invitations)
-          // But patients table needs auth — so we fetch via the invitation data
-          const { data: inv } = await supabase
-            .from("intake_invitations")
-            .select("patients(first_name, last_name, email, phone, date_of_birth, gender)")
-            .eq("token", invitationToken || "")
-            .single();
-          if (inv?.patients) {
-            const p = inv.patients as any;
+          const { data } = await supabase.functions.invoke("submit-remote-intake", {
+            body: { _lookupToken: true, token: invitationToken },
+          });
+          if (data?.invitation?.patients) {
+            const p = data.invitation.patients as any;
             if (p.first_name && !firstName) setFirstName(p.first_name);
             if (p.last_name && !lastName) setLastName(p.last_name);
             if (p.email && !email) setEmail(p.email);
