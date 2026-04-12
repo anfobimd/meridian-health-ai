@@ -47,7 +47,6 @@ const navSections: NavSection[] = [
     label: "PATIENTS",
     items: [
       { to: "/patients", icon: Users, label: "Patients" },
-      { to: "/encounters", icon: FileText, label: "Encounters" },
       { to: "/messages", icon: Mail, label: "Messages", badgeKey: "unread_messages" },
       { to: "/patient-inbox", icon: Inbox, label: "Patient Inbox", roles: ["admin", "front_desk"] },
       { to: "/notifications", icon: Bell, label: "Notifications" },
