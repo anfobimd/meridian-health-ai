@@ -228,6 +228,43 @@ export default function MdOversightDashboard() {
         ))}
       </div>
 
+      {/* My Facilities */}
+      {assignedClinics.length > 0 && (
+        <div className="space-y-2">
+          <h2 className="text-sm font-semibold flex items-center gap-1.5"><Building2 className="h-4 w-4 text-primary" /> My Facilities</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {assignedClinics.map((clinic: any) => (
+              <Card
+                key={clinic.id}
+                className={`cursor-pointer transition-colors hover:border-primary/40 ${filterClinic === clinic.id ? "border-primary bg-primary/5" : ""}`}
+                onClick={() => setFilterClinic(filterClinic === clinic.id ? "all" : clinic.id)}
+              >
+                <CardContent className="pt-4 pb-3 flex items-start gap-3">
+                  <div className="h-9 w-9 shrink-0 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Building2 className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold truncate">{clinic.name}</p>
+                    <p className="text-[10px] text-muted-foreground truncate">
+                      {[clinic.city, clinic.state].filter(Boolean).join(", ") || "No location"}
+                      {clinic.contractName && ` · ${clinic.contractName}`}
+                    </p>
+                    <div className="flex items-center gap-2 mt-1">
+                      {clinic.pendingCharts > 0 ? (
+                        <Badge variant="destructive" className="text-[9px] px-1.5 py-0">{clinic.pendingCharts} pending</Badge>
+                      ) : (
+                        <Badge variant="secondary" className="text-[9px] px-1.5 py-0">All clear</Badge>
+                      )}
+                      {clinic.isPrimary && <Badge variant="outline" className="text-[9px] px-1.5 py-0">Primary</Badge>}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
       <Tabs defaultValue="reports">
         <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="reports"><Brain className="h-3 w-3 mr-1" /> AI Reports</TabsTrigger>
