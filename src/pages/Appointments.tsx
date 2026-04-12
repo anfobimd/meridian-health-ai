@@ -189,7 +189,7 @@ export default function Appointments() {
         throw new Error("Conflict detected: " + result.conflicts.map((c) => c.label).join("; "));
       }
 
-      const apt = {
+      const apt: any = {
         patient_id: bookPatientId,
         provider_id: bookProviderId || null,
         treatment_id: bookTreatmentId || null,
@@ -198,6 +198,8 @@ export default function Appointments() {
         notes: bookNotes || null,
         room_id: bookRoomId || null,
         device_id: bookDeviceId || null,
+        visit_type: bookVisitType,
+        video_room_url: bookVisitType === "telehealth" ? (bookVideoUrl || null) : null,
       };
       const { error } = await supabase.from("appointments").insert(apt);
       if (error) throw error;
@@ -216,6 +218,7 @@ export default function Appointments() {
     setBookPatientId(""); setBookTreatmentId(""); setBookProviderId("");
     setBookDate(undefined); setAvailableSlots([]); setSelectedSlot(null);
     setConflictResult(null); setBookNotes(""); setBookRoomId(""); setBookDeviceId("");
+    setBookVisitType("in_person"); setBookVideoUrl("");
     setAiSuggestion(null); setNoShowRisk(null); setDurationEstimate(null);
     setProviderMatch(null); setContraindicationCheck(null);
   };
