@@ -68,13 +68,12 @@ export default function MdOversight() {
     queryKey: ["md-assigned-clinics", user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
-      const { data: provider } = await supabase.from("providers").select("id").eq("auth_user_id", user.id).single();
+      const { data: provider } = await supabase.from("providers").select("id").eq("user_id", user.id).single();
       if (!provider) return [];
       const { data } = await supabase
         .from("md_coverage_assignments")
         .select("clinic_id, clinics(id, name, contract_id, contracts(name))")
-        .eq("md_provider_id", provider.id)
-        .eq("is_active", true);
+        .eq("md_provider_id", provider.id);
       return data?.map((d: any) => ({ id: d.clinic_id, name: d.clinics?.name, contractName: d.clinics?.contracts?.name })) || [];
     },
     enabled: !!user?.id,
