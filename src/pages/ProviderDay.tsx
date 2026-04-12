@@ -490,7 +490,15 @@ export default function ProviderDay() {
                     <Button variant="ghost" size="sm" className="text-xs h-7" onClick={() => openChart(apt)}>
                       View Chart <ChevronRight className="h-3 w-3 ml-1" />
                     </Button>
-                    <Button variant="ghost" size="sm" className="text-xs h-7 text-primary" onClick={() => toast.info("Aftercare sending coming in Batch 3")}>
+                    <Button variant="ghost" size="sm" className="text-xs h-7 text-primary" onClick={async () => {
+                      try {
+                        const { data: enc } = await supabase.from("encounters").select("id").eq("appointment_id", apt.id).limit(1);
+                        await supabase.functions.invoke("ai-aftercare-message", {
+                          body: { encounter_id: enc?.[0]?.id, procedure_type: apt.treatments?.name || "Visit", patient_name: `${apt.patients?.first_name} ${apt.patients?.last_name}`, auto_send: true },
+                        });
+                        toast.success("Aftercare sent");
+                      } catch { toast.error("Failed to send aftercare"); }
+                    }}>
                       <Send className="h-3 w-3 mr-1" /> Aftercare
                     </Button>
                   </div>
