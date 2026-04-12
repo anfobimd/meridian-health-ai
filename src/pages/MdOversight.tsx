@@ -272,6 +272,20 @@ export default function MdOversight() {
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground mt-1">Chart reviews + hormone approvals</p>
         </div>
+        {assignedClinics.length > 0 && (
+          <Select value={filterClinic} onValueChange={setFilterClinic}>
+            <SelectTrigger className="w-[200px] h-8 text-xs">
+              <Building2 className="h-3 w-3 mr-1" />
+              <SelectValue placeholder="All My Clinics" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All My Clinics</SelectItem>
+              {assignedClinics.map((c: any) => (
+                <SelectItem key={c.id} value={c.id}>{c.name}{c.contractName ? ` (${c.contractName})` : ""}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       {/* Summary Strip */}
