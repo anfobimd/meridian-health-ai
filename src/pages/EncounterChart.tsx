@@ -694,6 +694,16 @@ export default function EncounterChart() {
   // Active charting screen
   return (
     <div className="space-y-4">
+      {/* Read-only banner for front desk */}
+      {isReadOnly && (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardContent className="p-3 flex items-center gap-2">
+            <Eye className="h-4 w-4 text-primary shrink-0" />
+            <p className="text-xs text-primary font-medium">Read-only view — clinical fields cannot be edited by front desk staff</p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Header with completeness bar */}
       <div className="flex flex-col gap-3">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -705,7 +715,8 @@ export default function EncounterChart() {
               <h1 className="text-xl font-bold flex items-center gap-2">
                 <span className="text-2xl">{activeTemplate?.icon || "📋"}</span>
                 {activeTemplate?.name || "Chart"}
-                {isSigned && <Badge className="text-[10px] bg-green-600">Signed</Badge>}
+                {encounter?.status === "signed" && <Badge className="text-[10px] bg-green-600">Signed</Badge>}
+                {isReadOnly && <Badge variant="outline" className="text-[10px]"><Eye className="h-2.5 w-2.5 mr-0.5" />View Only</Badge>}
               </h1>
               <p className="text-sm text-muted-foreground">
                 {encounter?.patients?.first_name} {encounter?.patients?.last_name}
@@ -713,7 +724,7 @@ export default function EncounterChart() {
               </p>
             </div>
           </div>
-          {!isSigned && (
+          {!isSigned && !isReadOnly && (
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={() => saveEncounter(false)} disabled={saving}>
                 {saving ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />}
