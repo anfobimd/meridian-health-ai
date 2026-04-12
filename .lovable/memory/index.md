@@ -18,3 +18,4 @@ Next: Phase 3 charting templates, Phase 4 scheduling engine, Phase 5 package tra
 - [UX Workflows](mem://features/ux-workflows) — Batch A-D plan for 7 persona workflows
 - [MD Oversight](mem://features/md-oversight) — Physician oversight with AI chart analysis and review queue
 - [Telehealth & Prescribing](mem://features/telehealth) — 3-batch telehealth video visit + prescribing — Batch 1 complete
+- [Facility Scoping](mem://features/facility-scoping) — clinic_id on appointments/encounters, MD clinic filter, facility cards on dashboard
