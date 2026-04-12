@@ -117,12 +117,26 @@ ${custom_instructions ? `Additional instructions: ${custom_instructions}` : ""}`
     }
 
     const aiData = await aiRes.json();
-    let result = {};
+    let result: any = {};
     try {
       result = JSON.parse(aiData.choices?.[0]?.message?.content || "{}");
     } catch { result = { error: "Failed to parse AI response" }; }
 
-    return new Response(JSON.stringify(result), {
+    // Auto-send: log to patient communication
+    if (auto_send && resolvedPatientId && result.body) {
+      try {
+        await supabaseAdmin.from("patient_communication_log").insert({
+          patient_id: resolvedPatientId,
+          direction: "outbound",
+          channel: "sms",
+          subject: `Aftercare: ${treatmentName}`,
+          body: result.body,
+          is_read: false,
+        });
+      } catch (e) { console.error("Failed to log aftercare communication:", e); }
+    }
+
+    return new Response(JSON.stringify({ ...result, auto_sent: !!auto_send }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
