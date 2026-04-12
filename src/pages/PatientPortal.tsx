@@ -319,6 +319,111 @@ function AppointmentsTab({ patientId }: { patientId: string }) {
   );
 }
 
+// ── Telehealth Tab ───────────────────────────────────────────────────────────
+function TelehealthTab({ patientId }: { patientId: string }) {
+  const { data: telehealthApts, isLoading } = useQuery({
+    queryKey: ["portal-telehealth", patientId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("appointments")
+        .select("id, scheduled_at, status, video_room_url, visit_type, treatments:treatment_id(name), providers:provider_id(first_name, last_name)")
+        .eq("patient_id", patientId)
+        .in("visit_type", ["telehealth", "phone"])
+        .order("scheduled_at", { ascending: false })
+        .limit(20);
+      return data ?? [];
+    },
+  });
+
+  const upcoming = telehealthApts?.filter(a => new Date(a.scheduled_at) >= new Date(Date.now() - 15 * 60 * 1000) && !["cancelled", "completed", "no_show"].includes(a.status)) ?? [];
+  const past = telehealthApts?.filter(a => new Date(a.scheduled_at) < new Date(Date.now() - 15 * 60 * 1000) || a.status === "completed") ?? [];
+
+  const canJoin = (apt: any) => {
+    const diff = new Date(apt.scheduled_at).getTime() - Date.now();
+    return diff <= 15 * 60 * 1000 && diff >= -60 * 60 * 1000 && apt.status !== "completed";
+  };
+
+  if (isLoading) return <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-3">Upcoming Telehealth Visits</h2>
+        {upcoming.length === 0 ? (
+          <Card><CardContent className="py-8 text-center text-muted-foreground text-sm">No upcoming telehealth visits</CardContent></Card>
+        ) : (
+          <div className="space-y-2">
+            {upcoming.map(apt => (
+              <Card key={apt.id} className={canJoin(apt) ? "border-primary/30 bg-primary/[0.02]" : ""}>
+                <CardContent className="py-4 px-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={`h-10 w-10 rounded-full flex items-center justify-center ${canJoin(apt) ? "bg-primary/10 animate-pulse" : "bg-muted"}`}>
+                        <Video className={`h-5 w-5 ${canJoin(apt) ? "text-primary" : "text-muted-foreground"}`} />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">{(apt.treatments as any)?.name || "Telehealth Visit"}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {format(new Date(apt.scheduled_at), "MMM d, yyyy 'at' h:mm a")}
+                          {(apt.providers as any) && ` · ${(apt.providers as any).first_name} ${(apt.providers as any).last_name}`}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {canJoin(apt) ? (
+                        <Button size="sm" className="gap-1" onClick={() => apt.video_room_url ? window.open(apt.video_room_url, "_blank") : null} disabled={!apt.video_room_url}>
+                          <Video className="h-3.5 w-3.5" /> Join Video
+                        </Button>
+                      ) : (
+                        <Badge variant="secondary" className="text-[10px]">
+                          <Clock className="h-2.5 w-2.5 mr-0.5" /> Scheduled
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                  {canJoin(apt) && !apt.video_room_url && (
+                    <p className="text-xs text-muted-foreground mt-2 ml-13">Your provider will connect shortly. Please wait here.</p>
+                  )}
+                  {canJoin(apt) && (
+                    <div className="mt-3 ml-13 p-3 bg-muted/50 rounded-md">
+                      <div className="flex items-center gap-2 text-xs">
+                        <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+                        <span className="text-muted-foreground">Waiting room — your provider will connect shortly</span>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {past.length > 0 && (
+        <div>
+          <h2 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-3">Past Telehealth Visits</h2>
+          <div className="space-y-2">
+            {past.slice(0, 10).map(apt => (
+              <Card key={apt.id} className="opacity-75">
+                <CardContent className="py-3 px-4 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <CheckCircle className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm">{(apt.treatments as any)?.name || "Telehealth Visit"}</p>
+                      <p className="text-xs text-muted-foreground">{format(new Date(apt.scheduled_at), "MMM d, yyyy")}</p>
+                    </div>
+                  </div>
+                  <Badge variant="outline" className="text-[10px]">{apt.status}</Badge>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Packages Tab ──────────────────────────────────────────────────────────────
 function PackagesTab({ patientId }: { patientId: string }) {
   const { data: purchases, isLoading } = useQuery({
