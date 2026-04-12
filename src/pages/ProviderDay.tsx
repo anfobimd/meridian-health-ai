@@ -443,7 +443,12 @@ export default function ProviderDay() {
                         <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => loadAiBrief(apt)} disabled={briefLoading[apt.id]} title="AI Brief">
                           {briefLoading[apt.id] ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openChart(apt)} title="Open Chart">
+                        {apt.visit_type === "telehealth" && (
+                          <Button variant="outline" size="sm" className="h-7 text-xs text-primary border-primary/30" onClick={() => navigate(`/telehealth/${apt.id}`)}>
+                            <Video className="h-3 w-3 mr-0.5" /> Join
+                          </Button>
+                        )}
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => apt.visit_type === "telehealth" ? navigate(`/telehealth/${apt.id}`) : openChart(apt)} title="Open Chart">
                           <ChevronRight className="h-4 w-4" />
                         </Button>
                       </div>
