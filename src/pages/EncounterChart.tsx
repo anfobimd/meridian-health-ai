@@ -1006,6 +1006,11 @@ export default function EncounterChart() {
               </CardContent>
             </Card>
           )}
+
+          {/* Admin Notes Panel — visible for front_desk and admin */}
+          {encounter && (role === "front_desk" || role === "admin") && (
+            <AdminNotesPanel encounterId={encounterId!} patientId={encounter.patient_id} />
+          )}
         </div>
       </div>
     </div>
