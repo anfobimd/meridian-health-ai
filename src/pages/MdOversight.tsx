@@ -83,7 +83,7 @@ export default function MdOversight() {
 
   // ── Chart Reviews Query ──
   const { data: reviews, isLoading: reviewsLoading } = useQuery({
-    queryKey: ["chart-reviews", filterTier, filterStatus],
+    queryKey: ["chart-reviews", filterTier, filterStatus, filterClinic],
     queryFn: async () => {
       let query = supabase
         .from("chart_review_records")
@@ -93,7 +93,14 @@ export default function MdOversight() {
       if (filterTier !== "all") query = query.eq("ai_risk_tier", filterTier);
       const { data, error } = await query;
       if (error) throw error;
-      return data || [];
+      let results = data || [];
+      // Client-side clinic filter (encounters.clinic_id)
+      if (filterClinic !== "all") {
+        results = results.filter((r: any) => r.encounters?.clinic_id === filterClinic);
+      } else if (assignedClinicIds.length > 0) {
+        results = results.filter((r: any) => !r.encounters?.clinic_id || assignedClinicIds.includes(r.encounters.clinic_id));
+      }
+      return results;
     },
   });
 
