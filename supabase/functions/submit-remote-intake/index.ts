@@ -28,6 +28,28 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Handle token lookup — returns patient demographics for pre-fill (replaces anon SELECT on intake_invitations)
+    if (body._lookupToken && body.token) {
+      const supabaseAdmin = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      );
+      const { data: inv } = await supabaseAdmin
+        .from("intake_invitations")
+        .select("focus_areas, patients(first_name, last_name, email, phone, date_of_birth, gender)")
+        .eq("token", body.token)
+        .single();
+      if (!inv) {
+        return new Response(JSON.stringify({ error: "Invalid or expired token" }), {
+          status: 404,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      return new Response(JSON.stringify({ success: true, invitation: inv }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const {
       firstName, lastName, email, phone, dob, sex,
       weightLbs, heightIn, menoStatus,

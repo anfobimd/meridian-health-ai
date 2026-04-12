@@ -29,20 +29,12 @@ export function InvitationTracker() {
     },
   });
 
-  // Realtime subscription
+  // Poll for updates every 30s (Realtime removed for security — intake_invitations contains sensitive data)
   useEffect(() => {
-    const channel = supabase
-      .channel("invitation-changes")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "intake_invitations" },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ["intake-invitations-recent"] });
-        }
-      )
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
+    const interval = setInterval(() => {
+      queryClient.invalidateQueries({ queryKey: ["intake-invitations-recent"] });
+    }, 30000);
+    return () => clearInterval(interval);
   }, [queryClient]);
 
   if (!invitations?.length) return null;
