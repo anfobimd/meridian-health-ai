@@ -1475,6 +1475,51 @@ export type Database = {
           },
         ]
       }
+      encounter_admin_notes: {
+        Row: {
+          author_id: string
+          content: string
+          created_at: string
+          encounter_id: string
+          id: string
+          note_type: string
+          patient_id: string
+        }
+        Insert: {
+          author_id: string
+          content: string
+          created_at?: string
+          encounter_id: string
+          id?: string
+          note_type?: string
+          patient_id: string
+        }
+        Update: {
+          author_id?: string
+          content?: string
+          created_at?: string
+          encounter_id?: string
+          id?: string
+          note_type?: string
+          patient_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "encounter_admin_notes_encounter_id_fkey"
+            columns: ["encounter_id"]
+            isOneToOne: false
+            referencedRelation: "encounters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encounter_admin_notes_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       encounter_field_responses: {
         Row: {
           ai_suggested: boolean
