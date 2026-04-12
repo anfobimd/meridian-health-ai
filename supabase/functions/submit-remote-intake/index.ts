@@ -78,7 +78,7 @@ Deno.serve(async (req) => {
     }
 
     // Create intake form
-    await supabaseAdmin.from("intake_forms").insert({
+    const { data: intakeForm, error: ifErr } = await supabaseAdmin.from("intake_forms").insert({
       patient_id: patient.id,
       form_type: "remote_hormone",
       responses: {
@@ -93,7 +93,9 @@ Deno.serve(async (req) => {
         consent: { general: true, telehealth: true, timestamp: new Date().toISOString() },
       },
       submitted_at: new Date().toISOString(),
-    });
+    }).select("id").single();
+
+    if (ifErr) console.error("Intake form error:", ifErr);
 
     // Create hormone visit with labs
     await supabaseAdmin.from("hormone_visits").insert({
@@ -132,7 +134,21 @@ Deno.serve(async (req) => {
       await supabaseAdmin.from("e_consents").insert(consents);
     }
 
-    return new Response(JSON.stringify({ success: true, patientId: patient.id }), {
+    // Auto-create front desk notification/task for telehealth booking
+    try {
+      await supabaseAdmin.from("patient_communication_log").insert({
+        patient_id: patient.id,
+        direction: "inbound",
+        channel: "portal",
+        subject: "Remote Intake Submitted — Book Telehealth",
+        body: `${firstName} ${lastName} submitted a remote intake form. Focus areas: ${(focus || []).join(", ") || "Hormone optimization"}. Ready for telehealth appointment booking.`,
+        is_read: false,
+      });
+    } catch (e) {
+      console.error("Auto-task creation error:", e);
+    }
+
+    return new Response(JSON.stringify({ success: true, patientId: patient.id, intakeFormId: intakeForm?.id || null }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
