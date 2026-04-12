@@ -789,6 +789,8 @@ export default function Appointments() {
                       {apt.treatments?.name ?? "General"} • Dr. {apt.providers?.last_name ?? "Unassigned"} • {format(parseISO(apt.scheduled_at), "MMM d, yyyy 'at' h:mm a")}
                     </p>
                     <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      {apt.visit_type === "telehealth" && <Badge className="bg-blue-500/10 text-blue-600 text-[10px] gap-1"><Video className="h-2.5 w-2.5" />Telehealth</Badge>}
+                      {apt.visit_type === "phone" && <Badge className="bg-amber-500/10 text-amber-600 text-[10px] gap-1"><Phone className="h-2.5 w-2.5" />Phone</Badge>}
                       {apt.rooms && <Badge variant="outline" className="text-[10px] gap-1"><DoorOpen className="h-2.5 w-2.5" />{apt.rooms.name}</Badge>}
                       {apt.devices && <Badge variant="outline" className="text-[10px] gap-1"><Cpu className="h-2.5 w-2.5" />{apt.devices.name}</Badge>}
                     </div>
