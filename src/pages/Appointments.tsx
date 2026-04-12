@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Calendar, Sparkles, Loader2, DoorOpen, Cpu, AlertTriangle, Brain, Clock, Check, XCircle, Ban, ShieldAlert, Timer, UserCheck } from "lucide-react";
+import { Plus, Calendar, Sparkles, Loader2, DoorOpen, Cpu, AlertTriangle, Brain, Clock, Check, XCircle, Ban, ShieldAlert, Timer, UserCheck, Video, Phone } from "lucide-react";
 import { toast } from "sonner";
 import { format, parseISO, addMinutes } from "date-fns";
 import { Calendar as CalendarWidget } from "@/components/ui/calendar";
@@ -53,6 +53,8 @@ export default function Appointments() {
   const [bookNotes, setBookNotes] = useState("");
   const [bookRoomId, setBookRoomId] = useState("");
   const [bookDeviceId, setBookDeviceId] = useState("");
+  const [bookVisitType, setBookVisitType] = useState("in_person");
+  const [bookVideoUrl, setBookVideoUrl] = useState("");
 
   // AI scheduling intelligence state
   const [noShowRisk, setNoShowRisk] = useState<any>(null);
