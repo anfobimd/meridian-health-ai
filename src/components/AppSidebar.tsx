@@ -58,6 +58,7 @@ const navSections: NavSection[] = [
     items: [
       { to: "/clinical-notes", icon: ClipboardList, label: "Clinical Notes" },
       { to: "/encounters", icon: FileText, label: "Encounters" },
+      { to: "/prescriptions", icon: Pill, label: "Prescriptions", roles: ["admin", "provider"] },
       { to: "/hormone-visits", icon: FlaskConical, label: "Hormone Labs", roles: ["admin", "provider"] },
       { to: "/hormone-intake", icon: ClipboardPlus, label: "Hormone Intake", roles: ["admin", "provider"] },
       { to: "/physician-approval", icon: ShieldCheck, label: "Approvals", roles: ["admin", "provider"] },
