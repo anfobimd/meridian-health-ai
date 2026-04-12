@@ -55,6 +55,7 @@ export default function Appointments() {
   const [bookDeviceId, setBookDeviceId] = useState("");
   const [bookVisitType, setBookVisitType] = useState("in_person");
   const [bookVideoUrl, setBookVideoUrl] = useState("");
+  const [bookClinicId, setBookClinicId] = useState("");
 
   // AI scheduling intelligence state
   const [noShowRisk, setNoShowRisk] = useState<any>(null);
@@ -115,6 +116,14 @@ export default function Appointments() {
     queryKey: ["devices-active"],
     queryFn: async () => {
       const { data } = await supabase.from("devices").select("id, name, device_type").eq("is_active", true).order("name");
+      return data ?? [];
+    },
+  });
+
+  const { data: clinics } = useQuery({
+    queryKey: ["clinics-active"],
+    queryFn: async () => {
+      const { data } = await supabase.from("clinics").select("id, name").eq("is_active", true).order("name");
       return data ?? [];
     },
   });
@@ -215,6 +224,7 @@ export default function Appointments() {
         visit_type: bookVisitType,
         video_room_url: bookVisitType === "telehealth" ? (bookVideoUrl || null) : null,
         intake_form_id: intakeFormId,
+        clinic_id: bookClinicId || null,
       };
       const { error } = await supabase.from("appointments").insert(apt);
       if (error) throw error;
@@ -233,7 +243,7 @@ export default function Appointments() {
     setBookPatientId(""); setBookTreatmentId(""); setBookProviderId("");
     setBookDate(undefined); setAvailableSlots([]); setSelectedSlot(null);
     setConflictResult(null); setBookNotes(""); setBookRoomId(""); setBookDeviceId("");
-    setBookVisitType("in_person"); setBookVideoUrl("");
+    setBookVisitType("in_person"); setBookVideoUrl(""); setBookClinicId("");
     setAiSuggestion(null); setNoShowRisk(null); setDurationEstimate(null);
     setProviderMatch(null); setContraindicationCheck(null);
   };
@@ -619,6 +629,14 @@ export default function Appointments() {
                     </p>
                   </div>
                 )}
+
+                <div className="space-y-1">
+                  <Label className="text-xs">Clinic / Facility</Label>
+                  <select value={bookClinicId} onChange={(e) => setBookClinicId(e.target.value)} className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm">
+                    <option value="">Select clinic</option>
+                    {clinics?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">

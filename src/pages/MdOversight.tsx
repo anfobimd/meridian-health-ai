@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,7 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import {
   Shield, AlertTriangle, CheckCircle, Clock, Brain, FileText, XCircle,
-  Loader2, FlaskConical, User, Edit3, ChevronDown, ChevronUp, Sparkles,
+  Loader2, FlaskConical, User, Edit3, ChevronDown, ChevronUp, Sparkles, Building2,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 
@@ -42,11 +43,13 @@ const approvalBadge: Record<string, { label: string; class: string }> = {
 };
 
 export default function MdOversight() {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("charts");
   const [selectedReview, setSelectedReview] = useState<any>(null);
   const [selectedHormone, setSelectedHormone] = useState<any>(null);
   const [filterTier, setFilterTier] = useState("all");
   const [filterStatus, setFilterStatus] = useState("pending_review");
+  const [filterClinic, setFilterClinic] = useState("all");
   const [hormoneFilter, setHormoneFilter] = useState("pending");
   const [mdComment, setMdComment] = useState("");
   const [reviewStartTime, setReviewStartTime] = useState<number | null>(null);
@@ -60,9 +63,27 @@ export default function MdOversight() {
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const queryClient = useQueryClient();
 
+  // ── MD's assigned clinics ──
+  const { data: assignedClinics = [] } = useQuery({
+    queryKey: ["md-assigned-clinics", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const { data: provider } = await supabase.from("providers").select("id").eq("user_id", user.id).single();
+      if (!provider) return [];
+      const { data } = await supabase
+        .from("md_coverage_assignments")
+        .select("clinic_id, clinics(id, name, contract_id, contracts(name))")
+        .eq("md_provider_id", provider.id);
+      return data?.map((d: any) => ({ id: d.clinic_id, name: d.clinics?.name, contractName: d.clinics?.contracts?.name })) || [];
+    },
+    enabled: !!user?.id,
+  });
+
+  const assignedClinicIds = assignedClinics.map((c: any) => c.id);
+
   // ── Chart Reviews Query ──
   const { data: reviews, isLoading: reviewsLoading } = useQuery({
-    queryKey: ["chart-reviews", filterTier, filterStatus],
+    queryKey: ["chart-reviews", filterTier, filterStatus, filterClinic],
     queryFn: async () => {
       let query = supabase
         .from("chart_review_records")
@@ -72,7 +93,14 @@ export default function MdOversight() {
       if (filterTier !== "all") query = query.eq("ai_risk_tier", filterTier);
       const { data, error } = await query;
       if (error) throw error;
-      return data || [];
+      let results = data || [];
+      // Client-side clinic filter (encounters.clinic_id)
+      if (filterClinic !== "all") {
+        results = results.filter((r: any) => r.encounters?.clinic_id === filterClinic);
+      } else if (assignedClinicIds.length > 0) {
+        results = results.filter((r: any) => !r.encounters?.clinic_id || assignedClinicIds.includes(r.encounters.clinic_id));
+      }
+      return results;
     },
   });
 
@@ -244,6 +272,20 @@ export default function MdOversight() {
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground mt-1">Chart reviews + hormone approvals</p>
         </div>
+        {assignedClinics.length > 0 && (
+          <Select value={filterClinic} onValueChange={setFilterClinic}>
+            <SelectTrigger className="w-[200px] h-8 text-xs">
+              <Building2 className="h-3 w-3 mr-1" />
+              <SelectValue placeholder="All My Clinics" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All My Clinics</SelectItem>
+              {assignedClinics.map((c: any) => (
+                <SelectItem key={c.id} value={c.id}>{c.name}{c.contractName ? ` (${c.contractName})` : ""}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       {/* Summary Strip */}

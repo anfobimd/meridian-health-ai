@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -8,13 +9,53 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Shield, Brain, Users, Activity, DollarSign, Settings, Loader2, UserCog, Plus } from "lucide-react";
+import { Shield, Brain, Users, Activity, DollarSign, Settings, Loader2, UserCog, Plus, Building2 } from "lucide-react";
 import { toast } from "sonner";
 
 export default function MdOversightDashboard() {
+  const { user } = useAuth();
   const [coachingProviderId, setCoachingProviderId] = useState<string | null>(null);
+  const [filterClinic, setFilterClinic] = useState("all");
   const queryClient = useQueryClient();
+
+  // ── MD's assigned clinics with pending counts ──
+  const { data: assignedClinics = [] } = useQuery({
+    queryKey: ["md-dashboard-clinics", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const { data: provider } = await supabase.from("providers").select("id").eq("user_id", user.id).single();
+      if (!provider) return [];
+      const { data: assignments } = await supabase
+        .from("md_coverage_assignments")
+        .select("clinic_id, is_primary, clinics(id, name, city, state, contract_id, contracts(name))")
+        .eq("md_provider_id", provider.id);
+      if (!assignments?.length) return [];
+      // Get pending chart counts per clinic
+      const clinicIds = assignments.map((a: any) => a.clinic_id);
+      const { data: pendingCharts } = await supabase
+        .from("chart_review_records")
+        .select("encounters!inner(clinic_id)")
+        .in("status", ["pending_review", "pending_ai"])
+        .in("encounters.clinic_id", clinicIds);
+      const countMap: Record<string, number> = {};
+      pendingCharts?.forEach((r: any) => {
+        const cid = r.encounters?.clinic_id;
+        if (cid) countMap[cid] = (countMap[cid] || 0) + 1;
+      });
+      return assignments.map((a: any) => ({
+        id: a.clinic_id,
+        name: a.clinics?.name,
+        city: a.clinics?.city,
+        state: a.clinics?.state,
+        contractName: a.clinics?.contracts?.name,
+        isPrimary: a.is_primary,
+        pendingCharts: countMap[a.clinic_id] || 0,
+      }));
+    },
+    enabled: !!user?.id,
+  });
 
   // Fetch oversight reports
   const { data: reports, isLoading: reportsLoading } = useQuery({
@@ -186,6 +227,43 @@ export default function MdOversightDashboard() {
           </Card>
         ))}
       </div>
+
+      {/* My Facilities */}
+      {assignedClinics.length > 0 && (
+        <div className="space-y-2">
+          <h2 className="text-sm font-semibold flex items-center gap-1.5"><Building2 className="h-4 w-4 text-primary" /> My Facilities</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {assignedClinics.map((clinic: any) => (
+              <Card
+                key={clinic.id}
+                className={`cursor-pointer transition-colors hover:border-primary/40 ${filterClinic === clinic.id ? "border-primary bg-primary/5" : ""}`}
+                onClick={() => setFilterClinic(filterClinic === clinic.id ? "all" : clinic.id)}
+              >
+                <CardContent className="pt-4 pb-3 flex items-start gap-3">
+                  <div className="h-9 w-9 shrink-0 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Building2 className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold truncate">{clinic.name}</p>
+                    <p className="text-[10px] text-muted-foreground truncate">
+                      {[clinic.city, clinic.state].filter(Boolean).join(", ") || "No location"}
+                      {clinic.contractName && ` · ${clinic.contractName}`}
+                    </p>
+                    <div className="flex items-center gap-2 mt-1">
+                      {clinic.pendingCharts > 0 ? (
+                        <Badge variant="destructive" className="text-[9px] px-1.5 py-0">{clinic.pendingCharts} pending</Badge>
+                      ) : (
+                        <Badge variant="secondary" className="text-[9px] px-1.5 py-0">All clear</Badge>
+                      )}
+                      {clinic.isPrimary && <Badge variant="outline" className="text-[9px] px-1.5 py-0">Primary</Badge>}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
 
       <Tabs defaultValue="reports">
         <TabsList className="grid w-full grid-cols-5">

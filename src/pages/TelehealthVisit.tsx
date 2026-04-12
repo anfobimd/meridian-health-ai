@@ -420,6 +420,7 @@ export default function TelehealthVisit() {
         encounter_type: "telehealth",
         status: "in_progress" as any,
         started_at: new Date().toISOString(),
+        clinic_id: (appointment as any).clinic_id || null,
       }).select("id").single();
       if (error) throw error;
       return newEnc;
