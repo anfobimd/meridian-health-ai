@@ -412,6 +412,32 @@ export default function Appointments() {
             {/* Step 0: Patient + Treatment + AI Insights */}
             {bookingStep === 0 && (
               <div className="space-y-4">
+                {/* Visit Type Selector */}
+                <div className="space-y-2">
+                  <Label>Visit Type</Label>
+                  <div className="flex gap-2">
+                    {[
+                      { value: "in_person", label: "In-Person", icon: Calendar },
+                      { value: "telehealth", label: "Telehealth", icon: Video },
+                      { value: "phone", label: "Phone", icon: Phone },
+                    ].map(({ value, label, icon: Icon }) => (
+                      <button key={value} type="button"
+                        onClick={() => setBookVisitType(value)}
+                        className={`flex-1 flex items-center justify-center gap-1.5 rounded-md border px-3 py-2 text-xs font-medium transition-colors ${
+                          bookVisitType === value ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-primary/40 text-muted-foreground"
+                        }`}>
+                        <Icon className="h-3.5 w-3.5" />{label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {bookVisitType === "telehealth" && (
+                  <div className="space-y-2">
+                    <Label>Video Room URL <span className="text-muted-foreground text-[10px]">(optional — auto-generated if blank)</span></Label>
+                    <Input value={bookVideoUrl} onChange={(e) => setBookVideoUrl(e.target.value)} placeholder="https://meet.example.com/room-id" />
+                  </div>
+                )}
                 <div className="space-y-2">
                   <Label>Patient *</Label>
                   <select value={bookPatientId} onChange={(e) => setBookPatientId(e.target.value)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
