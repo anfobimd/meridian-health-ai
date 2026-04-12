@@ -6,12 +6,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, User, FlaskConical, CheckCircle, Clock, AlertTriangle, Package, Sparkles, Loader2, Camera, Wand2 } from "lucide-react";
+import { ArrowLeft, User, FlaskConical, CheckCircle, Clock, AlertTriangle, Package, Sparkles, Loader2, Camera, Wand2, Link2 } from "lucide-react";
 import { PhotoGallery } from "@/components/clinical-photos/PhotoGallery";
 import { PhotoUpload } from "@/components/clinical-photos/PhotoUpload";
 import { ComparisonView } from "@/components/clinical-photos/ComparisonView";
 import { TreatmentRecommendations } from "@/components/TreatmentRecommendations";
 import { CommunicationTimeline } from "@/components/front-desk/CommunicationTimeline";
+import { SendIntakeLinkDialog } from "@/components/front-desk/SendIntakeLinkDialog";
 import { format, parseISO, differenceInDays } from "date-fns";
 import { useState } from "react";
 import { toast } from "@/hooks/use-toast";
@@ -122,6 +123,7 @@ export default function PatientRecord() {
   const [aiRec, setAiRec] = useState<any>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [photoUploadOpen, setPhotoUploadOpen] = useState(false);
+  const [sendIntakeOpen, setSendIntakeOpen] = useState(false);
 
   const redeemSession = useMutation({
     mutationFn: async ({ purchaseId, treatmentName }: { purchaseId: string; treatmentName: string }) => {
@@ -166,11 +168,20 @@ export default function PatientRecord() {
         <Button variant="ghost" size="icon" onClick={() => navigate("/patients")}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
-        <div>
+        <div className="flex-1">
           <h1 className="text-2xl font-bold font-serif">{patient.first_name} {patient.last_name}</h1>
           <p className="text-muted-foreground text-sm">Patient Record</p>
         </div>
+        <Button variant="outline" size="sm" onClick={() => setSendIntakeOpen(true)} className="gap-1.5">
+          <Link2 className="h-3.5 w-3.5" /> Send Intake Link
+        </Button>
       </div>
+
+      <SendIntakeLinkDialog
+        open={sendIntakeOpen}
+        onOpenChange={setSendIntakeOpen}
+        patient={patient}
+      />
 
       <Tabs defaultValue="demographics">
         <TabsList>

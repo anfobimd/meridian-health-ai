@@ -13,6 +13,7 @@ import { format } from "date-fns";
 import { QueueCard } from "@/components/front-desk/QueueCard";
 import { ActionBar } from "@/components/front-desk/ActionBar";
 import { QuickDock } from "@/components/front-desk/QuickDock";
+import { InvitationTracker } from "@/components/front-desk/InvitationTracker";
 import {
   UserPlus, CheckCircle2, DoorOpen, Play, Flag, Clock, Users,
   Loader2, AlertTriangle, Search, RefreshCw,
@@ -232,6 +233,9 @@ export default function FrontDesk() {
         </div>
       )}
 
+      {/* Invitation Tracker */}
+      <InvitationTracker />
+
       {/* Walk-In Dialog */}
       <Dialog open={walkinOpen} onOpenChange={setWalkinOpen}>
         <DialogContent>
@@ -269,7 +273,7 @@ export default function FrontDesk() {
       </Dialog>
 
       {/* Quick Action Dock */}
-      <QuickDock onWalkIn={() => setWalkinOpen(true)} />
+      <QuickDock onWalkIn={() => setWalkinOpen(true)} patients={patients || []} />
     </div>
   );
 }

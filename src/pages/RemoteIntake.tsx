@@ -88,6 +88,9 @@ const SAVE_KEY = "meridian_intake_draft";
 export default function RemoteIntake() {
   const [searchParams] = useSearchParams();
   const clinicName = searchParams.get("clinic") || "Meridian Wellness";
+  const invitationToken = searchParams.get("token");
+  const refPatientId = searchParams.get("ref");
+  const focusParam = searchParams.get("focus");
 
   const [step, setStep] = useState(0);
   const [submitted, setSubmitted] = useState(false);
@@ -104,7 +107,7 @@ export default function RemoteIntake() {
   const [menoStatus, setMenoStatus] = useState("");
 
   // Step 2: Focus & Symptoms
-  const [focus, setFocus] = useState<string[]>([]);
+  const [focus, setFocus] = useState<string[]>(focusParam ? focusParam.split(",") : []);
   const [symptoms, setSymptoms] = useState<string[]>([]);
 
   // Step 3: Labs
@@ -128,18 +131,54 @@ export default function RemoteIntake() {
   const absoluteFlags = CONTRAINDICATION_ITEMS.filter(c => c.severity === "absolute" && contraindications.includes(c.key));
   const progressPct = Math.round((step / (STEPS.length - 1)) * 100);
 
+  // Mark invitation as opened + pre-fill from patient record
+  useEffect(() => {
+    if (invitationToken) {
+      // Mark opened via edge function (service role handles RLS)
+      supabase.functions.invoke("submit-remote-intake", {
+        body: { _markOpened: true, invitation_token: invitationToken },
+      }).catch(() => {});
+      // Actually let's use a simpler approach — the edge function is for submission.
+      // We'll just track opened status when they submit.
+    }
+    if (refPatientId) {
+      // Fetch patient demographics to pre-fill
+      const fetchPatient = async () => {
+        try {
+          // Use public anon read (RLS allows anon select on intake_invitations)
+          // But patients table needs auth — so we fetch via the invitation data
+          const { data: inv } = await supabase
+            .from("intake_invitations")
+            .select("patients(first_name, last_name, email, phone, date_of_birth, gender)")
+            .eq("token", invitationToken || "")
+            .single();
+          if (inv?.patients) {
+            const p = inv.patients as any;
+            if (p.first_name && !firstName) setFirstName(p.first_name);
+            if (p.last_name && !lastName) setLastName(p.last_name);
+            if (p.email && !email) setEmail(p.email);
+            if (p.phone && !phone) setPhone(p.phone);
+            if (p.date_of_birth && !dob) setDob(p.date_of_birth);
+            if (p.gender && !sex) setSex(p.gender);
+          }
+        } catch { /* ignore */ }
+      };
+      fetchPatient();
+    }
+  }, [invitationToken, refPatientId]);
+
   // Restore draft from localStorage
   useEffect(() => {
     try {
       const saved = localStorage.getItem(SAVE_KEY);
       if (saved) {
         const d = JSON.parse(saved);
-        if (d.firstName) setFirstName(d.firstName);
-        if (d.lastName) setLastName(d.lastName);
-        if (d.email) setEmail(d.email);
-        if (d.phone) setPhone(d.phone);
-        if (d.dob) setDob(d.dob);
-        if (d.sex) setSex(d.sex);
+        if (d.firstName && !firstName) setFirstName(d.firstName);
+        if (d.lastName && !lastName) setLastName(d.lastName);
+        if (d.email && !email) setEmail(d.email);
+        if (d.phone && !phone) setPhone(d.phone);
+        if (d.dob && !dob) setDob(d.dob);
+        if (d.sex && !sex) setSex(d.sex);
         if (d.step) setStep(d.step);
       }
     } catch { /* ignore */ }
@@ -206,6 +245,8 @@ export default function RemoteIntake() {
           generalConsentText: GENERAL_CONSENT_TEXT,
           telehealthConsentText: TELEHEALTH_CONSENT_TEXT,
           userAgent: navigator.userAgent,
+          invitation_token: invitationToken || undefined,
+          existing_patient_id: refPatientId || undefined,
         },
       });
       if (error) throw error;

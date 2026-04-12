@@ -1959,6 +1959,78 @@ export type Database = {
           },
         ]
       }
+      intake_invitations: {
+        Row: {
+          channel: string | null
+          completed_at: string | null
+          created_at: string | null
+          email: string | null
+          expires_at: string | null
+          focus_areas: string[] | null
+          id: string
+          intake_form_id: string | null
+          opened_at: string | null
+          patient_id: string | null
+          phone: string | null
+          sent_at: string | null
+          sent_by: string | null
+          status: string | null
+          token: string
+          updated_at: string | null
+        }
+        Insert: {
+          channel?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          email?: string | null
+          expires_at?: string | null
+          focus_areas?: string[] | null
+          id?: string
+          intake_form_id?: string | null
+          opened_at?: string | null
+          patient_id?: string | null
+          phone?: string | null
+          sent_at?: string | null
+          sent_by?: string | null
+          status?: string | null
+          token: string
+          updated_at?: string | null
+        }
+        Update: {
+          channel?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          email?: string | null
+          expires_at?: string | null
+          focus_areas?: string[] | null
+          id?: string
+          intake_form_id?: string | null
+          opened_at?: string | null
+          patient_id?: string | null
+          phone?: string | null
+          sent_at?: string | null
+          sent_by?: string | null
+          status?: string | null
+          token?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "intake_invitations_intake_form_id_fkey"
+            columns: ["intake_form_id"]
+            isOneToOne: false
+            referencedRelation: "intake_forms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "intake_invitations_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoice_items: {
         Row: {
           created_at: string
