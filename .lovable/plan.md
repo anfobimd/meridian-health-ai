@@ -1,104 +1,58 @@
 
 
-# Telehealth Visit Flow — End-to-End Review
+# Facility-Scoped MD Dashboard — Implementation Plan
 
-## Current Flow Summary
+## Why start here
 
-The system implements a complete 6-stage telehealth workflow. Here is the current state of each stage, with identified gaps and recommended fixes.
+The contracts and clinics tables exist, and MD coverage assignments link MDs to clinics. But **encounters and appointments have no `clinic_id` column** — so there's no way to scope what an MD sees by facility. This is the structural fix that unlocks everything else.
 
----
+## What we'll build
 
-## Stage 1: Patient Receives Intake Link
-**Status: Working**
+### 1. Database: Add `clinic_id` to appointments and encounters
 
-- Staff opens `SendIntakeLinkDialog` from QuickDock (FrontDesk) or PatientRecord header
-- Selects focus areas, enters phone, sends via SMS or copies link manually
-- `send-intake-invite` edge function generates a token, inserts into `intake_invitations`, sends SMS via Twilio
-- `InvitationTracker` on FrontDesk shows realtime status (Sent → Opened → Completed)
+- Add `clinic_id` (uuid, nullable, FK → clinics) to `appointments` and `encounters`
+- When booking, front desk selects clinic; encounter inherits from appointment on creation
 
-**Gap found:** RemoteIntake tries to mark the invitation as "opened" by calling `submit-remote-intake` with `{ _markOpened: true }`, but that edge function has no handler for `_markOpened` — it immediately fails validation ("Name and email are required"). The opened status is never recorded.
+### 2. Enrich clinics table
 
-**Fix:** Add a `_markOpened` early-return branch in `submit-remote-intake` that updates `intake_invitations` status to `opened` and returns immediately.
+- Add `phone`, `timezone`, `city`, `state` columns to `clinics` for better facility cards
+- Update `ContractsAdmin.tsx` clinic form to capture these fields
 
----
+### 3. Clinic selector in booking flow
 
-## Stage 2: Patient Fills Out Intake Form
-**Status: Working with minor issues**
+- Add a clinic dropdown to the appointment booking dialog in `Appointments.tsx`
+- Default to the provider's primary clinic if one exists (via `md_coverage_assignments` or a new `provider_clinic_assignments` table — we'll use a simple approach: let front desk pick)
 
-- RemoteIntake reads `token`, `ref`, `focus` query params
-- Pre-fills demographics from `intake_invitations` join to `patients` table
-- 6-step wizard: Welcome → Demographics → Focus/Symptoms → Labs (with AI OCR upload) → History/Contraindications → Goals/Consent/Signature
-- On submit, calls `submit-remote-intake` with `invitation_token` + `existing_patient_id`
-- Edge function updates the invitation to `completed`, links intake_form_id, skips duplicate patient creation
+### 4. Encounter inherits clinic_id
 
-**Gap found:** The RLS policy "Public can read invitation by token" uses `qual: true` — it allows anonymous SELECT on all rows. This should be scoped to only allow reading by token match, or the query itself limits exposure. Acceptable for now since the query filters by token, but a tighter policy like `token = current_setting('request.headers')::json->>'x-invitation-token'` would be better. Low priority.
+- When `TelehealthVisit.tsx` and `EncounterChart.tsx` auto-create encounters, copy `clinic_id` from the appointment
 
----
+### 5. Facility-scoped MD Oversight views
 
-## Stage 3: Front Desk Books Telehealth Appointment
-**Status: Working**
+- **MdOversight.tsx**: On load, fetch the logged-in MD's `md_coverage_assignments` to get their assigned `clinic_id`s. Add a clinic filter dropdown (defaulting to "All My Clinics"). Filter `chart_review_records` and `hormone_visits` queries by joining through encounters → clinic_id.
+- **MdOversightDashboard.tsx**: Same clinic scoping for stats, provider intelligence, and reports. Add a facility summary card showing each assigned clinic with pending review counts.
 
-- Appointments booking dialog has visit type selector (In-Person / Telehealth / Phone)
-- When telehealth selected, video URL field appears
-- Appointment saved with `visit_type`, `video_room_url`, and optionally `intake_form_id`
-- Appointment cards show Video/Phone badges
+### 6. MD "My Facilities" overview card
 
-**Gap found:** There is no automated linking between the completed intake invitation and the booking. Front desk must manually note the intake_form_id when booking. The `intake_form_id` field on appointments exists but must be populated by hand.
+- New section at top of MdOversightDashboard showing assigned clinics as cards with: clinic name, contract name, pending charts count, last review date. Clicking a card filters the entire dashboard to that facility.
 
-**Fix:** When front desk books a telehealth appointment for a patient, auto-query for the most recent completed intake form for that patient and pre-fill `intake_form_id`. This is a small UX improvement.
+## Files to create/modify
 
----
+| File | Change |
+|------|--------|
+| Migration SQL | Add `clinic_id` to appointments + encounters; add phone/timezone/city/state to clinics |
+| `src/pages/Appointments.tsx` | Add clinic selector to booking dialog |
+| `src/pages/EncounterChart.tsx` | Copy clinic_id from appointment when creating encounter |
+| `src/pages/TelehealthVisit.tsx` | Same — copy clinic_id |
+| `src/pages/MdOversight.tsx` | Fetch MD's assigned clinics, add clinic filter, scope all queries |
+| `src/pages/MdOversightDashboard.tsx` | Add facility cards, scope stats by clinic |
+| `src/pages/ContractsAdmin.tsx` | Add phone/timezone/city/state to clinic form |
+| `src/pages/MdCoverage.tsx` | No changes needed (already works) |
 
-## Stage 4: Provider Opens Telehealth Workspace
-**Status: Working**
+## Technical notes
 
-- Provider navigates to `/telehealth/:appointmentId` (from ProviderDay "Join Telehealth" button)
-- 3-panel resizable layout loads:
-  - **Left:** IntakeReviewPanel — AI patient brief, allergies, intake form responses, lab values, consents
-  - **Center:** VideoPanel — Start Call button, timer, mute/camera controls, external video link launcher
-  - **Right:** Tabbed Chart (SOAP with per-section AI generation) + Prescribe (TelehealthRx embedded)
-- Auto-creates encounter on load with `encounter_type: "telehealth"`
-
-**No gaps.** This stage is solid.
-
----
-
-## Stage 5: Patient Joins Video Call
-**Status: Working with limitation**
-
-- PatientPortal Telehealth tab shows upcoming telehealth appointments
-- "Join Video" button activates 15 minutes before scheduled time
-- Waiting room with animated pulse indicator when within join window
-- Opens `video_room_url` in new tab
-
-**Known limitation (by design):** Video is external link-based (Daily.co/Zoom/Doxy.me). No embedded video. This is documented and intentional.
-
-**Minor gap:** If `video_room_url` is null, the Join Video button is disabled with no clear message. The "Your provider will connect shortly" message only appears when `canJoin` is true AND `video_room_url` is falsy — slightly confusing.
-
----
-
-## Stage 6: Sign & Close with Aftercare
-**Status: Working**
-
-- After provider ends call, "Sign & Close" button appears in top bar
-- Signs encounter (`status: signed`, `signed_at`)
-- Marks appointment completed
-- Runs in parallel:
-  - `ai-aftercare-message` with `auto_send: true` — generates aftercare and logs to `patient_communication_log`
-  - `ai-checkout-review` with `telehealth_summary` mode — generates visit summary, follow-up recommendation
-- Shows follow-up toast, navigates to provider-day
-
-**No gaps.** This stage is complete.
-
----
-
-## Recommended Fixes (Priority Order)
-
-1. **Fix `_markOpened` handler in `submit-remote-intake`** — Add early-return branch so invitation status updates to "opened" when patient loads the form. Currently this silently fails. Small code change (5 lines).
-
-2. **Auto-link intake form when booking telehealth** — In the Appointments booking dialog, when a patient is selected and visit_type is telehealth, auto-query for their most recent completed intake form and pre-fill `intake_form_id`. Small UX improvement.
-
-3. **Improve "no video URL" messaging in PatientPortal** — Show a clearer message when the appointment has no video link yet (e.g., "Video link will be available shortly before your appointment").
-
-All three fixes are small and can be done in a single batch. No database changes needed.
+- `clinic_id` is nullable so existing data isn't broken
+- MD clinic scoping uses: `SELECT clinic_id FROM md_coverage_assignments WHERE md_provider_id = (SELECT id FROM providers WHERE auth_user_id = current_user_id)`
+- No new tables needed — leverages existing `md_coverage_assignments`
+- After this batch, the second feature (enriching contracts structure, adding provider-to-clinic assignments for non-MDs) becomes straightforward
 
