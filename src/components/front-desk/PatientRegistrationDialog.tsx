@@ -82,7 +82,7 @@ export function PatientRegistrationDialog({ open, onOpenChange }: Props) {
         city: form.city.trim() || null,
         state: form.state.trim() || null,
         zip: form.zip.trim() || null,
-      } as any);
+      });
       if (error) throw error;
     },
     onSuccess: () => {
