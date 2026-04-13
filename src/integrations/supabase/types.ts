@@ -3431,10 +3431,12 @@ export type Database = {
           email: string | null
           emergency_contact_name: string | null
           emergency_contact_phone: string | null
+          emergency_contact_relationship: string | null
           fertility_goals: string | null
           first_name: string
           focus: string[] | null
           gender: string | null
+          gender_identity: string | null
           goals: string[] | null
           height_in: number | null
           id: string
@@ -3449,8 +3451,12 @@ export type Database = {
           no_show_count: number
           phone: string | null
           preferences: Json | null
+          preferred_contact_channel: string | null
+          preferred_name: string | null
           preferred_routes: string[] | null
           prior_therapy: string | null
+          referral_source: string | null
+          sex_at_birth: string | null
           state: string | null
           symptoms: string[] | null
           updated_at: string
@@ -3469,10 +3475,12 @@ export type Database = {
           email?: string | null
           emergency_contact_name?: string | null
           emergency_contact_phone?: string | null
+          emergency_contact_relationship?: string | null
           fertility_goals?: string | null
           first_name: string
           focus?: string[] | null
           gender?: string | null
+          gender_identity?: string | null
           goals?: string[] | null
           height_in?: number | null
           id?: string
@@ -3487,8 +3495,12 @@ export type Database = {
           no_show_count?: number
           phone?: string | null
           preferences?: Json | null
+          preferred_contact_channel?: string | null
+          preferred_name?: string | null
           preferred_routes?: string[] | null
           prior_therapy?: string | null
+          referral_source?: string | null
+          sex_at_birth?: string | null
           state?: string | null
           symptoms?: string[] | null
           updated_at?: string
@@ -3507,10 +3519,12 @@ export type Database = {
           email?: string | null
           emergency_contact_name?: string | null
           emergency_contact_phone?: string | null
+          emergency_contact_relationship?: string | null
           fertility_goals?: string | null
           first_name?: string
           focus?: string[] | null
           gender?: string | null
+          gender_identity?: string | null
           goals?: string[] | null
           height_in?: number | null
           id?: string
@@ -3525,8 +3539,12 @@ export type Database = {
           no_show_count?: number
           phone?: string | null
           preferences?: Json | null
+          preferred_contact_channel?: string | null
+          preferred_name?: string | null
           preferred_routes?: string[] | null
           prior_therapy?: string | null
+          referral_source?: string | null
+          sex_at_birth?: string | null
           state?: string | null
           symptoms?: string[] | null
           updated_at?: string
