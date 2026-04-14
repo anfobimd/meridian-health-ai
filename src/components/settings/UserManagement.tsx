@@ -13,7 +13,39 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Users, Loader2, Link2, Unlink, Search, ChevronLeft, ChevronRight } from "lucide-react";
 
-type AppRole = "admin" | "provider" | "front_desk";
+type AppRole =
+  | "super_admin"
+  | "admin"
+  | "clinic_owner"
+  | "medical_director"
+  | "physician"
+  | "nurse_practitioner"
+  | "physician_assistant"
+  | "registered_nurse"
+  | "provider"
+  | "aesthetician"
+  | "front_desk"
+  | "billing"
+  | "marketing"
+  | "user";
+
+const ROLE_OPTIONS: { value: string; label: string }[] = [
+  { value: "none", label: "No role" },
+  { value: "super_admin", label: "Super Admin" },
+  { value: "admin", label: "Admin" },
+  { value: "clinic_owner", label: "Clinic Owner" },
+  { value: "medical_director", label: "Medical Director" },
+  { value: "physician", label: "Physician" },
+  { value: "nurse_practitioner", label: "Nurse Practitioner" },
+  { value: "physician_assistant", label: "Physician Assistant" },
+  { value: "registered_nurse", label: "Registered Nurse" },
+  { value: "provider", label: "Provider" },
+  { value: "aesthetician", label: "Aesthetician" },
+  { value: "front_desk", label: "Front Desk" },
+  { value: "billing", label: "Billing" },
+  { value: "marketing", label: "Marketing" },
+  { value: "user", label: "User" },
+];
 
 interface UserRow {
   user_id: string;
@@ -103,13 +135,15 @@ export function UserManagement() {
     }
   };
 
+  const HIGH_PRIVILEGE_ROLES: AppRole[] = ["super_admin", "admin", "clinic_owner", "medical_director"];
+
   const handleRoleChange = (userId: string, newRole: string) => {
     const user = users.find((u) => u.user_id === userId);
-    const isRemovingAdmin = user?.role === "admin" && newRole !== "admin";
-    if (isRemovingAdmin) {
+    const isDowngradingPrivileged = user?.role && HIGH_PRIVILEGE_ROLES.includes(user.role) && !HIGH_PRIVILEGE_ROLES.includes(newRole as AppRole);
+    if (isDowngradingPrivileged) {
       setConfirmAction({
-        title: "Remove admin role?",
-        description: `This will remove admin privileges from ${user?.display_name || "this user"}. They may lose access to management features.`,
+        title: "Downgrade privileged role?",
+        description: `This will remove ${user?.role?.replace(/_/g, " ")} privileges from ${user?.display_name || "this user"}. They may lose access to management features.`,
         onConfirm: () => doRoleChange(userId, newRole),
       });
     } else {
@@ -202,11 +236,22 @@ export function UserManagement() {
   const roleBadge = (role: AppRole | null) => {
     if (!role) return <Badge variant="outline" className="text-muted-foreground">No role</Badge>;
     const colors: Record<AppRole, string> = {
+      super_admin: "bg-red-600/10 text-red-700 border-red-600/20",
       admin: "bg-destructive/10 text-destructive border-destructive/20",
+      clinic_owner: "bg-purple-600/10 text-purple-700 border-purple-600/20",
+      medical_director: "bg-indigo-600/10 text-indigo-700 border-indigo-600/20",
+      physician: "bg-blue-600/10 text-blue-700 border-blue-600/20",
+      nurse_practitioner: "bg-cyan-600/10 text-cyan-700 border-cyan-600/20",
+      physician_assistant: "bg-teal-600/10 text-teal-700 border-teal-600/20",
+      registered_nurse: "bg-emerald-600/10 text-emerald-700 border-emerald-600/20",
       provider: "bg-primary/10 text-primary border-primary/20",
+      aesthetician: "bg-pink-600/10 text-pink-700 border-pink-600/20",
       front_desk: "bg-accent text-accent-foreground",
+      billing: "bg-amber-600/10 text-amber-700 border-amber-600/20",
+      marketing: "bg-orange-600/10 text-orange-700 border-orange-600/20",
+      user: "bg-gray-500/10 text-gray-600 border-gray-500/20",
     };
-    return <Badge variant="outline" className={colors[role]}>{role.replace("_", " ")}</Badge>;
+    return <Badge variant="outline" className={colors[role] ?? ""}>{role.replace(/_/g, " ")}</Badge>;
   };
 
   return (
@@ -235,14 +280,13 @@ export function UserManagement() {
               <div className="flex items-center gap-2">
                 <span className="text-xs text-muted-foreground whitespace-nowrap">{selected.size} selected</span>
                 <Select value={bulkRole} onValueChange={setBulkRole}>
-                  <SelectTrigger className="w-[130px] h-8 text-xs">
+                  <SelectTrigger className="w-[160px] h-8 text-xs">
                     <SelectValue placeholder="Bulk role…" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">No role</SelectItem>
-                    <SelectItem value="admin">Admin</SelectItem>
-                    <SelectItem value="provider">Provider</SelectItem>
-                    <SelectItem value="front_desk">Front Desk</SelectItem>
+                    {ROLE_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 <Button size="sm" variant="secondary" onClick={handleBulkAssign} disabled={!bulkRole}>
@@ -306,14 +350,13 @@ export function UserManagement() {
                                 onValueChange={(v) => handleRoleChange(u.user_id, v)}
                                 disabled={saving === u.user_id}
                               >
-                                <SelectTrigger className="w-[140px] h-8 text-xs">
+                                <SelectTrigger className="w-[170px] h-8 text-xs">
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="none">No role</SelectItem>
-                                  <SelectItem value="admin">Admin</SelectItem>
-                                  <SelectItem value="provider">Provider</SelectItem>
-                                  <SelectItem value="front_desk">Front Desk</SelectItem>
+                                  {ROLE_OPTIONS.map((opt) => (
+                                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                                  ))}
                                 </SelectContent>
                               </Select>
                             </TableCell>
