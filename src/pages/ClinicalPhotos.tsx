@@ -304,7 +304,7 @@ export function ClinicalPhotos() {
                 <CardTitle>Before & After Comparison</CardTitle>
                 <CardDescription>
                   {getPatientName(selectedPhotoObjects[0])} -{" "}
-                  {getTreatmentLabel(selectedPhotoObjects[0]?.treatment_type)}
+                  {getTreatmentLabel(selectedPhotoObjects[0]?.body_area)}
                 </CardDescription>
               </div>
               <Button
@@ -342,7 +342,7 @@ export function ClinicalPhotos() {
                   : selectedPhotoObjects[1]?.taken_at
               }
               treatmentName={getTreatmentLabel(
-                selectedPhotoObjects[0]?.treatment_type
+                selectedPhotoObjects[0]?.body_area
               )}
             />
           </CardContent>
