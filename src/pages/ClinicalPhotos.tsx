@@ -146,7 +146,7 @@ export function ClinicalPhotos() {
 
   const filteredPhotos = photos.filter((photo: ClinicalPhoto) => {
     if (filterPatient && photo.patient_id !== filterPatient) return false;
-    if (filterTreatment && photo.treatment_type !== filterTreatment) return false;
+    if (filterTreatment && photo.body_area !== filterTreatment) return false;
     if (filterStartDate) {
       const photoDate = new Date(photo.taken_at);
       if (photoDate < new Date(filterStartDate)) return false;
@@ -227,7 +227,7 @@ export function ClinicalPhotos() {
               <div className="space-y-2">
                 <Label htmlFor="treatment">Treatment Type</Label>
                 <Select
-                  value={uploadData.treatment_type}
+                  value={uploadData.body_area}
                   onValueChange={(value) =>
                     setUploadData({ ...uploadData, treatment_type: value })
                   }
@@ -323,13 +323,13 @@ export function ClinicalPhotos() {
             <BeforeAfterCompare
               beforeUrl={
                 selectedPhotoObjects[0]?.photo_type === "before"
-                  ? selectedPhotoObjects[0]?.file_path
-                  : selectedPhotoObjects[1]?.file_path
+                  ? selectedPhotoObjects[0]?.storage_path
+                  : selectedPhotoObjects[1]?.storage_path
               }
               afterUrl={
                 selectedPhotoObjects[0]?.photo_type === "after"
-                  ? selectedPhotoObjects[0]?.file_path
-                  : selectedPhotoObjects[1]?.file_path
+                  ? selectedPhotoObjects[0]?.storage_path
+                  : selectedPhotoObjects[1]?.storage_path
               }
               beforeDate={
                 selectedPhotoObjects[0]?.photo_type === "before"
@@ -472,8 +472,8 @@ export function ClinicalPhotos() {
                 >
                   <div className="relative bg-gray-100 aspect-square overflow-hidden">
                     <img
-                      src={photo.file_path}
-                      alt={`${photo.treatment_type} photo`}
+                      src={photo.storage_path}
+                      alt={`${photo.body_area} photo`}
                       className="w-full h-full object-cover"
                     />
                     {compareMode && selectedPhotos.includes(photo.id) && (
@@ -496,7 +496,7 @@ export function ClinicalPhotos() {
                       </div>
                       <div className="flex gap-2">
                         <Badge variant="secondary" className="text-xs">
-                          {getTreatmentLabel(photo.treatment_type)}
+                          {getTreatmentLabel(photo.body_area)}
                         </Badge>
                         <Badge
                           variant="outline"
