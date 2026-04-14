@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useHormoneRecommendation } from "@/hooks/useHormoneRecommendation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -14,7 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   CheckCircle, XCircle, Edit3, Clock, Sparkles, AlertTriangle, User,
-  FlaskConical, FileText, Shield, ChevronDown, ChevronUp,
+  FlaskConical, FileText, Shield, ChevronDown, ChevronUp, Zap, Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
@@ -27,11 +28,19 @@ const approvalBadge: Record<string, { label: string; class: string; icon: any }>
   rejected: { label: "Rejected", class: "bg-red-100 text-red-800 border-red-200", icon: XCircle },
 };
 
+const riskLevelColors: Record<string, string> = {
+  low: "bg-emerald-50 border-emerald-200 text-emerald-900",
+  medium: "bg-amber-50 border-amber-200 text-amber-900",
+  high: "bg-orange-50 border-orange-200 text-orange-900",
+  critical: "bg-red-50 border-red-200 text-red-900",
+};
+
 export default function PhysicianApproval() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const highlightId = searchParams.get("visit");
   const queryClient = useQueryClient();
+  const { clearanceReview } = useHormoneRecommendation();
 
   const [reviewVisitId, setReviewVisitId] = useState<string | null>(highlightId);
   const [editedTreatment, setEditedTreatment] = useState("");
@@ -41,6 +50,8 @@ export default function PhysicianApproval() {
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     treatment: true, monitoring: true, risks: true,
   });
+  const [triageResult, setTriageResult] = useState<any>(null);
+  const [showTriageResult, setShowTriageResult] = useState(false);
 
   // Fetch visits pending approval
   const { data: visits, isLoading } = useQuery({
@@ -79,6 +90,8 @@ export default function PhysicianApproval() {
     setEditedTreatment(visit.edited_treatment || sections?.treatment_recommendation || "");
     setEditedMonitoring(visit.edited_monitoring || sections?.monitoring_plan || "");
     setApprovalNotes(visit.approval_notes || "");
+    setTriageResult(null);
+    setShowTriageResult(false);
   };
 
   const approvalMutation = useMutation({
@@ -106,6 +119,17 @@ export default function PhysicianApproval() {
       editedMonitoring !== (aiSections?.monitoring_plan || "")
     );
     approvalMutation.mutate({ status: isModified ? "modified" : "approved", visitId });
+  };
+
+  const handleAiTriage = async () => {
+    if (!currentVisit?.id) return;
+    try {
+      const data = await clearanceReview.mutateAsync({ clearance_id: currentVisit.id });
+      setTriageResult(data);
+      setShowTriageResult(true);
+    } catch (err: any) {
+      toast.error(err.message || "Triage failed");
+    }
   };
 
   const toggleSection = (key: string) => {
@@ -261,6 +285,62 @@ export default function PhysicianApproval() {
                   <p className="text-sm">{aiSections.summary}</p>
                 </div>
 
+                {/* AI Triage Result (if shown) */}
+                {showTriageResult && triageResult && (
+                  <div className={`p-4 rounded-lg border ${riskLevelColors[triageResult.risk_level]}`}>
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-wider mb-1">AI Triage Review</p>
+                        <p className="text-sm font-semibold">Risk Score: {triageResult.risk_score}/100</p>
+                        <Badge variant="outline" className="mt-1">
+                          {triageResult.risk_level.toUpperCase()}
+                        </Badge>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowTriageResult(false)}
+                        className="text-xs h-6"
+                      >
+                        Close
+                      </Button>
+                    </div>
+                    <div className="space-y-2">
+                      <div>
+                        <p className="text-xs font-semibold mb-1">Recommendation</p>
+                        <p className="text-sm">{triageResult.recommendation.replace(/_/g, " ").toUpperCase()}</p>
+                      </div>
+                      {triageResult.conditions && (
+                        <div>
+                          <p className="text-xs font-semibold mb-1">Conditions</p>
+                          <p className="text-sm">{triageResult.conditions}</p>
+                        </div>
+                      )}
+                      {triageResult.lab_concerns && triageResult.lab_concerns.length > 0 && (
+                        <div>
+                          <p className="text-xs font-semibold mb-1">Lab Concerns</p>
+                          <ul className="text-sm space-y-0.5">
+                            {triageResult.lab_concerns.map((concern: string, i: number) => (
+                              <li key={i}>• {concern}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {triageResult.monitoring_needed && triageResult.monitoring_needed.length > 0 && (
+                        <div>
+                          <p className="text-xs font-semibold mb-1">Monitoring Needed</p>
+                          <ul className="text-sm space-y-0.5">
+                            {triageResult.monitoring_needed.map((monitor: string, i: number) => (
+                              <li key={i}>• {monitor}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      <p className="text-xs mt-2 italic">{triageResult.triage_summary}</p>
+                    </div>
+                  </div>
+                )}
+
                 {/* Editable Treatment Plan */}
                 <div className="border rounded-lg overflow-hidden">
                   <button
@@ -357,6 +437,33 @@ export default function PhysicianApproval() {
                     </div>
                   )}
                 </div>
+
+                {/* AI Triage Button */}
+                {currentVisit.approval_status === "pending" && (
+                  <Button
+                    onClick={handleAiTriage}
+                    disabled={clearanceReview.isPending || showTriageResult}
+                    variant="outline"
+                    className="w-full gap-2"
+                  >
+                    {clearanceReview.isPending ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Running triage...
+                      </>
+                    ) : showTriageResult ? (
+                      <>
+                        <Zap className="h-4 w-4" />
+                        Triage Complete
+                      </>
+                    ) : (
+                      <>
+                        <Zap className="h-4 w-4" />
+                        Run AI Triage Review
+                      </>
+                    )}
+                  </Button>
+                )}
 
                 {/* Approval Notes */}
                 <div>

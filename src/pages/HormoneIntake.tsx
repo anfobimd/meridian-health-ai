@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useLabExtraction, applyLabsToForm } from "@/hooks/useLabExtraction";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -124,6 +125,7 @@ const STEPS = [
 export default function HormoneIntake() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { extractFromImage, extractFromText } = useLabExtraction();
   const [step, setStep] = useState(0);
 
   // Step 1: Demographics
@@ -143,6 +145,7 @@ export default function HormoneIntake() {
   const [labValues, setLabValues] = useState<Record<string, string>>({});
   const [extracting, setExtracting] = useState(false);
   const [extractedFields, setExtractedFields] = useState<string[]>([]);
+  const [labPasteText, setLabPasteText] = useState("");
 
   // Step 4: History
   const [priorTherapy, setPriorTherapy] = useState("");
@@ -224,10 +227,7 @@ export default function HormoneIntake() {
         });
       }
 
-      const { data, error } = await supabase.functions.invoke("ai-extract-labs", {
-        body: { mediaType, base64Data: base64 },
-      });
-      if (error) throw error;
+      const data = await extractFromImage.mutateAsync({ mediaType, base64Data: base64 });
       if (data?.labs) {
         const extracted: string[] = [];
         for (const [key, val] of Object.entries(data.labs)) {
@@ -237,14 +237,37 @@ export default function HormoneIntake() {
           }
         }
         setExtractedFields(extracted);
-        toast.success(`Extracted ${extracted.length} lab values from document`);
       }
     } catch (err: any) {
       toast.error(err.message || "Failed to extract labs");
     } finally {
       setExtracting(false);
     }
-  }, []);
+  }, [extractFromImage]);
+
+  // Lab extraction from pasted text
+  const handleLabPaste = async () => {
+    if (!labPasteText.trim()) {
+      toast.error("Please paste lab data");
+      return;
+    }
+    setExtracting(true);
+    try {
+      const data = await extractFromText.mutateAsync({ text: labPasteText });
+      if (data?.labs) {
+        const updated = applyLabsToForm(data.labs, labValues);
+        setLabValues(updated);
+        const extracted = Object.keys(data.labs).filter(key => data.labs[key] != null).map(k => `lab_${k}`);
+        setExtractedFields(extracted);
+        setLabPasteText("");
+        toast.success(`Applied ${extracted.length} lab values from pasted text`);
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to extract labs from text");
+    } finally {
+      setExtracting(false);
+    }
+  };
 
   // Submit intake
   const submitIntake = useMutation({
@@ -494,12 +517,12 @@ export default function HormoneIntake() {
           {/* STEP 2: Labs */}
           {step === 2 && (
             <>
-              {/* AI Lab Extraction */}
+              {/* AI Lab Extraction from Image/PDF */}
               <div className="p-4 border-2 border-dashed border-primary/30 rounded-lg bg-primary/5">
                 <div className="flex items-center gap-3 mb-2">
                   <Upload className="h-5 w-5 text-primary" />
                   <div>
-                    <p className="text-sm font-semibold">AI Lab Extraction</p>
+                    <p className="text-sm font-semibold">Upload Lab Document</p>
                     <p className="text-xs text-muted-foreground">Upload a lab PDF or photo — AI will extract and auto-fill values</p>
                   </div>
                 </div>
@@ -510,6 +533,35 @@ export default function HormoneIntake() {
                 {extractedFields.length > 0 && (
                   <p className="text-xs text-primary mt-2">✓ Auto-filled {extractedFields.length} values. Review highlighted fields below.</p>
                 )}
+              </div>
+
+              {/* Paste Lab Results Section */}
+              <div className="p-4 border-2 border-dashed border-accent/30 rounded-lg bg-accent/5">
+                <div className="flex items-center gap-3 mb-2">
+                  <FlaskConical className="h-5 w-5 text-accent-foreground/60" />
+                  <div>
+                    <p className="text-sm font-semibold">Paste Lab Results</p>
+                    <p className="text-xs text-muted-foreground">Paste CSV, HL7, or text lab data — AI will parse and extract values</p>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Textarea
+                    placeholder="Paste lab results (e.g., Total Testosterone: 450 ng/dL, Free Testosterone: 12 pg/mL, ...)"
+                    value={labPasteText}
+                    onChange={e => setLabPasteText(e.target.value)}
+                    className="min-h-[100px] text-sm font-mono"
+                  />
+                  <Button
+                    onClick={handleLabPaste}
+                    disabled={!labPasteText.trim() || extracting}
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                  >
+                    {extracting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FlaskConical className="h-4 w-4" />}
+                    Extract from Text
+                  </Button>
+                </div>
               </div>
 
               {/* Core Labs */}

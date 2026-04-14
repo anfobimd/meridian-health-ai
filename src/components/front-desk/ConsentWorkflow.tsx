@@ -69,8 +69,26 @@ export function ConsentWorkflow({ patientId, patientName, appointmentId }: Props
   });
 
   const sendViaSms = async (templateId: string) => {
-    toast.info("SMS consent link sent to patient");
-    // In production, this would call the send-sms edge function with a consent link
+    try {
+      const { data: patient } = await supabase
+        .from("patients")
+        .select("phone, first_name")
+        .eq("id", patientId)
+        .single();
+      if (!patient?.phone) {
+        toast.error("Patient has no phone number on file");
+        return;
+      }
+      await supabase.functions.invoke("send-sms", {
+        body: {
+          to: patient.phone,
+          message: `Hi ${patient.first_name}, please sign your consent form: ${window.location.origin}/portal?consent=${templateId}&patient=${patientId}`,
+        },
+      });
+      toast.success("Consent link sent via SMS");
+    } catch {
+      toast.error("Failed to send SMS");
+    }
   };
 
   const signedTemplateIds = new Set(
