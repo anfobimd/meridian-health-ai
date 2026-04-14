@@ -57,145 +57,290 @@ const ROLE_RANK: Record<AppRole, number> = {
 
 export type Permission =
   | "dashboard.view"
-  | "patients.view" | "patients.create" | "patients.edit" | "patients.delete"
-  | "appointments.view" | "appointments.create" | "appointments.edit" | "appointments.cancel"
-  | "encounters.view" | "encounters.create" | "encounters.sign"
-  | "prescriptions.view" | "prescriptions.create" | "prescriptions.approve"
-  | "labs.view" | "labs.order" | "labs.review"
-  | "clearance.view" | "clearance.approve" | "clearance.decline"
-  | "billing.view" | "billing.charge" | "billing.refund"
-  | "marketplace.view" | "marketplace.manage"
-  | "providers.view" | "providers.manage"
-  | "settings.view" | "settings.manage"
-  | "reports.view" | "reports.export"
+  | "patients.view"
+  | "patients.create"
+  | "patients.edit"
+  | "patients.delete"
+  | "appointments.view"
+  | "appointments.create"
+  | "appointments.edit"
+  | "appointments.cancel"
+  | "encounters.view"
+  | "encounters.create"
+  | "encounters.sign"
+  | "prescriptions.view"
+  | "prescriptions.create"
+  | "prescriptions.approve"
+  | "labs.view"
+  | "labs.order"
+  | "labs.review"
+  | "clearance.view"
+  | "clearance.approve"
+  | "clearance.decline"
+  | "billing.view"
+  | "billing.charge"
+  | "billing.refund"
+  | "marketplace.view"
+  | "marketplace.manage"
+  | "providers.view"
+  | "providers.manage"
+  | "settings.view"
+  | "settings.manage"
+  | "reports.view"
+  | "reports.export"
   | "audit.view"
   | "clinic.switch";
 
 const ROLE_PERMISSIONS: Record<AppRole, Permission[]> = {
   super_admin: [
-    "dashboard.view", "patients.view", "patients.create", "patients.edit", "patients.delete",
-    "appointments.view", "appointments.create", "appointments.edit", "appointments.cancel",
-    "encounters.view", "encounters.create", "encounters.sign",
-    "prescriptions.view", "prescriptions.create", "prescriptions.approve",
-    "labs.view", "labs.order", "labs.review",
-    "clearance.view", "clearance.approve", "clearance.decline",
-    "billing.view", "billing.charge", "billing.refund",
-    "marketplace.view", "marketplace.manage",
-    "providers.view", "providers.manage",
-    "settings.view", "settings.manage",
-    "reports.view", "reports.export",
-    "audit.view", "clinic.switch",
+    "dashboard.view",
+    "patients.view",
+    "patients.create",
+    "patients.edit",
+    "patients.delete",
+    "appointments.view",
+    "appointments.create",
+    "appointments.edit",
+    "appointments.cancel",
+    "encounters.view",
+    "encounters.create",
+    "encounters.sign",
+    "prescriptions.view",
+    "prescriptions.create",
+    "prescriptions.approve",
+    "labs.view",
+    "labs.order",
+    "labs.review",
+    "clearance.view",
+    "clearance.approve",
+    "clearance.decline",
+    "billing.view",
+    "billing.charge",
+    "billing.refund",
+    "marketplace.view",
+    "marketplace.manage",
+    "providers.view",
+    "providers.manage",
+    "settings.view",
+    "settings.manage",
+    "reports.view",
+    "reports.export",
+    "audit.view",
+    "clinic.switch",
   ],
   admin: [
-    "dashboard.view", "patients.view", "patients.create", "patients.edit", "patients.delete",
-    "appointments.view", "appointments.create", "appointments.edit", "appointments.cancel",
-    "encounters.view", "encounters.create", "encounters.sign",
-    "prescriptions.view", "prescriptions.create", "prescriptions.approve",
-    "labs.view", "labs.order", "labs.review",
-    "clearance.view", "clearance.approve", "clearance.decline",
-    "billing.view", "billing.charge", "billing.refund",
-    "marketplace.view", "marketplace.manage",
-    "providers.view", "providers.manage",
-    "settings.view", "settings.manage",
-    "reports.view", "reports.export",
+    "dashboard.view",
+    "patients.view",
+    "patients.create",
+    "patients.edit",
+    "patients.delete",
+    "appointments.view",
+    "appointments.create",
+    "appointments.edit",
+    "appointments.cancel",
+    "encounters.view",
+    "encounters.create",
+    "encounters.sign",
+    "prescriptions.view",
+    "prescriptions.create",
+    "prescriptions.approve",
+    "labs.view",
+    "labs.order",
+    "labs.review",
+    "clearance.view",
+    "clearance.approve",
+    "clearance.decline",
+    "billing.view",
+    "billing.charge",
+    "billing.refund",
+    "marketplace.view",
+    "marketplace.manage",
+    "providers.view",
+    "providers.manage",
+    "settings.view",
+    "settings.manage",
+    "reports.view",
+    "reports.export",
     "audit.view",
   ],
   clinic_owner: [
-    "dashboard.view", "patients.view", "patients.create", "patients.edit",
-    "appointments.view", "appointments.create", "appointments.edit", "appointments.cancel",
+    "dashboard.view",
+    "patients.view",
+    "patients.create",
+    "patients.edit",
+    "appointments.view",
+    "appointments.create",
+    "appointments.edit",
+    "appointments.cancel",
     "encounters.view",
     "prescriptions.view",
     "labs.view",
-    "clearance.view", "clearance.approve",
-    "billing.view", "billing.charge", "billing.refund",
-    "marketplace.view", "marketplace.manage",
-    "providers.view", "providers.manage",
-    "settings.view", "settings.manage",
-    "reports.view", "reports.export",
+    "clearance.view",
+    "clearance.approve",
+    "billing.view",
+    "billing.charge",
+    "billing.refund",
+    "marketplace.view",
+    "marketplace.manage",
+    "providers.view",
+    "providers.manage",
+    "settings.view",
+    "settings.manage",
+    "reports.view",
+    "reports.export",
   ],
   medical_director: [
-    "dashboard.view", "patients.view", "patients.create", "patients.edit",
-    "appointments.view", "appointments.create", "appointments.edit",
-    "encounters.view", "encounters.create", "encounters.sign",
-    "prescriptions.view", "prescriptions.create", "prescriptions.approve",
-    "labs.view", "labs.order", "labs.review",
-    "clearance.view", "clearance.approve", "clearance.decline",
+    "dashboard.view",
+    "patients.view",
+    "patients.create",
+    "patients.edit",
+    "appointments.view",
+    "appointments.create",
+    "appointments.edit",
+    "encounters.view",
+    "encounters.create",
+    "encounters.sign",
+    "prescriptions.view",
+    "prescriptions.create",
+    "prescriptions.approve",
+    "labs.view",
+    "labs.order",
+    "labs.review",
+    "clearance.view",
+    "clearance.approve",
+    "clearance.decline",
     "billing.view",
     "reports.view",
     "audit.view",
   ],
   physician: [
-    "dashboard.view", "patients.view", "patients.create", "patients.edit",
-    "appointments.view", "appointments.create", "appointments.edit",
-    "encounters.view", "encounters.create", "encounters.sign",
-    "prescriptions.view", "prescriptions.create", "prescriptions.approve",
-    "labs.view", "labs.order", "labs.review",
-    "clearance.view", "clearance.approve", "clearance.decline",
+    "dashboard.view",
+    "patients.view",
+    "patients.create",
+    "patients.edit",
+    "appointments.view",
+    "appointments.create",
+    "appointments.edit",
+    "encounters.view",
+    "encounters.create",
+    "encounters.sign",
+    "prescriptions.view",
+    "prescriptions.create",
+    "prescriptions.approve",
+    "labs.view",
+    "labs.order",
+    "labs.review",
+    "clearance.view",
+    "clearance.approve",
+    "clearance.decline",
     "billing.view",
   ],
   nurse_practitioner: [
-    "dashboard.view", "patients.view", "patients.create", "patients.edit",
-    "appointments.view", "appointments.create", "appointments.edit",
-    "encounters.view", "encounters.create", "encounters.sign",
-    "prescriptions.view", "prescriptions.create",
-    "labs.view", "labs.order", "labs.review",
-    "clearance.view", "clearance.approve",
+    "dashboard.view",
+    "patients.view",
+    "patients.create",
+    "patients.edit",
+    "appointments.view",
+    "appointments.create",
+    "appointments.edit",
+    "encounters.view",
+    "encounters.create",
+    "encounters.sign",
+    "prescriptions.view",
+    "prescriptions.create",
+    "labs.view",
+    "labs.order",
+    "labs.review",
+    "clearance.view",
+    "clearance.approve",
     "billing.view",
   ],
   physician_assistant: [
-    "dashboard.view", "patients.view", "patients.create", "patients.edit",
-    "appointments.view", "appointments.create", "appointments.edit",
-    "encounters.view", "encounters.create",
-    "prescriptions.view", "prescriptions.create",
-    "labs.view", "labs.order",
+    "dashboard.view",
+    "patients.view",
+    "patients.create",
+    "patients.edit",
+    "appointments.view",
+    "appointments.create",
+    "appointments.edit",
+    "encounters.view",
+    "encounters.create",
+    "prescriptions.view",
+    "prescriptions.create",
+    "labs.view",
+    "labs.order",
     "clearance.view",
     "billing.view",
   ],
   registered_nurse: [
-    "dashboard.view", "patients.view", "patients.edit",
-    "appointments.view", "appointments.edit",
-    "encounters.view", "encounters.create",
+    "dashboard.view",
+    "patients.view",
+    "patients.edit",
+    "appointments.view",
+    "appointments.edit",
+    "encounters.view",
+    "encounters.create",
     "prescriptions.view",
-    "labs.view", "labs.order",
+    "labs.view",
+    "labs.order",
     "clearance.view",
   ],
   provider: [
-    "dashboard.view", "patients.view", "patients.create", "patients.edit",
-    "appointments.view", "appointments.create", "appointments.edit",
-    "encounters.view", "encounters.create", "encounters.sign",
-    "prescriptions.view", "prescriptions.create",
-    "labs.view", "labs.order",
+    "dashboard.view",
+    "patients.view",
+    "patients.create",
+    "patients.edit",
+    "appointments.view",
+    "appointments.create",
+    "appointments.edit",
+    "encounters.view",
+    "encounters.create",
+    "encounters.sign",
+    "prescriptions.view",
+    "prescriptions.create",
+    "labs.view",
+    "labs.order",
     "clearance.view",
     "billing.view",
     "marketplace.view",
   ],
   aesthetician: [
-    "dashboard.view", "patients.view", "patients.edit",
-    "appointments.view", "appointments.create", "appointments.edit",
-    "encounters.view", "encounters.create",
+    "dashboard.view",
+    "patients.view",
+    "patients.edit",
+    "appointments.view",
+    "appointments.create",
+    "appointments.edit",
+    "encounters.view",
+    "encounters.create",
     "labs.view",
     "marketplace.view",
   ],
   front_desk: [
-    "dashboard.view", "patients.view", "patients.create", "patients.edit",
-    "appointments.view", "appointments.create", "appointments.edit", "appointments.cancel",
-    "billing.view", "billing.charge",
+    "dashboard.view",
+    "patients.view",
+    "patients.create",
+    "patients.edit",
+    "appointments.view",
+    "appointments.create",
+    "appointments.edit",
+    "appointments.cancel",
+    "billing.view",
+    "billing.charge",
     "marketplace.view",
   ],
   billing: [
-    "dashboard.view", "patients.view",
-    "appointments.view",
-    "billing.view", "billing.charge", "billing.refund",
-    "reports.view", "reports.export",
-  ],
-  marketing: [
-    "dashboard.view", "patients.view",
-    "marketplace.view", "marketplace.manage",
-    "reports.view",
-  ],
-  user: [
     "dashboard.view",
+    "patients.view",
+    "appointments.view",
+    "billing.view",
+    "billing.charge",
+    "billing.refund",
+    "reports.view",
+    "reports.export",
   ],
+  marketing: ["dashboard.view", "patients.view", "marketplace.view", "marketplace.manage", "reports.view"],
+  user: ["dashboard.view"],
 };
 
 // ─── Context ─────────────────────────────────────────────────────────────────
@@ -238,55 +383,105 @@ export function RBACProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const fetchRole = async (userId: string) => {
-    // Try role_permissions table first (Phase 1 migration), fall back to user_roles
-    const { data: rpData } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", userId)
-      .maybeSingle();
+    try {
+      // Try role_permissions table first (Phase 1 migration), fall back to user_roles
+      const { data: rpData, error: roleError } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", userId)
+        .maybeSingle();
 
-    const fetchedRole = (rpData?.role as AppRole) ?? "user";
-    setRole(fetchedRole);
+      if (roleError) {
+        console.warn("[RBAC] Failed to fetch user role:", roleError.message);
+      }
 
-    // Fetch clinic context if multi-clinic is active
-    const { data: staffData } = await (supabase as any)
-      .from("clinic_staff")
-      .select("clinic_id")
-      .eq("user_id", userId)
-      .eq("is_active", true)
-      .limit(1)
-      .maybeSingle();
+      const fetchedRole = (rpData?.role as AppRole) ?? "user";
+      setRole(fetchedRole);
 
-    if (staffData?.clinic_id) {
-      setClinicId(staffData.clinic_id);
+      // Fetch clinic context if multi-clinic is active
+      const { data: staffData, error: staffError } = await supabase
+        .from("clinic_staff")
+        .select("clinic_id")
+        .eq("user_id", userId)
+        .eq("is_active", true)
+        .limit(1)
+        .maybeSingle();
+
+      if (staffError) {
+        console.warn("[RBAC] Failed to fetch clinic staff:", staffError.message);
+      }
+
+      if (staffData?.clinic_id) {
+        setClinicId(staffData.clinic_id);
+      }
+    } catch (err) {
+      console.error("[RBAC] Unexpected error in fetchRole:", err);
+      // Default to "user" role so the app doesn't hang
+      setRole("user");
     }
   };
 
   useEffect(() => {
+    // Track whether the initial session has been handled to avoid double-loading
+    let initialSessionHandled = false;
+
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (_event, sess) => {
       setSession(sess);
       setUser(sess?.user ?? null);
       if (sess?.user) {
-        setTimeout(() => fetchRole(sess.user.id), 0);
+        // Await fetchRole so loading state is accurate
+        await fetchRole(sess.user.id);
       } else {
         setRole(null);
         setClinicId(null);
       }
-      setLoading(false);
-    });
-
-    supabase.auth.getSession().then(({ data: { session: existing } }) => {
-      setSession(existing);
-      setUser(existing?.user ?? null);
-      if (existing?.user) {
-        fetchRole(existing.user.id);
+      // Mark initial load complete after first auth event
+      if (!initialSessionHandled) {
+        initialSessionHandled = true;
+        setLoading(false);
       }
-      setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    // Fallback: if onAuthStateChange doesn't fire, use getSession
+    // (handles broken Supabase connections, network issues, etc.)
+    supabase.auth
+      .getSession()
+      .then(async ({ data: { session: existing } }) => {
+        // Only process if onAuthStateChange hasn't already handled it
+        if (!initialSessionHandled) {
+          setSession(existing);
+          setUser(existing?.user ?? null);
+          if (existing?.user) {
+            await fetchRole(existing.user.id);
+          }
+          initialSessionHandled = true;
+          setLoading(false);
+        }
+      })
+      .catch((err) => {
+        console.error("[RBAC] Failed to get session:", err);
+        // Ensure loading state is cleared even on error
+        if (!initialSessionHandled) {
+          initialSessionHandled = true;
+          setLoading(false);
+        }
+      });
+
+    // Safety timeout: if nothing resolves within 8 seconds, stop the spinner
+    const safetyTimeout = setTimeout(() => {
+      if (!initialSessionHandled) {
+        console.warn("[RBAC] Safety timeout reached - forcing loading=false");
+        initialSessionHandled = true;
+        setLoading(false);
+      }
+    }, 8000);
+
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(safetyTimeout);
+    };
   }, []);
 
   const signOut = async () => {
