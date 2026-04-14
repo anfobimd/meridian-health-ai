@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useEmail } from "@/hooks/useEmail";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,6 +35,7 @@ interface SendIntakeLinkDialogProps {
 }
 
 export function SendIntakeLinkDialog({ open, onOpenChange, patient }: SendIntakeLinkDialogProps) {
+  const { sendEmail } = useEmail();
   const [focusAreas, setFocusAreas] = useState<string[]>([]);
   const [phone, setPhone] = useState(patient?.phone || "");
   const [channel, setChannel] = useState<"sms" | "manual">("sms");
@@ -76,6 +78,15 @@ export function SendIntakeLinkDialog({ open, onOpenChange, patient }: SendIntake
         toast.info("Invitation created but SMS delivery failed. Copy the link manually.");
       } else {
         toast.success("Intake link generated!");
+      }
+
+      // Send email if patient has email address
+      if (patient.email) {
+        sendEmail.mutate({
+          to: patient.email,
+          subject: "Complete Your Intake Form - Meridian Wellness",
+          html: `<p>Hi ${patient.first_name},</p><p>Please complete your intake form before your appointment: <a href="${data.url}">Click here</a></p>`,
+        });
       }
     } catch (err: any) {
       toast.error(err.message || "Failed to send invitation");

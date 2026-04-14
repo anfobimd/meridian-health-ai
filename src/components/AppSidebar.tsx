@@ -5,11 +5,12 @@ import {
   Activity, FlaskConical, FileText, Pill, DollarSign, ClipboardPlus, ShieldCheck, DoorOpen, Store, Package,
   CreditCard, TrendingUp, Calculator, MonitorCheck, Briefcase, Search, LogOut, CalendarClock, TrendingDown,
   Settings, UserCircle, CalendarOff, MessageSquare, ClipboardCheck, Mail, Clock, ListChecks,
-  Building2, BarChart3, Zap, BookOpen, Bell, CalendarDays, Inbox, Video,
+  Building2, BarChart3, Zap, BookOpen, Bell, CalendarDays, Inbox, Video, ScrollText, Target, Camera,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/contexts/RBACContext";
 import { supabase } from "@/integrations/supabase/client";
+import { ClinicSwitcher } from "@/components/admin/ClinicSwitcher";
 
 type NavItem = {
   to: string;
@@ -64,6 +65,7 @@ const navSections: NavSection[] = [
       { to: "/physician-approval", icon: ShieldCheck, label: "Approvals", roles: ["admin", "provider"] },
       { to: "/protocols", icon: Pill, label: "Protocols", roles: ["admin", "provider"] },
       { to: "/md-feedback", icon: MessageSquare, label: "MD Feedback", roles: ["provider"], badgeKey: "md_corrections" },
+      { to: "/clinical-photos", icon: Camera, label: "Clinical Photos" },
     ],
   },
   {
@@ -115,6 +117,7 @@ const navSections: NavSection[] = [
       { to: "/md-coverage", icon: ShieldCheck, label: "MD Coverage" },
       { to: "/master-catalog", icon: BookOpen, label: "Master Catalog" },
       { to: "/benchmarks", icon: BarChart3, label: "Benchmarks" },
+      { to: "/audit-log", icon: ScrollText, label: "Audit Log" },
     ],
   },
   {
@@ -122,6 +125,7 @@ const navSections: NavSection[] = [
     items: [
       { to: "/my-profile", icon: UserCircle, label: "My Profile" },
       { to: "/my-performance", icon: BarChart3, label: "Performance", roles: ["provider"] },
+      { to: "/performance-goals", icon: Target, label: "Goals", roles: ["provider"] },
       { to: "/time-off", icon: CalendarOff, label: "Time Off" },
       { to: "/settings", icon: Settings, label: "Settings" },
     ],
@@ -145,6 +149,7 @@ export function AppSidebar() {
   const [badges, setBadges] = useState<Record<string, number>>({});
 
   const visibleSections = filterNav(navSections, role);
+  const isAdminLike = role && ["admin", "super_admin", "clinic_owner"].includes(role);
 
   useEffect(() => {
     if (!user) return;
@@ -197,6 +202,12 @@ export function AppSidebar() {
         </div>
         <p className="text-[9px] font-bold tracking-[0.14em] uppercase text-sidebar-primary mt-0.5">WELLNESS EHR</p>
       </div>
+
+      {isAdminLike && (
+        <div className="px-3 py-2 border-b border-sidebar-border">
+          <ClinicSwitcher />
+        </div>
+      )}
 
       <button
         onClick={() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }))}

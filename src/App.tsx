@@ -5,7 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { CommandPalette } from "@/components/CommandPalette";
 import { AppLayout } from "@/components/AppLayout";
-import { AuthProvider } from "@/contexts/AuthContext";
+import { RBACProvider } from "@/contexts/RBACContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import Patients from "./pages/Patients";
@@ -58,6 +58,9 @@ import MdCoverage from "./pages/MdCoverage";
 import MasterCatalog from "./pages/MasterCatalog";
 import Benchmarks from "./pages/Benchmarks";
 import AutomationRules from "./pages/AutomationRules";
+import AuditLog from "./pages/AuditLog";
+import PerformanceGoals from "./pages/PerformanceGoals";
+import ClinicalPhotos from "./pages/ClinicalPhotos";
 import NotificationCenter from "./pages/NotificationCenter";
 import MultiProviderCalendar from "./pages/MultiProviderCalendar";
 import PatientInbox from "./pages/PatientInbox";
@@ -73,7 +76,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <AuthProvider>
+        <RBACProvider>
           <CommandPalette />
           <Routes>
             {/* Protected routes — require authentication */}
@@ -121,11 +124,19 @@ const App = () => (
                 <Route path="/provider-performance" element={<ProviderDrillDown />} />
                 <Route path="/my-performance" element={<ProviderPerformanceDashboard />} />
                 <Route path="/reports" element={<Reports />} />
-                <Route path="/contracts" element={<ContractsAdmin />} />
-                <Route path="/md-coverage" element={<MdCoverage />} />
-                <Route path="/master-catalog" element={<MasterCatalog />} />
-                <Route path="/benchmarks" element={<Benchmarks />} />
-                <Route path="/automation-rules" element={<AutomationRules />} />
+                <Route path="/clinical-photos" element={<ClinicalPhotos />} />
+                <Route path="/performance-goals" element={<PerformanceGoals />} />
+
+                {/* Admin-only routes */}
+                <Route element={<ProtectedRoute minRole="admin" />}>
+                  <Route path="/contracts" element={<ContractsAdmin />} />
+                  <Route path="/md-coverage" element={<MdCoverage />} />
+                  <Route path="/master-catalog" element={<MasterCatalog />} />
+                  <Route path="/benchmarks" element={<Benchmarks />} />
+                  <Route path="/automation-rules" element={<AutomationRules />} />
+                  <Route path="/audit-log" element={<AuditLog />} />
+                </Route>
+
                 <Route path="/notifications" element={<NotificationCenter />} />
                 <Route path="/calendar-grid" element={<MultiProviderCalendar />} />
                 <Route path="/patient-inbox" element={<PatientInbox />} />
@@ -140,7 +151,7 @@ const App = () => (
             <Route path="/portal" element={<PatientPortal />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
-        </AuthProvider>
+        </RBACProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
