@@ -59,7 +59,7 @@ export function PerformanceGoals() {
     queryKey: ["provider-goals", user?.id],
     enabled: !!user?.id,
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("provider_goals")
         .select("*")
         .eq("provider_id", user!.id)
@@ -80,7 +80,7 @@ export function PerformanceGoals() {
         throw new Error("Please fill in all fields");
       }
 
-      const { error } = await supabase.from("provider_goals").insert({
+      const { error } = await (supabase as any).from("provider_goals").insert({
         provider_id: user!.id,
         metric_name: newGoal.metric_name,
         target_value: parseFloat(newGoal.target_value),
@@ -343,7 +343,7 @@ export function PerformanceGoals() {
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {goals.map((goal: ProviderGoal) => {
+          {(goals as ProviderGoal[]).map((goal: ProviderGoal) => {
             const trend = getTrendIndicator(goal.current_value, goal.target_value);
             const percentage = getProgressPercentage(goal.current_value, goal.target_value);
 

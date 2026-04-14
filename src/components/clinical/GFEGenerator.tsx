@@ -64,7 +64,7 @@ export function GFEGenerator({ patientId, appointmentId, treatments }: GFEGenera
   const fetchActivePackages = async () => {
     try {
       setLoadingPackages(true);
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("patient_package_purchases")
         .select("id, service_packages(name, credits), remaining_credits")
         .eq("patient_id", patientId)
@@ -102,7 +102,7 @@ export function GFEGenerator({ patientId, appointmentId, treatments }: GFEGenera
       setLoading(true);
 
       // Create GFE record
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("good_faith_estimates")
         .insert({
           patient_id: patientId,
@@ -111,7 +111,7 @@ export function GFEGenerator({ patientId, appointmentId, treatments }: GFEGenera
           subtotal,
           discounts,
           total: estimatedTotal,
-          valid_until: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(), // 60 days
+          valid_until: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(),
           created_by: user.id,
         })
         .select()
@@ -142,7 +142,7 @@ export function GFEGenerator({ patientId, appointmentId, treatments }: GFEGenera
       setSendingEmail(true);
 
       // First generate/fetch the GFE
-      const { data: gfeData, error: gfeError } = await supabase
+      const { data: gfeData, error: gfeError } = await (supabase as any)
         .from("good_faith_estimates")
         .select("*")
         .eq("patient_id", patientId)

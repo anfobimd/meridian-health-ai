@@ -42,7 +42,7 @@ export interface EmailResponse {
 
 // ─── Invoke helper ───────────────────────────────────────────────────────────
 
-async function invokeEmail<T>(action: string, body: Record<string, unknown>): Promise<T> {
+async function invokeEmail<T>(action: string, body: Record<string, unknown> | object): Promise<T> {
   const { data, error } = await supabase.functions.invoke("send-email", {
     body: { action, ...body },
   });

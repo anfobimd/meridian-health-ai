@@ -231,7 +231,7 @@ export default function HormoneIntake() {
       if (data?.labs) {
         const extracted: string[] = [];
         for (const [key, val] of Object.entries(data.labs)) {
-          if (val != null && val !== "") {
+          if (val != null && String(val) !== "") {
             setLabValues(prev => ({ ...prev, [`lab_${key}`]: String(val) }));
             extracted.push(`lab_${key}`);
           }

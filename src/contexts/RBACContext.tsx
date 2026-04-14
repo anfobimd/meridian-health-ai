@@ -249,7 +249,7 @@ export function RBACProvider({ children }: { children: ReactNode }) {
     setRole(fetchedRole);
 
     // Fetch clinic context if multi-clinic is active
-    const { data: staffData } = await supabase
+    const { data: staffData } = await (supabase as any)
       .from("clinic_staff")
       .select("clinic_id")
       .eq("user_id", userId)

@@ -31,11 +31,15 @@ interface ClinicalPhoto {
   id: string;
   patient_id: string;
   patients?: { first_name: string; last_name: string };
-  treatment_type: string;
-  photo_type: "before" | "after";
-  file_path: string;
+  body_area: string;
+  photo_type: string;
+  storage_path: string;
   taken_at: string;
   created_at: string;
+  encounter_id?: string;
+  treatment_id?: string;
+  notes?: string;
+  uploaded_by?: string;
 }
 
 const TREATMENT_TYPES = [
@@ -116,9 +120,9 @@ export function ClinicalPhotos() {
 
       const { error: insertError } = await supabase.from("clinical_photos").insert({
         patient_id: uploadData.patient_id,
-        treatment_type: uploadData.treatment_type,
+        body_area: uploadData.treatment_type,
         photo_type: uploadData.photo_type,
-        file_path: urlData.publicUrl,
+        storage_path: urlData.publicUrl,
         taken_at: new Date().toISOString(),
       });
 
@@ -142,7 +146,7 @@ export function ClinicalPhotos() {
 
   const filteredPhotos = photos.filter((photo: ClinicalPhoto) => {
     if (filterPatient && photo.patient_id !== filterPatient) return false;
-    if (filterTreatment && photo.treatment_type !== filterTreatment) return false;
+    if (filterTreatment && photo.body_area !== filterTreatment) return false;
     if (filterStartDate) {
       const photoDate = new Date(photo.taken_at);
       if (photoDate < new Date(filterStartDate)) return false;
@@ -300,7 +304,7 @@ export function ClinicalPhotos() {
                 <CardTitle>Before & After Comparison</CardTitle>
                 <CardDescription>
                   {getPatientName(selectedPhotoObjects[0])} -{" "}
-                  {getTreatmentLabel(selectedPhotoObjects[0]?.treatment_type)}
+                  {getTreatmentLabel(selectedPhotoObjects[0]?.body_area)}
                 </CardDescription>
               </div>
               <Button
@@ -319,13 +323,13 @@ export function ClinicalPhotos() {
             <BeforeAfterCompare
               beforeUrl={
                 selectedPhotoObjects[0]?.photo_type === "before"
-                  ? selectedPhotoObjects[0]?.file_path
-                  : selectedPhotoObjects[1]?.file_path
+                  ? selectedPhotoObjects[0]?.storage_path
+                  : selectedPhotoObjects[1]?.storage_path
               }
               afterUrl={
                 selectedPhotoObjects[0]?.photo_type === "after"
-                  ? selectedPhotoObjects[0]?.file_path
-                  : selectedPhotoObjects[1]?.file_path
+                  ? selectedPhotoObjects[0]?.storage_path
+                  : selectedPhotoObjects[1]?.storage_path
               }
               beforeDate={
                 selectedPhotoObjects[0]?.photo_type === "before"
@@ -338,7 +342,7 @@ export function ClinicalPhotos() {
                   : selectedPhotoObjects[1]?.taken_at
               }
               treatmentName={getTreatmentLabel(
-                selectedPhotoObjects[0]?.treatment_type
+                selectedPhotoObjects[0]?.body_area
               )}
             />
           </CardContent>
@@ -468,8 +472,8 @@ export function ClinicalPhotos() {
                 >
                   <div className="relative bg-gray-100 aspect-square overflow-hidden">
                     <img
-                      src={photo.file_path}
-                      alt={`${photo.treatment_type} photo`}
+                      src={photo.storage_path}
+                      alt={`${photo.body_area} photo`}
                       className="w-full h-full object-cover"
                     />
                     {compareMode && selectedPhotos.includes(photo.id) && (
@@ -492,7 +496,7 @@ export function ClinicalPhotos() {
                       </div>
                       <div className="flex gap-2">
                         <Badge variant="secondary" className="text-xs">
-                          {getTreatmentLabel(photo.treatment_type)}
+                          {getTreatmentLabel(photo.body_area)}
                         </Badge>
                         <Badge
                           variant="outline"
