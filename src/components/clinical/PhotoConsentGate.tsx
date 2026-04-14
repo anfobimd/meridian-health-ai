@@ -48,7 +48,7 @@ export function PhotoConsentGate({ patientId, children, fallback }: PhotoConsent
         .from("e_consents")
         .select("id, signed_at")
         .eq("patient_id", patientId)
-        .eq("consent_type", "photo")
+        .eq("consent_type", "photo_release")
         .not("signed_at", "is", null)
         .limit(1);
 
