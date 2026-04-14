@@ -122,7 +122,7 @@ export function UserManagement() {
         if (error) throw error;
       } else {
         await supabase.from("user_roles").delete().eq("user_id", userId);
-        const { error } = await supabase.from("user_roles").insert({ user_id: userId, role: newRole as AppRole });
+        const { error } = await supabase.from("user_roles").insert({ user_id: userId, role: newRole } as any);
         if (error) throw error;
       }
       toast({ title: "Role updated" });

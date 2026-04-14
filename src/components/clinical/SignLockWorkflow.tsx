@@ -75,9 +75,8 @@ export function SignLockWorkflow({
       const { error: auditError } = await supabase.from("audit_logs").insert({
         user_id: user.id,
         action: "sign_note",
-        resource_type: "encounter",
-        resource_id: encounterId,
-        created_at: now,
+        table_name: "encounters",
+        record_id: encounterId,
       });
 
       if (auditError) {

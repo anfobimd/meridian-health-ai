@@ -211,7 +211,7 @@ export function PostProcedureInstructions({
 
   const loadTemplates = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("instruction_templates")
         .select("*")
         .order("treatment_type");
@@ -356,7 +356,7 @@ export function PostProcedureInstructions({
       setLoading(true);
 
       // Create a note entry in the encounter
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from("encounter_notes")
         .insert({
           encounter_id: encounterId,
