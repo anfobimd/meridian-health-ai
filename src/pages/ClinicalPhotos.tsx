@@ -227,7 +227,7 @@ export function ClinicalPhotos() {
               <div className="space-y-2">
                 <Label htmlFor="treatment">Treatment Type</Label>
                 <Select
-                  value={uploadData.body_area}
+                  value={uploadData.treatment_type}
                   onValueChange={(value) =>
                     setUploadData({ ...uploadData, treatment_type: value })
                   }
