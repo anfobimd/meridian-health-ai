@@ -37,23 +37,23 @@ export function NotificationPreferences() {
     queryKey: ["notif-prefs", user?.id],
     enabled: !!user?.id,
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("staff_notification_preferences")
         .select("*")
         .eq("user_id", user!.id);
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []) as any[];
     },
   });
 
   useEffect(() => {
     if (prefs) {
-      const quietHoursPrefs = prefs.filter((p: any) => p.type === "quiet_hours");
+      const quietHoursPrefs = prefs.filter((p: any) => p.notification_type === "quiet_hours");
       if (quietHoursPrefs.length > 0) {
         const qh = quietHoursPrefs[0];
         setQuietHours({
-          start: qh.start_time || "21:00",
-          end: qh.end_time || "08:00",
+          start: qh.quiet_hours_start || "21:00",
+          end: qh.quiet_hours_end || "08:00",
           enabled: qh.is_enabled ?? false,
         });
       }
@@ -83,20 +83,19 @@ export function NotificationPreferences() {
     }) => {
       const existing = getPref(type, channel);
       if (existing) {
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from("staff_notification_preferences")
           .update({ is_enabled: enabled })
           .eq("id", existing.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from("staff_notification_preferences")
           .insert({
             user_id: user!.id,
             notification_type: type,
             channel,
             is_enabled: enabled,
-            type: "notification",
           });
         if (error) throw error;
       }
@@ -109,27 +108,27 @@ export function NotificationPreferences() {
 
   const saveQuietHours = useMutation({
     mutationFn: async () => {
-      const existing = prefs?.find((p: any) => p.type === "quiet_hours");
+      const existing = prefs?.find((p: any) => p.notification_type === "quiet_hours");
 
       if (existing) {
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from("staff_notification_preferences")
           .update({
             is_enabled: quietHours.enabled,
-            start_time: quietHours.start,
-            end_time: quietHours.end,
+            quiet_hours_start: quietHours.start,
+            quiet_hours_end: quietHours.end,
           })
           .eq("id", existing.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from("staff_notification_preferences")
           .insert({
             user_id: user!.id,
-            type: "quiet_hours",
+            notification_type: "quiet_hours",
             is_enabled: quietHours.enabled,
-            start_time: quietHours.start,
-            end_time: quietHours.end,
+            quiet_hours_start: quietHours.start,
+            quiet_hours_end: quietHours.end,
           });
         if (error) throw error;
       }
