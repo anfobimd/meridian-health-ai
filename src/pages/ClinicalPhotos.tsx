@@ -31,11 +31,15 @@ interface ClinicalPhoto {
   id: string;
   patient_id: string;
   patients?: { first_name: string; last_name: string };
-  treatment_type: string;
-  photo_type: "before" | "after";
-  file_path: string;
+  body_area: string;
+  photo_type: string;
+  storage_path: string;
   taken_at: string;
   created_at: string;
+  encounter_id?: string;
+  treatment_id?: string;
+  notes?: string;
+  uploaded_by?: string;
 }
 
 const TREATMENT_TYPES = [
@@ -116,9 +120,9 @@ export function ClinicalPhotos() {
 
       const { error: insertError } = await supabase.from("clinical_photos").insert({
         patient_id: uploadData.patient_id,
-        treatment_type: uploadData.treatment_type,
+        body_area: uploadData.treatment_type,
         photo_type: uploadData.photo_type,
-        file_path: urlData.publicUrl,
+        storage_path: urlData.publicUrl,
         taken_at: new Date().toISOString(),
       });
 
