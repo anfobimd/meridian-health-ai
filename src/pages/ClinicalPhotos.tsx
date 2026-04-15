@@ -539,3 +539,5 @@ export function ClinicalPhotos() {
     </div>
   );
 }
+
+export default ClinicalPhotos;
