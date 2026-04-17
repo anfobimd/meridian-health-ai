@@ -201,12 +201,18 @@ export function IntakeReviewPanel({ appointmentId, patientId }: { appointmentId?
 }
 
 // ── Video Panel ──
-function VideoPanel({ videoUrl, appointmentId, onCallEnd }: { videoUrl: string | null; appointmentId: string; onCallEnd: () => void }) {
+function VideoPanel({ videoUrl, appointmentId, patientId, onCallEnd }: { videoUrl: string | null; appointmentId: string; patientId?: string; onCallEnd: () => void }) {
   const [callActive, setCallActive] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [muted, setMuted] = useState(false);
   const [videoOn, setVideoOn] = useState(true);
+  const [creating, setCreating] = useState(false);
+  const [roomUrl, setRoomUrl] = useState<string | null>(videoUrl);
+  const [roomName, setRoomName] = useState<string | null>(null);
+  const [providerToken, setProviderToken] = useState<string | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => { setRoomUrl(videoUrl); }, [videoUrl]);
 
   useEffect(() => {
     if (callActive) {
@@ -218,15 +224,58 @@ function VideoPanel({ videoUrl, appointmentId, onCallEnd }: { videoUrl: string |
   }, [callActive]);
 
   const startCall = async () => {
-    setCallActive(true);
-    setElapsed(0);
-    // Update appointment status to in_progress
-    await supabase.from("appointments").update({ status: "in_progress" as any }).eq("id", appointmentId);
-    if (videoUrl) window.open(videoUrl, "_blank");
+    setCreating(true);
+    try {
+      // Create Daily.co room if we don't already have one
+      let url = roomUrl;
+      let name = roomName;
+      let token = providerToken;
+      if (!url && patientId) {
+        const { data, error } = await supabase.functions.invoke("daily-video", {
+          body: {
+            action: "create_room",
+            appointment_id: appointmentId,
+            patient_id: patientId,
+            max_participants: 4,
+            expires_in_minutes: 120,
+          },
+        });
+        if (error || !data?.room_url) {
+          toast.error(data?.error || "Failed to create video room");
+          setCreating(false);
+          return;
+        }
+        url = data.room_url;
+        name = data.room_name;
+        token = data.provider_token;
+        setRoomUrl(url);
+        setRoomName(name);
+        setProviderToken(token);
+      }
+      if (!url) {
+        toast.error("No video room available");
+        setCreating(false);
+        return;
+      }
+
+      setCallActive(true);
+      setElapsed(0);
+      await supabase.from("appointments").update({ status: "in_progress" as any }).eq("id", appointmentId);
+      // Open Daily.co room with provider token (owner privileges)
+      const joinUrl = token ? `${url}?t=${token}` : url;
+      window.open(joinUrl, "_blank", "width=1280,height=800");
+    } finally {
+      setCreating(false);
+    }
   };
 
   const endCall = async () => {
     setCallActive(false);
+    if (roomName) {
+      await supabase.functions.invoke("daily-video", {
+        body: { action: "end_session", room_name: roomName },
+      }).catch(() => {});
+    }
     onCallEnd();
   };
 
@@ -242,11 +291,16 @@ function VideoPanel({ videoUrl, appointmentId, onCallEnd }: { videoUrl: string |
             </div>
             <h3 className="text-lg font-semibold">Telehealth Visit</h3>
             <p className="text-sm text-muted-foreground max-w-xs">
-              {videoUrl ? "Click to start the video call. A new window will open." : "No video link configured for this appointment."}
+              {roomUrl
+                ? "Click to start the video call. A new window will open."
+                : patientId
+                  ? "Click Start to create a secure HIPAA-compliant video room."
+                  : "Patient information is required to start a video call."}
             </p>
           </div>
-          <Button size="lg" className="gap-2" onClick={startCall}>
-            <Video className="h-5 w-5" /> Start Call
+          <Button size="lg" className="gap-2" onClick={startCall} disabled={creating || !patientId}>
+            {creating ? <Loader2 className="h-5 w-5 animate-spin" /> : <Video className="h-5 w-5" />}
+            {creating ? "Creating room..." : "Start Call"}
           </Button>
           {videoUrl && (
             <Button variant="outline" size="sm" className="gap-1" onClick={() => window.open(videoUrl, "_blank")}>
@@ -521,7 +575,7 @@ export default function TelehealthVisit() {
 
         {/* Center: Video */}
         <ResizablePanel defaultSize={40} minSize={30}>
-          <VideoPanel videoUrl={appointment.video_room_url} appointmentId={appointmentId!} onCallEnd={handleCallEnd} />
+          <VideoPanel videoUrl={appointment.video_room_url} appointmentId={appointmentId!} patientId={appointment.patient_id} onCallEnd={handleCallEnd} />
         </ResizablePanel>
 
         <ResizableHandle withHandle />

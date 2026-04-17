@@ -59,6 +59,7 @@ import MasterCatalog from "./pages/MasterCatalog";
 import Benchmarks from "./pages/Benchmarks";
 import AutomationRules from "./pages/AutomationRules";
 import { AuditLog } from "./pages/AuditLog";
+import IntakeClearanceQueue from "./pages/IntakeClearanceQueue";
 import { PerformanceGoals } from "./pages/PerformanceGoals";
 import { ClinicalPhotos } from "./pages/ClinicalPhotos";
 import NotificationCenter from "./pages/NotificationCenter";
@@ -135,6 +136,7 @@ const App = () => (
                   <Route path="/benchmarks" element={<Benchmarks />} />
                   <Route path="/automation-rules" element={<AutomationRules />} />
                   <Route path="/audit-log" element={<AuditLog />} />
+                  <Route path="/intake-clearance" element={<IntakeClearanceQueue />} />
                 </Route>
 
                 <Route path="/notifications" element={<NotificationCenter />} />
