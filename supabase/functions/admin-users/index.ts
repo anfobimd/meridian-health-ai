@@ -138,9 +138,8 @@ Deno.serve(async (req) => {
       const { data: existing } = await admin.auth.admin.listUsers({ perPage: 200 });
       const match = existing?.users?.find(u => u.email?.toLowerCase() === email.trim().toLowerCase());
       if (match) {
-        await admin.from("user_roles").insert({ user_id: match.id, role: "super_admin" })
-          .then(r => r)
-          .catch(() => {/* may already exist */});
+        const { error: insErr } = await admin.from("user_roles").insert({ user_id: match.id, role: "super_admin" });
+        if (insErr && !insErr.message.includes("duplicate")) {/* ignore */}
       }
 
       return jsonResponse({ added: true, email, promoted_existing: !!match });
@@ -176,9 +175,8 @@ Deno.serve(async (req) => {
 
       // Assign role if specified
       if (role && VALID_ROLES.includes(role) && invited?.user) {
-        await admin.from("user_roles").insert({ user_id: invited.user.id, role })
-          .then(r => r)
-          .catch(() => {/* ignore duplicate */});
+        const { error: insErr } = await admin.from("user_roles").insert({ user_id: invited.user.id, role });
+        if (insErr && !insErr.message.includes("duplicate")) {/* ignore */}
       }
 
       return jsonResponse({ invited: true, email, user_id: invited?.user?.id, role });
