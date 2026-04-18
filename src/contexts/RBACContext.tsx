@@ -398,22 +398,7 @@ export function RBACProvider({ children }: { children: ReactNode }) {
       const fetchedRole = (rpData?.role as AppRole) ?? "user";
       setRole(fetchedRole);
 
-      // Fetch clinic context if multi-clinic is active
-      const { data: staffData, error: staffError } = await supabase
-        .from("clinic_staff")
-        .select("clinic_id")
-        .eq("user_id", userId)
-        .eq("is_active", true)
-        .limit(1)
-        .maybeSingle();
-
-      if (staffError) {
-        console.warn("[RBAC] Failed to fetch clinic staff:", staffError.message);
-      }
-
-      if (staffData?.clinic_id) {
-        setClinicId(staffData.clinic_id);
-      }
+      // Multi-clinic context not yet enabled (no clinic_staff table); leave clinicId unset.
     } catch (err) {
       console.error("[RBAC] Unexpected error in fetchRole:", err);
       // Default to "user" role so the app doesn't hang
