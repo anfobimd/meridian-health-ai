@@ -11,8 +11,8 @@
 // Also supports direct component calls with { to, templateId, data } (used by
 // GFEGenerator, PhotoConsentGate, PostProcedureInstructions).
 //
-// Uses the Resend API via RESEND_API_KEY env var. Falls back to logging when
-// the key is not configured (dev/preview environments).
+// Uses SendGrid (SENDGRID_API_KEY) — falls back to Resend (RESEND_API_KEY) if
+// SendGrid isn't configured, and finally to console logging in dev/preview.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
@@ -99,29 +99,50 @@ interface SendParams {
   text?: string;
 }
 
-async function sendViaResend(params: SendParams): Promise<{ success: boolean; messageId: string; note?: string }> {
-  const resendKey = Deno.env.get("RESEND_API_KEY");
+function parseFromAddress(raw: string): { email: string; name?: string } {
+  // Supports "Name <email>" and bare "email" formats.
+  const match = raw.match(/^\s*(.*?)\s*<([^>]+)>\s*$/);
+  if (match) return { name: match[1] || undefined, email: match[2] };
+  return { email: raw.trim() };
+}
 
-  if (!resendKey) {
-    // Dev/preview fallback — log the email instead of sending
-    console.log("[send-email] No RESEND_API_KEY — logging email:", {
-      to: params.to,
+async function sendViaSendGrid(params: SendParams, apiKey: string): Promise<{ success: boolean; messageId: string }> {
+  const fromRaw = Deno.env.get("EMAIL_FROM") || "Meridian AI Care <noreply@meridian-ai-care.lovable.app>";
+  const from = parseFromAddress(fromRaw);
+
+  const res = await fetch("https://api.sendgrid.com/v3/mail/send", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      personalizations: [{ to: [{ email: params.to }] }],
+      from: { email: from.email, name: from.name },
       subject: params.subject,
-      htmlLength: params.html.length,
-    });
-    return {
-      success: true,
-      messageId: `dev-${crypto.randomUUID().slice(0, 8)}`,
-      note: "Email logged (RESEND_API_KEY not configured). Set the key in Supabase secrets for production sending.",
-    };
+      content: [
+        { type: "text/html", value: params.html },
+        ...(params.text ? [{ type: "text/plain", value: params.text }] : []),
+      ],
+    }),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`SendGrid API error [${res.status}]: ${errText}`);
   }
 
-  const fromAddress = Deno.env.get("EMAIL_FROM") || "Meridian AI Care <noreply@meridian-ai-care.lovable.app>";
+  // SendGrid returns a message ID in the X-Message-Id response header.
+  const messageId = res.headers.get("x-message-id") || "sent";
+  return { success: true, messageId };
+}
 
+async function sendViaResend(params: SendParams, apiKey: string): Promise<{ success: boolean; messageId: string }> {
+  const fromAddress = Deno.env.get("EMAIL_FROM") || "Meridian AI Care <noreply@meridian-ai-care.lovable.app>";
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${resendKey}`,
+      Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
@@ -132,14 +153,29 @@ async function sendViaResend(params: SendParams): Promise<{ success: boolean; me
       text: params.text || undefined,
     }),
   });
-
   const data = await res.json();
-
-  if (!res.ok) {
-    throw new Error(`Resend API error [${res.status}]: ${JSON.stringify(data)}`);
-  }
-
+  if (!res.ok) throw new Error(`Resend API error [${res.status}]: ${JSON.stringify(data)}`);
   return { success: true, messageId: data.id || "sent" };
+}
+
+async function sendEmail(params: SendParams): Promise<{ success: boolean; messageId: string; note?: string }> {
+  const sendgridKey = Deno.env.get("SENDGRID_API_KEY");
+  const resendKey = Deno.env.get("RESEND_API_KEY");
+
+  if (sendgridKey) return await sendViaSendGrid(params, sendgridKey);
+  if (resendKey) return await sendViaResend(params, resendKey);
+
+  // Dev/preview fallback — log the email instead of sending
+  console.log("[send-email] No email provider configured — logging email:", {
+    to: params.to,
+    subject: params.subject,
+    htmlLength: params.html.length,
+  });
+  return {
+    success: true,
+    messageId: `dev-${crypto.randomUUID().slice(0, 8)}`,
+    note: "Email logged (SENDGRID_API_KEY / RESEND_API_KEY not configured).",
+  };
 }
 
 // ── Resolve patient email from ID ───────────────────────────────────────
@@ -186,7 +222,7 @@ Deno.serve(async (req) => {
     if (templateId && !action) {
       const recipientEmail = await resolveEmail(admin, body.to);
       const rendered = renderTemplate(templateId, body.data || {});
-      result = await sendViaResend({
+      result = await sendEmail({
         to: recipientEmail,
         subject: rendered.subject,
         html: rendered.html,
@@ -203,7 +239,7 @@ Deno.serve(async (req) => {
         );
       }
       const recipientEmail = await resolveEmail(admin, to);
-      result = await sendViaResend({ to: recipientEmail, subject, html, text });
+      result = await sendEmail({ to: recipientEmail, subject, html, text });
     } else if (action === "send_template") {
       // Dynamic template
       const { to, template_id, dynamic_data } = body;
@@ -215,7 +251,7 @@ Deno.serve(async (req) => {
       }
       const recipientEmail = await resolveEmail(admin, to);
       const rendered = renderTemplate(template_id, dynamic_data || {});
-      result = await sendViaResend({ to: recipientEmail, subject: rendered.subject, html: rendered.html });
+      result = await sendEmail({ to: recipientEmail, subject: rendered.subject, html: rendered.html });
     } else if (action === "intake_form") {
       // Intake form email
       const { patient_email, patient_name, appointment_id, treatment_id, scheduled_start } = body;
@@ -238,7 +274,7 @@ Deno.serve(async (req) => {
         intake_url: intakeUrl,
       });
 
-      result = await sendViaResend({ to: patient_email, subject: rendered.subject, html: rendered.html });
+      result = await sendEmail({ to: patient_email, subject: rendered.subject, html: rendered.html });
 
       // Log to communication timeline
       try {
