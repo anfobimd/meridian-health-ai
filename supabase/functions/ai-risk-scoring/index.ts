@@ -207,7 +207,7 @@ Only include the JSON array, no other text.`;
             const summaries: Array<{ patient_id: string; summary: string }> = JSON.parse(jsonMatch[0]);
             summaries.forEach((s) => {
               const score = topRisk.find((r) => r.patient_id === s.patient_id);
-              if (score) score.ai_summary = s.summary;
+              if (score) (score as any).ai_summary = s.summary;
             });
           }
         }
@@ -248,7 +248,7 @@ Only include the JSON array, no other text.`;
     });
   } catch (err) {
     console.error("Risk scoring error:", err);
-    return new Response(JSON.stringify({ error: err.message }), {
+    return new Response(JSON.stringify({ error: err instanceof Error ? err.message : "Unknown error" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

@@ -13,18 +13,6 @@ Deno.serve(async (req) => {
   try {
     const { patient_id, procedure_type, custom_instructions, encounter_id, patient_name, auto_send } = await req.json();
 
-    // Allow either patient_id or encounter_id
-    let resolvedPatientId = patient_id;
-    if (!resolvedPatientId && encounter_id) {
-      const { data: enc } = await supabaseAdmin.from("encounters").select("patient_id").eq("id", encounter_id).single();
-      resolvedPatientId = enc?.patient_id;
-    }
-    if (!resolvedPatientId) {
-      return new Response(JSON.stringify({ error: "patient_id or encounter_id required" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
       return new Response(JSON.stringify({ error: "AI not configured", aiUnavailable: true }), {
@@ -36,6 +24,18 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
+
+    // Allow either patient_id or encounter_id
+    let resolvedPatientId = patient_id;
+    if (!resolvedPatientId && encounter_id) {
+      const { data: enc } = await supabaseAdmin.from("encounters").select("patient_id").eq("id", encounter_id).single();
+      resolvedPatientId = enc?.patient_id;
+    }
+    if (!resolvedPatientId) {
+      return new Response(JSON.stringify({ error: "patient_id or encounter_id required" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     // Get patient info
     const { data: patient } = await supabaseAdmin.from("patients")
@@ -64,7 +64,9 @@ Deno.serve(async (req) => {
       if (template) templateBody = template.body;
     }
 
-    const treatmentName = procedure_type || recentApt?.treatments?.name || "general visit";
+    const aptTreatments = recentApt?.treatments as { name?: string } | { name?: string }[] | null | undefined;
+    const treatmentFromApt = Array.isArray(aptTreatments) ? aptTreatments[0]?.name : aptTreatments?.name;
+    const treatmentName = procedure_type || treatmentFromApt || "general visit";
     const patientFirstName = patient_name?.split(" ")[0] || patient?.first_name || "the patient";
 
     const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {

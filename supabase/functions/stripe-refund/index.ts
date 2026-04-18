@@ -64,17 +64,19 @@ Deno.serve(async (req) => {
     }
 
     // Log to audit (best-effort)
-    await admin.from("audit_logs").insert({
-      resource_type: "stripe_refund",
-      resource_id: refund.id,
-      action: "refund_issued",
-      details: {
-        payment_intent_id,
-        amount: refund.amount,
-        status: refund.status,
-        metadata,
-      },
-    }).catch(() => {});
+    try {
+      await admin.from("audit_logs").insert({
+        resource_type: "stripe_refund",
+        resource_id: refund.id,
+        action: "refund_issued",
+        details: {
+          payment_intent_id,
+          amount: refund.amount,
+          status: refund.status,
+          metadata,
+        },
+      });
+    } catch { /* best-effort */ }
 
     return new Response(JSON.stringify({
       refund_id: refund.id,

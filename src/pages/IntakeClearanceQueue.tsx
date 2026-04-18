@@ -97,7 +97,7 @@ export default function IntakeClearanceQueue() {
 
   return (
     <div className="space-y-6">
-      <Breadcrumbs items={[{ label: "Dashboard", href: "/" }, { label: "Intake Clearance Queue" }]} />
+      <Breadcrumbs />
 
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2">

@@ -137,7 +137,7 @@ serve(async (req) => {
     });
   } catch (e) {
     console.error("automation-advisor error:", e);
-    return new Response(JSON.stringify({ error: e.message }), {
+    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
