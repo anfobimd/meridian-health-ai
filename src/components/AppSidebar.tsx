@@ -134,11 +134,16 @@ const navSections: NavSection[] = [
 
 function filterNav(sections: NavSection[], role: string | null): NavSection[] {
   const r = role || "user";
+  // super_admin sees everything admin sees (and more). Nav items were authored
+  // with "admin" in their roles list; alias super_admin → admin for matching.
+  const effectiveRoles = r === "super_admin" ? ["admin", "super_admin"] : [r];
+  const matches = (allowed: string[] | undefined) =>
+    !allowed || effectiveRoles.some((role) => allowed.includes(role));
   return sections
-    .filter((s) => !s.roles || s.roles.includes(r))
+    .filter((s) => matches(s.roles))
     .map((s) => ({
       ...s,
-      items: s.items.filter((i) => !i.roles || i.roles.includes(r)),
+      items: s.items.filter((i) => matches(i.roles)),
     }))
     .filter((s) => s.items.length > 0);
 }
