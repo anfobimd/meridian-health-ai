@@ -200,13 +200,14 @@ ${Object.entries(reviewerMap).map(([id, recs]) => {
     });
   } catch (error) {
     const latency = Date.now() - startTime;
+    const msg = error instanceof Error ? error.message : "Unknown error";
     await supabase.from("ai_api_calls").insert({
       function_name: "ai-monthly-report",
       status: "error",
-      error_message: error.message,
+      error_message: msg,
       latency_ms: latency,
     });
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ error: msg }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
