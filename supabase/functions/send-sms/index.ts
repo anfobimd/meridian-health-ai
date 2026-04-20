@@ -1,8 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 const corsHeaders = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
 
-const GATEWAY_URL = "https://connector-gateway.lovable.dev/twilio";
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -16,10 +14,10 @@ Deno.serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
-    const TWILIO_API_KEY = Deno.env.get("TWILIO_API_KEY");
-    if (!TWILIO_API_KEY) throw new Error("TWILIO_API_KEY is not configured");
+    const accountSid = Deno.env.get("TWILIO_ACCOUNT_SID");
+    const authToken = Deno.env.get("TWILIO_AUTH_TOKEN");
+    const defaultFrom = Deno.env.get("TWILIO_PHONE_NUMBER");
+    if (!accountSid || !authToken) throw new Error("TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN must be configured");
 
     // Verify caller
     const userClient = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authHeader } } });
@@ -32,19 +30,19 @@ Deno.serve(async (req) => {
     if (!to || !body) {
       return new Response(JSON.stringify({ error: "to and body required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
+    const fromNumber = from || defaultFrom;
+    if (!fromNumber) {
+      return new Response(JSON.stringify({ error: "from number required (set TWILIO_PHONE_NUMBER or pass `from`)" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
-    const response = await fetch(`${GATEWAY_URL}/Messages.json`, {
+    const basicAuth = btoa(`${accountSid}:${authToken}`);
+    const response = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "X-Connection-Api-Key": TWILIO_API_KEY,
+        Authorization: `Basic ${basicAuth}`,
         "Content-Type": "application/x-www-form-urlencoded",
       },
-      body: new URLSearchParams({
-        To: to,
-        From: from || "+15005550006",
-        Body: body,
-      }),
+      body: new URLSearchParams({ To: to, From: fromNumber, Body: body }),
     });
 
     const data = await response.json();

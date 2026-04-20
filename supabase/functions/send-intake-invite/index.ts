@@ -5,7 +5,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const GATEWAY_URL = "https://connector-gateway.lovable.dev/twilio";
 const APP_URL = "https://meridian-ai-care.lovable.app";
 
 Deno.serve(async (req) => {
@@ -59,10 +58,11 @@ Deno.serve(async (req) => {
     // Send SMS via Twilio if channel is sms and phone provided
     let smsSent = false;
     if (channel === "sms" && phone) {
-      const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-      const TWILIO_API_KEY = Deno.env.get("TWILIO_API_KEY");
+      const accountSid = Deno.env.get("TWILIO_ACCOUNT_SID");
+      const authToken = Deno.env.get("TWILIO_AUTH_TOKEN");
+      const fromNumber = Deno.env.get("TWILIO_PHONE_NUMBER");
 
-      if (LOVABLE_API_KEY && TWILIO_API_KEY) {
+      if (accountSid && authToken && fromNumber) {
         try {
           // Fetch patient name for personalized message
           const { data: patient } = await supabaseAdmin
@@ -73,16 +73,16 @@ Deno.serve(async (req) => {
 
           const smsBody = `Hi ${patient?.first_name || "there"}, your intake form is ready. Please complete it before your visit: ${intakeUrl}`;
 
-          const smsRes = await fetch(`${GATEWAY_URL}/Messages.json`, {
+          const basicAuth = btoa(`${accountSid}:${authToken}`);
+          const smsRes = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`, {
             method: "POST",
             headers: {
-              Authorization: `Bearer ${LOVABLE_API_KEY}`,
-              "X-Connection-Api-Key": TWILIO_API_KEY,
+              Authorization: `Basic ${basicAuth}`,
               "Content-Type": "application/x-www-form-urlencoded",
             },
             body: new URLSearchParams({
               To: phone,
-              From: "+15005550006",
+              From: fromNumber,
               Body: smsBody,
             }),
           });
