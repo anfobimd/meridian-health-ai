@@ -14,9 +14,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
-
     const extractPrompt = `You are a lab value extractor. Extract every value from this lab document that matches the list below. Return ONLY a valid JSON object — no explanation, no markdown, no backticks. Use null for values not found. All numeric values must be numbers, not strings.
 
 Extract these keys exactly:
@@ -60,36 +57,21 @@ If a value is reported in different units, convert to the target unit. Include v
       image_url: { url: `data:${mediaType};base64,${base64Data}` },
     };
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [{
+    const response = await chatCompletion({
+messages: [{
           role: "user",
           content: [
             imageContent,
             { type: "text", text: extractPrompt },
-          ],
+          ]
         }],
         temperature: 0.1,
-        max_tokens: 1024,
-      }),
-    });
+        max_tokens: 1024
+      });
 
-    if (!response.ok) {
-      const status = response.status;
-      if (status === 429) return new Response(JSON.stringify({ error: "Rate limited. Please try again." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      if (status === 402) return new Response(JSON.stringify({ error: "AI credits exhausted." }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      const errText = await response.text();
-      console.error("AI error:", status, errText);
-      return new Response(JSON.stringify({ error: "Lab extraction failed" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
+    
 
-    const data = await response.json();
+    const data = response;
     const raw = data.choices?.[0]?.message?.content || "{}";
     const clean = raw.replace(/```json|```/g, "").trim();
 

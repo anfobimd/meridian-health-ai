@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { chatCompletion } from "../_shared/bedrock.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -10,8 +11,6 @@ serve(async (req) => {
 
   try {
     const { patient, appointment, treatment, provider, priorNotes } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
     const systemPrompt = `You are a clinical documentation AI assistant for a medspa/wellness EHR called Meridian. Generate a professional SOAP note based on the provided appointment context.
 
@@ -49,15 +48,8 @@ PROVIDER: ${provider?.first_name || ""} ${provider?.last_name || ""}, ${provider
 
 ${priorNotes?.length ? `PRIOR NOTES (most recent first):\n${priorNotes.map((n: any) => `- ${n.assessment || ""} | Plan: ${n.plan || ""}`).join("\n")}` : "No prior notes available."}`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
+    const response = await chatCompletion({
+messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
@@ -72,27 +64,19 @@ ${priorNotes?.length ? `PRIOR NOTES (most recent first):\n${priorNotes.map((n: a
                 subjective: { type: "string" },
                 objective: { type: "string" },
                 assessment: { type: "string" },
-                plan: { type: "string" },
+                plan: { type: "string" }
               },
               required: ["subjective", "objective", "assessment", "plan"],
-              additionalProperties: false,
-            },
-          },
+              additionalProperties: false
+            }
+          }
         }],
-        tool_choice: { type: "function", function: { name: "generate_soap_note" } },
-      }),
-    });
+        tool_choice: { type: "function", function: { name: "generate_soap_note" } }
+      });
 
-    if (!response.ok) {
-      const status = response.status;
-      if (status === 429) return new Response(JSON.stringify({ error: "Rate limited. Please try again in a moment." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      if (status === 402) return new Response(JSON.stringify({ error: "AI credits exhausted. Please add funds." }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      const t = await response.text();
-      console.error("AI error:", status, t);
-      return new Response(JSON.stringify({ error: "AI generation failed" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
+    
 
-    const result = await response.json();
+    const result = response;
     const toolCall = result.choices?.[0]?.message?.tool_calls?.[0];
     const soapNote = toolCall ? JSON.parse(toolCall.function.arguments) : null;
 

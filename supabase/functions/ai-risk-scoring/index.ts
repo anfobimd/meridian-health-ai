@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { chatCompletion } from "../_shared/bedrock.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -7,8 +8,6 @@ const corsHeaders = {
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -185,21 +184,13 @@ Respond with valid JSON array of objects: [{"patient_id": "...", "summary": "...
 Only include the JSON array, no other text.`;
 
       try {
-        const aiResp = await fetch("https://api.lovable.dev/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          },
-          body: JSON.stringify({
-            model: "google/gemini-2.5-flash",
-            messages: [{ role: "user", content: prompt }],
-            temperature: 0.3,
-          }),
-        });
+        const aiResp = await chatCompletion({
+messages: [{ role: "user", content: prompt }],
+            temperature: 0.3
+          });
 
         if (aiResp.ok) {
-          const aiData = await aiResp.json();
+          const aiData = aiResp;
           const content = aiData.choices?.[0]?.message?.content ?? "";
           // Extract JSON from response
           const jsonMatch = content.match(/\[[\s\S]*\]/);

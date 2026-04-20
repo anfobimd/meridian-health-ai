@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { chatCompletion } from "../_shared/bedrock.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,13 +13,6 @@ Deno.serve(async (req) => {
 
   try {
     const { patient_id, procedure_type, custom_instructions, encounter_id, patient_name, auto_send } = await req.json();
-
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      return new Response(JSON.stringify({ error: "AI not configured", aiUnavailable: true }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
 
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -69,19 +63,12 @@ Deno.serve(async (req) => {
     const treatmentName = procedure_type || treatmentFromApt || "general visit";
     const patientFirstName = patient_name?.split(" ")[0] || patient?.first_name || "the patient";
 
-    const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [{
-          role: "system",
-          content: `You are a medical aesthetics aftercare specialist. Generate personalized aftercare instructions for a patient.
+    const aiData = await chatCompletion({
+      messages: [{
+        role: "system",
+        content: `You are a medical aesthetics aftercare specialist. Generate personalized aftercare instructions for a patient.
 
-Return JSON:
+Return ONLY a JSON object (no markdown, no prose) with these keys:
 - "subject": short subject line
 - "body": personalized aftercare message (3-5 paragraphs, warm professional tone)
 - "keyInstructions": string[] (3-6 bullet points of key do's/don'ts)
@@ -90,38 +77,19 @@ Return JSON:
 
 ${templateBody ? `Base template (personalize this):\n${templateBody}\n` : ""}
 ${patient?.allergies?.length ? `Patient allergies: ${patient.allergies.join(", ")}` : ""}
-${custom_instructions ? `Additional instructions: ${custom_instructions}` : ""}`
-        }, {
-          role: "user",
-          content: `Generate aftercare instructions for ${patientFirstName} after their ${treatmentName} procedure.`,
-        }],
-        response_format: { type: "json_object" },
-        temperature: 0.3,
-      }),
+${custom_instructions ? `Additional instructions: ${custom_instructions}` : ""}`,
+      }, {
+        role: "user",
+        content: `Generate aftercare instructions for ${patientFirstName} after their ${treatmentName} procedure.`,
+      }],
+      temperature: 0.3,
     });
 
-    if (!aiRes.ok) {
-      const status = aiRes.status;
-      if (status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limited" }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (status === 402) {
-        return new Response(JSON.stringify({ error: "AI credits exhausted" }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      console.error("AI error:", await aiRes.text());
-      return new Response(JSON.stringify({ error: "AI generation failed" }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const aiData = await aiRes.json();
     let result: any = {};
     try {
-      result = JSON.parse(aiData.choices?.[0]?.message?.content || "{}");
+      const raw = aiData.choices?.[0]?.message?.content || "{}";
+      const clean = raw.replace(/```json|```/g, "").trim();
+      result = JSON.parse(clean);
     } catch { result = { error: "Failed to parse AI response" }; }
 
     // Auto-send: log to patient communication

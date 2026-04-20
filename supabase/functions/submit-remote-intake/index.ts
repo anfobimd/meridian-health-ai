@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { chatCompletion } from "../_shared/bedrock.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -233,11 +234,10 @@ Deno.serve(async (req) => {
 
     // ── Auto-trigger AI hormone recommendation (fire-and-forget) ──
     if (hormoneVisit?.id) {
-      const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
       const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
       const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
 
-      if (LOVABLE_API_KEY && SUPABASE_URL && SUPABASE_ANON_KEY) {
+      if (SUPABASE_URL && SUPABASE_ANON_KEY) {
         // Fire-and-forget: call ai-hormone-rec in background
         (async () => {
           try {

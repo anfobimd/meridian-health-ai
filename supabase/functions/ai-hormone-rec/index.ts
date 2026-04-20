@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { chatCompletion } from "../_shared/bedrock.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -43,8 +44,6 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
     // ── MODE: prescribe_check ──
     if (body.mode === "prescribe_check") {
@@ -94,12 +93,8 @@ Frequency: ${data.frequency || "Not specified"}
 
 Provide dosing recommendation, contraindication check, titration schedule, and monitoring labs.`;
 
-      const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "google/gemini-3-flash-preview",
-          messages: [{ role: "user", content: prompt }],
+      const aiRes = await chatCompletion({
+messages: [{ role: "user", content: prompt }],
           tools: [{
             type: "function",
             function: {
@@ -113,23 +108,18 @@ Provide dosing recommendation, contraindication check, titration schedule, and m
                   monitoring_labs: { type: "array", items: { type: "string" } },
                   contraindications: { type: "array", items: { type: "string" } },
                   notes: { type: "string" },
-                  safety_level: { type: "string", enum: ["safe", "caution", "contraindicated"] },
+                  safety_level: { type: "string", enum: ["safe", "caution", "contraindicated"] }
                 },
-                required: ["suggested_dosage", "monitoring_labs", "contraindications", "safety_level"],
-              },
-            },
+                required: ["suggested_dosage", "monitoring_labs", "contraindications", "safety_level"]
+              }
+            }
           }],
-          tool_choice: { type: "function", function: { name: "prescribe_validation" } },
-        }),
-      });
+          tool_choice: { type: "function", function: { name: "prescribe_validation" } }
+        });
 
-      if (!aiRes.ok) {
-        if (aiRes.status === 429) return new Response(JSON.stringify({ error: "Rate limited" }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-        if (aiRes.status === 402) return new Response(JSON.stringify({ error: "Credits exhausted" }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-        throw new Error(`AI error: ${aiRes.status}`);
-      }
+      
 
-      const aiData = await aiRes.json();
+      const aiData = aiRes;
       const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
       const result = toolCall ? JSON.parse(toolCall.function.arguments) : { suggested_dosage: "Unable to validate", monitoring_labs: [], contraindications: [], safety_level: "caution" };
 
@@ -203,12 +193,8 @@ ${priorLabSummary}
 
 Provide full clinical recommendation for all focus areas.`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
+    const response = await chatCompletion({
+messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
         tools: [{
           type: "function",
           function: {
@@ -220,24 +206,16 @@ Provide full clinical recommendation for all focus areas.`;
                 summary: { type: "string" },
                 treatment_recommendation: { type: "string" },
                 monitoring_plan: { type: "string" },
-                risk_flags: { type: "string" },
+                risk_flags: { type: "string" }
               },
               required: ["summary", "treatment_recommendation", "monitoring_plan", "risk_flags"],
-              additionalProperties: false,
-            },
-          },
+              additionalProperties: false
+            }
+          }
         }],
-        tool_choice: { type: "function", function: { name: "hormone_recommendation" } },
-      }),
-    });
-
-    if (!response.ok) {
-      if (response.status === 429) return new Response(JSON.stringify({ error: "Rate limited." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      if (response.status === 402) return new Response(JSON.stringify({ error: "AI credits exhausted." }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      throw new Error(`AI error: ${response.status}`);
-    }
-
-    const result = await response.json();
+        tool_choice: { type: "function", function: { name: "hormone_recommendation" } }
+      });
+    const result = response;
     const toolCall = result.choices?.[0]?.message?.tool_calls?.[0];
     const rec = toolCall ? JSON.parse(toolCall.function.arguments) : null;
     if (!rec) throw new Error("Failed to parse AI response");

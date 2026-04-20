@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { chatCompletion } from "../_shared/bedrock.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -30,8 +31,6 @@ serve(async (req) => {
 
     // ── MODE: telehealth_summary ──
     if (mode === "telehealth_summary") {
-      const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-      if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
       // Gather SOAP notes + prescriptions from this visit
       const [noteRes, rxRes] = await Promise.all([
@@ -66,12 +65,8 @@ Generate a structured visit summary with:
 4. patient_instructions: 3-5 bullet points for the patient
 5. follow_up_days: number of days until recommended follow-up`;
 
-      const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "google/gemini-3-flash-preview",
-          messages: [{ role: "user", content: prompt }],
+      const aiRes = await chatCompletion({
+messages: [{ role: "user", content: prompt }],
           tools: [{
             type: "function",
             function: {
@@ -84,23 +79,18 @@ Generate a structured visit summary with:
                   prescriptions_summary: { type: "string" },
                   follow_up_recommendation: { type: "string" },
                   patient_instructions: { type: "array", items: { type: "string" } },
-                  follow_up_days: { type: "number" },
+                  follow_up_days: { type: "number" }
                 },
-                required: ["visit_summary", "follow_up_recommendation", "follow_up_days"],
-              },
-            },
+                required: ["visit_summary", "follow_up_recommendation", "follow_up_days"]
+              }
+            }
           }],
-          tool_choice: { type: "function", function: { name: "telehealth_summary" } },
-        }),
-      });
+          tool_choice: { type: "function", function: { name: "telehealth_summary" } }
+        });
 
-      if (!aiRes.ok) {
-        if (aiRes.status === 429) return new Response(JSON.stringify({ error: "Rate limited" }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-        if (aiRes.status === 402) return new Response(JSON.stringify({ error: "Credits exhausted" }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-        throw new Error(`AI error: ${aiRes.status}`);
-      }
+      
 
-      const aiData = await aiRes.json();
+      const aiData = aiRes;
       const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
       const summary = toolCall ? JSON.parse(toolCall.function.arguments) : { visit_summary: "Unable to generate", follow_up_days: 14 };
 
@@ -169,20 +159,13 @@ Generate a structured visit summary with:
     // AI follow-up suggestion
     let followUpSuggestion = "Schedule follow-up per treatment protocol";
     let followUpDays: number | null = null;
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (LOVABLE_API_KEY && apt) {
+    if (apt) {
       try {
-        const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-          method: "POST",
-          headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            model: "google/gemini-2.5-flash-lite",
-            messages: [{ role: "user", content: `Patient ${apt.patients?.first_name} ${apt.patients?.last_name} completed a ${apt.treatments?.name || "general"} visit. Respond in JSON: {"suggestion":"one sentence follow-up recommendation","days":number}. Be specific.` }],
-            response_format: { type: "json_object" },
-          }),
-        });
+        const aiRes = await chatCompletion({
+messages: [{ role: "user", content: `Patient ${apt.patients?.first_name} ${apt.patients?.last_name} completed a ${apt.treatments?.name || "general"} visit. Respond in JSON: {"suggestion":"one sentence follow-up recommendation","days":number}. Be specific.` }]
+});
         if (aiRes.ok) {
-          const d = await aiRes.json();
+          const d = aiRes;
           try {
             const parsed = JSON.parse(d.choices?.[0]?.message?.content || "");
             followUpSuggestion = parsed.suggestion || followUpSuggestion;

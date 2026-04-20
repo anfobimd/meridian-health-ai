@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { chatCompletion } from "../_shared/bedrock.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -67,18 +68,8 @@ Generate a brief with these sections (keep each to 1-2 sentences):
 
 Return as JSON with keys: visit_summary, alerts (array of strings), last_treatment, todays_prep`;
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
-
-    const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [{ role: "user", content: contextPrompt }],
+    const aiRes = await chatCompletion({
+messages: [{ role: "user", content: contextPrompt }],
         tools: [{
           type: "function",
           function: {
@@ -90,24 +81,18 @@ Return as JSON with keys: visit_summary, alerts (array of strings), last_treatme
                 visit_summary: { type: "string" },
                 alerts: { type: "array", items: { type: "string" } },
                 last_treatment: { type: "string" },
-                todays_prep: { type: "string" },
+                todays_prep: { type: "string" }
               },
-              required: ["visit_summary", "alerts", "last_treatment", "todays_prep"],
-            },
-          },
+              required: ["visit_summary", "alerts", "last_treatment", "todays_prep"]
+            }
+          }
         }],
-        tool_choice: { type: "function", function: { name: "patient_brief" } },
-      }),
-    });
+        tool_choice: { type: "function", function: { name: "patient_brief" } }
+      });
 
-    if (!aiRes.ok) {
-      const status = aiRes.status;
-      if (status === 429) return new Response(JSON.stringify({ error: "Rate limited" }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      if (status === 402) return new Response(JSON.stringify({ error: "Credits exhausted" }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      throw new Error(`AI gateway error: ${status}`);
-    }
+    
 
-    const aiData = await aiRes.json();
+    const aiData = aiRes;
     const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
     const brief = toolCall ? JSON.parse(toolCall.function.arguments) : {
       visit_summary: "Unable to generate brief",

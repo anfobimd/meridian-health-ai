@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { chatCompletion } from "../_shared/bedrock.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -18,17 +19,6 @@ Deno.serve(async (req) => {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      return new Response(JSON.stringify({
-        intent: "general",
-        confidence: 0,
-        draftReply: "",
-        aiUnavailable: true,
-      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-
     // Get patient context if available
     let patientContext = "";
     if (patient_id) {
@@ -45,54 +35,27 @@ Deno.serve(async (req) => {
       }
     }
 
-    const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [{
+    const aiRes = await chatCompletion({
+messages: [{
           role: "system",
           content: `You are a front-desk message classifier for a medical aesthetics clinic. Classify the inbound patient message and draft a professional reply.
-
 Return JSON:
 - "intent": one of "appointment_request", "cancellation", "reschedule", "pricing", "aftercare", "complaint", "lab_results", "refill", "general"
 - "confidence": 0.0-1.0
 - "urgency": "low" | "medium" | "high"
 - "draftReply": a professional, warm reply (2-3 sentences max). Don't confirm appointments — say the team will follow up.
 - "suggestedAction": brief action for staff (e.g. "Check availability for next week", "Escalate to manager")
-
 ${patientContext}Channel: ${channel || "sms"}`
         }, {
           role: "user",
-          content: message,
+          content: message
         }],
-        response_format: { type: "json_object" },
-        temperature: 0.2,
-      }),
-    });
+temperature: 0.2
+      });
 
-    if (!aiRes.ok) {
-      const status = aiRes.status;
-      if (status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limited, please try again later" }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (status === 402) {
-        return new Response(JSON.stringify({ error: "AI credits exhausted" }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      console.error("AI call failed:", await aiRes.text());
-      return new Response(JSON.stringify({
-        intent: "general", confidence: 0, draftReply: "", aiUnavailable: true,
-      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
+    
 
-    const aiData = await aiRes.json();
+    const aiData = aiRes;
     let result = {};
     try {
       result = JSON.parse(aiData.choices?.[0]?.message?.content || "{}");

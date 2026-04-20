@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { chatCompletion } from "../_shared/bedrock.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,32 +13,16 @@ Deno.serve(async (req) => {
     const { mode, patient_id, purchase_id, data } = await req.json();
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const sb = createClient(supabaseUrl, supabaseKey);
-
-    const lovableKey = Deno.env.get("LOVABLE_API_KEY");
-    if (!lovableKey) throw new Error("LOVABLE_API_KEY not set");
-
-    const callAI = async (systemPrompt: string, userPrompt: string) => {
-      const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${lovableKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "google/gemini-3-flash-preview",
-          messages: [
+    const sb = createClient(supabaseUrl, supabaseKey);    const callAI = async (systemPrompt: string, userPrompt: string) => {
+      const res = await chatCompletion({
+messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt },
           ],
-          temperature: 0.7,
-        }),
-      });
-      if (!res.ok) {
-        const errText = await res.text();
-        console.error("AI gateway error:", res.status, errText);
-        if (res.status === 429) throw new Error("Rate limited — please try again in a moment");
-        if (res.status === 402) throw new Error("AI credits exhausted — add funds in Settings > Workspace > Usage");
-        throw new Error(`AI gateway error: ${res.status}`);
-      }
-      const json = await res.json();
+          temperature: 0.7
+        });
+      
+      const json = res;
       return json.choices?.[0]?.message?.content || "";
     };
 

@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
+import { chatCompletion } from "../_shared/bedrock.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,16 +14,9 @@ serve(async (req) => {
     const { mode, data } = await req.json();
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const sb = createClient(supabaseUrl, serviceKey);
-    const apiKey = Deno.env.get("LOVABLE_API_KEY");
-
-    async function callAI(systemPrompt: string, userPrompt: string) {
-      const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "google/gemini-3-flash-preview",
-          messages: [
+    const sb = createClient(supabaseUrl, serviceKey);    async function callAI(systemPrompt: string, userPrompt: string) {
+      const res = await chatCompletion({
+messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt },
           ],
@@ -39,17 +33,16 @@ serve(async (req) => {
                   optimal_send_time: { type: "string", description: "ISO time string for best send time" },
                   subject: { type: "string" },
                   channel_recommendation: { type: "string", enum: ["sms", "email", "both"] },
-                  reasoning: { type: "string" },
+                  reasoning: { type: "string" }
                 },
-                required: ["message", "tone", "reasoning"],
-              },
-            },
+                required: ["message", "tone", "reasoning"]
+              }
+            }
           }],
-          tool_choice: { type: "function", function: { name: "notification_result" } },
-        }),
-      });
-      if (!res.ok) { console.error("AI error:", res.status); return null; }
-      const json = await res.json();
+          tool_choice: { type: "function", function: { name: "notification_result" } }
+        });
+      
+      const json = res;
       try { return JSON.parse(json.choices[0].message.tool_calls[0].function.arguments); }
       catch { return null; }
     }

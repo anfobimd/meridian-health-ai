@@ -2,10 +2,6 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
-
-const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
-const LOVABLE_API_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -51,29 +47,15 @@ ${sectionInstructions[section] || "Write a professional clinical note section."}
 
 Return ONLY the note text, no labels or headers.`;
 
-    const response = await fetch(LOVABLE_API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
+    const response = await chatCompletion({
+messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
         temperature: 0.3,
-        max_tokens: 800,
-      }),
-    });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`AI API error: ${response.status} ${errText}`);
-    }
-
-    const data = await response.json();
+        max_tokens: 800
+      });
+    const data = response;
     const text = data.choices?.[0]?.message?.content || "";
 
     return new Response(JSON.stringify({ text }), {

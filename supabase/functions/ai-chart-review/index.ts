@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { chatCompletion } from "../_shared/bedrock.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,21 +12,15 @@ serve(async (req) => {
 
   const startTime = Date.now();
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-  const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const lovableKey = Deno.env.get("LOVABLE_API_KEY")!;
-  const supabase = createClient(supabaseUrl, supabaseKey);
+  const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;  const supabase = createClient(supabaseUrl, supabaseKey);
 
   try {
     const body = await req.json();
 
     // ── MODE: pattern_detect (admin completeness patterns) ──
     if (body.mode === "pattern_detect") {
-      const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${lovableKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "google/gemini-3-flash-preview",
-          messages: [
+      const aiResponse = await chatCompletion({
+messages: [
             { role: "system", content: "You are a clinical documentation QA AI. Analyze chart completeness patterns and identify systemic issues. Return JSON with: narrative (string), patterns (array of {label, detail, severity}), recommendations (array of {label, detail})." },
             { role: "user", content: JSON.stringify(body.data) },
           ],
@@ -39,16 +34,15 @@ serve(async (req) => {
                 properties: {
                   narrative: { type: "string" },
                   patterns: { type: "array", items: { type: "object", properties: { label: { type: "string" }, detail: { type: "string" }, severity: { type: "string", enum: ["info", "warning", "critical"] } }, required: ["label", "detail", "severity"] } },
-                  recommendations: { type: "array", items: { type: "object", properties: { label: { type: "string" }, detail: { type: "string" } }, required: ["label", "detail"] } },
+                  recommendations: { type: "array", items: { type: "object", properties: { label: { type: "string" }, detail: { type: "string" } }, required: ["label", "detail"] } }
                 },
-                required: ["narrative", "patterns"],
-              },
-            },
+                required: ["narrative", "patterns"]
+              }
+            }
           }],
-          tool_choice: { type: "function", function: { name: "pattern_analysis" } },
-        }),
-      });
-      const aiData = await aiResponse.json();
+          tool_choice: { type: "function", function: { name: "pattern_analysis" } }
+        });
+      const aiData = aiResponse;
       let result;
       try { result = JSON.parse(aiData.choices[0].message.tool_calls[0].function.arguments); }
       catch { result = { narrative: "Unable to analyze patterns.", patterns: [], recommendations: [] }; }
@@ -138,15 +132,8 @@ ${checklists?.map((c: any) => `${c.procedure_type}: ${JSON.stringify(c.checklist
 Return your analysis as a JSON object using the suggest_chart_analysis tool.`;
 
     // 6. Call Lovable AI with tool calling for structured output
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${lovableKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
+    const aiResponse = await chatCompletion({
+messages: [
           { role: "system", content: prompt?.system_prompt || "Analyze the chart and return structured JSON." },
           { role: "user", content: userPrompt },
         ],
@@ -169,58 +156,29 @@ Return your analysis as a JSON object using the suggest_chart_analysis tool.`;
                       properties: {
                         flag: { type: "string" },
                         severity: { type: "string", enum: ["info", "warning", "critical"] },
-                        detail: { type: "string" },
+                        detail: { type: "string" }
                       },
-                      required: ["flag", "severity", "detail"],
-                    },
+                      required: ["flag", "severity", "detail"]
+                    }
                   },
                   patient_context: { type: "string" },
                   risk_score: { type: "number" },
                   risk_tier: { type: "string", enum: ["low", "medium", "high", "critical"] },
                   recommended_action: { type: "string" },
-                  estimated_review_seconds: { type: "number" },
+                  estimated_review_seconds: { type: "number" }
                 },
                 required: [
                   "procedure_summary", "documentation_status", "documentation_score",
                   "ai_flags", "patient_context", "risk_score", "risk_tier",
                   "recommended_action", "estimated_review_seconds",
-                ],
-              },
-            },
+                ]
+              }
+            }
           },
         ],
-        tool_choice: { type: "function", function: { name: "suggest_chart_analysis" } },
-      }),
-    });
-
-    if (!aiResponse.ok) {
-      const errText = await aiResponse.text();
-      console.error("AI gateway error:", aiResponse.status, errText);
-      
-      // Log failed call
-      await supabase.from("ai_api_calls").insert({
-        function_name: "ai-chart-review",
-        model_used: "google/gemini-2.5-flash",
-        latency_ms: Date.now() - startTime,
-        status: "error",
-        error_message: `${aiResponse.status}: ${errText.substring(0, 500)}`,
-        encounter_id,
+        tool_choice: { type: "function", function: { name: "suggest_chart_analysis" } }
       });
-
-      if (aiResponse.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limited, please try again later." }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (aiResponse.status === 402) {
-        return new Response(JSON.stringify({ error: "AI credits exhausted. Please add funds." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      throw new Error(`AI error: ${aiResponse.status}`);
-    }
-
-    const aiData = await aiResponse.json();
+    const aiData = aiResponse;
     const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
     if (!toolCall) throw new Error("No tool call response from AI");
 

@@ -1,5 +1,6 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { chatCompletion } from "../_shared/bedrock.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -16,12 +17,7 @@ Deno.serve(async (req) => {
     const sb = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
-
-    const lovableKey = Deno.env.get("LOVABLE_API_KEY");
-    if (!lovableKey) throw new Error("LOVABLE_API_KEY not set");
-
-    // Fetch patient data in parallel
+    );    // Fetch patient data in parallel
     const [patientRes, apptRes, treatmentsRes, packagesRes, hormoneRes] = await Promise.all([
       sb.from("patients").select("*").eq("id", patient_id).single(),
       sb.from("appointments")
@@ -105,28 +101,17 @@ Provide 3-6 recommendations sorted by priority. Be specific and actionable.`;
       })),
     });
 
-    const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${lovableKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
+    const aiRes = await chatCompletion({
+messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
-        temperature: 0.7,
-      }),
-    });
+        temperature: 0.7
+      });
 
-    if (!aiRes.ok) {
-      const errText = await aiRes.text();
-      console.error("AI error:", aiRes.status, errText);
-      if (aiRes.status === 429) throw new Error("Rate limited — try again shortly");
-      if (aiRes.status === 402) throw new Error("AI credits exhausted");
-      throw new Error(`AI gateway error: ${aiRes.status}`);
-    }
+    
 
-    const aiJson = await aiRes.json();
+    const aiJson = aiRes;
     const raw = aiJson.choices?.[0]?.message?.content || "";
 
     let parsed: any;

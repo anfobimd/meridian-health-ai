@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { chatCompletion } from "../_shared/bedrock.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,9 +12,7 @@ serve(async (req) => {
 
   const startTime = Date.now();
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-  const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const lovableKey = Deno.env.get("LOVABLE_API_KEY")!;
-  const supabase = createClient(supabaseUrl, supabaseKey);
+  const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;  const supabase = createClient(supabaseUrl, supabaseKey);
 
   try {
     const body = await req.json();
@@ -73,33 +72,16 @@ ${overdueNote}${correctionNote}
 
 Write 3-5 sentences summarizing key things the provider should know: total patients, any drug interaction risks (aspirin/blood thinners before fillers, etc.), lapsed patients returning, overdue charts, pending MD corrections. Be specific about patient names and concerns. Keep it professional and actionable.`;
 
-      const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${lovableKey}`,
-        },
-        body: JSON.stringify({
-          model: "google/gemini-3-flash-preview",
-          messages: [
+      const aiResponse = await chatCompletion({
+messages: [
             { role: "system", content: "You are a concise clinical briefing assistant. No markdown formatting. Plain text only." },
             { role: "user", content: prompt },
-          ],
-        }),
-      });
+          ]
+        });
 
-      if (!aiResponse.ok) {
-        const errText = await aiResponse.text();
-        console.error("AI gateway error:", aiResponse.status, errText);
-        if (aiResponse.status === 429) {
-          return new Response(JSON.stringify({ error: "Rate limited, please try again shortly." }), {
-            status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-        throw new Error("AI gateway error");
-      }
+      
 
-      const aiData = await aiResponse.json();
+      const aiData = aiResponse;
       const brief = aiData.choices?.[0]?.message?.content || "No summary available.";
 
       // Log the call
@@ -128,20 +110,15 @@ Credentials: ${ctx.credentials || ""}
 Modalities: ${(ctx.modalities || []).join(", ") || "Various aesthetic treatments"}
 Tone: Warm, professional, confidence-inspiring. No markdown.`;
 
-      const aiResponse = await fetch("https://api.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${lovableKey}` },
-        body: JSON.stringify({
-          model: "google/gemini-3-flash-preview",
-          messages: [
+      const aiResponse = await chatCompletion({
+messages: [
             { role: "system", content: "You are a professional bio writer for healthcare providers. Return only the bio text, no quotes or labels." },
             { role: "user", content: bioPrompt },
-          ],
-        }),
-      });
+          ]
+        });
 
       if (!aiResponse.ok) throw new Error("AI gateway error");
-      const aiData = await aiResponse.json();
+      const aiData = aiResponse;
       const bio = aiData.choices?.[0]?.message?.content || "";
 
       const latency = Date.now() - startTime;
@@ -213,23 +190,14 @@ ${(corrections || []).map((c: any) => `- Encounter type: ${c.encounters?.encount
 Active Coaching Actions:
 ${(existingActions || []).map((a: any) => `- [${a.action_type}] ${a.title}: ${a.description || ""}`).join("\n") || "None"}`;
 
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${lovableKey}`,
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
+    const aiResponse = await chatCompletion({
+messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
-        ],
-        response_format: { type: "json_object" },
-      }),
-    });
+        ]
+});
 
-    const aiData = await aiResponse.json();
+    const aiData = aiResponse;
     const content = aiData.choices?.[0]?.message?.content || "{}";
     const coaching = JSON.parse(content);
 

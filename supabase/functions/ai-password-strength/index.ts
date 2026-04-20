@@ -1,12 +1,10 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { chatCompletion } from "../_shared/bedrock.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
-
-const LOVABLE_API_KEY_NAME = "LOVABLE_API_KEY";
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -22,10 +20,7 @@ Deno.serve(async (req) => {
     }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const LOVABLE_API_KEY = Deno.env.get(LOVABLE_API_KEY_NAME);
-
-    const userClient = createClient(supabaseUrl, anonKey, {
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;    const userClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
     });
     const { data: userData, error: userErr } = await userClient.auth.getUser();
@@ -110,31 +105,23 @@ Deno.serve(async (req) => {
 
     // AI enhancement if available
     let aiSuggestion: string | null = null;
-    if (LOVABLE_API_KEY && warnings.length > 0) {
+    if (warnings.length > 0) {
       try {
-        const aiResp = await fetch("https://ai-gateway.lovable.dev/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${LOVABLE_API_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: "google/gemini-2.5-flash-lite",
-            max_tokens: 150,
+        const aiResp = await chatCompletion({
+max_tokens: 150,
             messages: [
               {
                 role: "system",
-                content: "You are a security advisor. Given password warnings, provide ONE short actionable tip (max 2 sentences) to create a stronger password. Never reveal or repeat the password.",
+                content: "You are a security advisor. Given password warnings, provide ONE short actionable tip (max 2 sentences) to create a stronger password. Never reveal or repeat the password."
               },
               {
                 role: "user",
-                content: `Password issues found: ${warnings.join(", ")}. Password length: ${password.length}. Score: ${score}/100. Give a brief improvement tip.`,
+                content: `Password issues found: ${warnings.join(", ")}. Password length: ${password.length}. Score: ${score}/100. Give a brief improvement tip.`
               },
-            ],
-          }),
-        });
+            ]
+          });
         if (aiResp.ok) {
-          const aiData = await aiResp.json();
+          const aiData = aiResp;
           aiSuggestion = aiData.choices?.[0]?.message?.content?.trim() || null;
         }
       } catch {

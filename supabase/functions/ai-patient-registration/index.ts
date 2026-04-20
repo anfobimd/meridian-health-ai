@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { chatCompletion } from "../_shared/bedrock.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,14 +13,6 @@ Deno.serve(async (req) => {
 
   try {
     const { firstName, lastName, email, phone, dob } = await req.json();
-
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      return new Response(JSON.stringify({ error: "AI not configured" }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
     // Check for duplicates
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -42,15 +35,8 @@ Deno.serve(async (req) => {
     const uniqueDupes = allDupes.filter((d, i, a) => a.findIndex(x => x.id === d.id) === i);
 
     // Call AI for validation
-    const aiRes = await fetch("https://api.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [{
+    const aiRes = await chatCompletion({
+messages: [{
           role: "system",
           content: `You are a patient registration validator for a medical aesthetics clinic. Analyze registration data and return JSON with:
 - "emailIssues": string[] (typos like "gmial.com", disposable domains, format issues)
@@ -64,26 +50,12 @@ Be concise. Empty arrays if no issues.`
           role: "user",
           content: JSON.stringify({
             registration: { firstName, lastName, email, phone, dob },
-            duplicateCandidates: uniqueDupes.slice(0, 5),
-          }),
+            duplicateCandidates: uniqueDupes.slice(0, 5)
+          })
         }],
-        response_format: { type: "json_object" },
-        temperature: 0.2,
-      }),
-    });
-
-    if (!aiRes.ok) {
-      console.error("AI call failed:", await aiRes.text());
-      return new Response(JSON.stringify({
-        duplicates: uniqueDupes.slice(0, 5),
-        validation: null,
-        aiUnavailable: true,
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+temperature: 0.2
       });
-    }
-
-    const aiData = await aiRes.json();
+    const aiData = aiRes;
     let validation = {};
     try {
       const content = aiData.choices?.[0]?.message?.content || "{}";
