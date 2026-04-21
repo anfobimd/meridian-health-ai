@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Activity, Calendar, Package, LogIn, LogOut, Loader2,
   Clock, CheckCircle, AlertCircle, User, FileText, Mail, KeyRound,
-  Video, PhoneOff,
+  Video, PhoneOff, Eye, EyeOff,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -133,6 +133,7 @@ function PortalAuth() {
   const [mode, setMode] = useState<"login" | "signup" | "forgot">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleEmailAuth = async () => {
@@ -211,7 +212,24 @@ function PortalAuth() {
         </CardHeader>
         <CardContent className="space-y-4">
           <Input type="email" placeholder="your@email.com" value={email} onChange={e => setEmail(e.target.value)} />
-          <Input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === "Enter" && handleEmailAuth()} />
+          <div className="relative">
+            <Input
+              type={showPassword ? "text" : "password"}
+              placeholder="Password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && handleEmailAuth()}
+              className="pr-10"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(v => !v)}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              aria-label={showPassword ? "Hide password" : "Show password"}
+            >
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
           <Button className="w-full" onClick={handleEmailAuth} disabled={loading || !email.trim() || !password.trim()}>
             {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : mode === "login" ? <LogIn className="h-4 w-4 mr-2" /> : <KeyRound className="h-4 w-4 mr-2" />}
             {mode === "login" ? "Sign In" : "Create Account"}

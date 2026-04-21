@@ -100,7 +100,7 @@ export default function TimeOff() {
     onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
-  const isAdmin = role === "admin";
+  const isAdmin = role === "admin" || role === "super_admin";
 
   return (
     <div className="space-y-6">

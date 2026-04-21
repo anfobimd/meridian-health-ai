@@ -57,6 +57,7 @@ export default function MasterCatalog() {
       if (error) throw error;
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["master-catalog"] }); toast.success("Item deprecated"); },
+    onError: (err: Error) => toast.error("Failed to deprecate item", { description: err.message }),
   });
 
   const reactivate = useMutation({
@@ -65,6 +66,7 @@ export default function MasterCatalog() {
       if (error) throw error;
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["master-catalog"] }); toast.success("Item reactivated"); },
+    onError: (err: Error) => toast.error("Failed to reactivate item", { description: err.message }),
   });
 
   const clinicCount = (id: string) => clinicItems.filter(ci => ci.master_item_id === id).length;

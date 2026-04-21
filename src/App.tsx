@@ -1,4 +1,5 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, MutationCache, QueryCache } from "@tanstack/react-query";
+import { toast as sonnerToast } from "sonner";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
@@ -70,7 +71,27 @@ import Prescriptions from "./pages/Prescriptions";
 import TelehealthVisit from "./pages/TelehealthVisit";
 import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+// Centralized error surface: any mutation or query that throws — and doesn't
+// handle its own onError — will toast the error instead of leaving the button
+// stuck in "loading" (which is exactly what Faz reported across multiple
+// pages). Individual components can still override with their own onError.
+const queryClient = new QueryClient({
+  mutationCache: new MutationCache({
+    onError: (error, _variables, _context, mutation) => {
+      if (mutation.options.onError) return; // component handles it
+      const msg = error instanceof Error ? error.message : "Something went wrong";
+      sonnerToast.error("Action failed", { description: msg });
+    },
+  }),
+  queryCache: new QueryCache({
+    onError: (error, query) => {
+      // Only surface explicit errors, not background refetch noise
+      if (query.meta?.silent) return;
+      const msg = error instanceof Error ? error.message : "Failed to load";
+      console.warn("[Query error]", query.queryKey, msg);
+    },
+  }),
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
