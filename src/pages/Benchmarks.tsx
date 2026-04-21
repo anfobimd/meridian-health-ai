@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -79,9 +78,7 @@ export default function Benchmarks() {
 
   return (
     <div className="space-y-6">
-      <Breadcrumbs />
-
-      <div>
+<div>
         <h1 className="text-2xl font-bold">Cross-Clinic Benchmarks</h1>
         <p className="text-sm text-muted-foreground">Compare performance metrics across all clinics</p>
       </div>

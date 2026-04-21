@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Activity, Loader2 } from "lucide-react";
+import { Activity, Loader2, Eye, EyeOff, ShieldCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { Navigate } from "react-router-dom";
@@ -16,7 +16,12 @@ export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  // MFA challenge state — when set, password step succeeded but user has TOTP
+  // enrolled and must complete a challenge before reaching aal2.
+  const [mfaFactorId, setMfaFactorId] = useState<string | null>(null);
+  const [mfaCode, setMfaCode] = useState("");
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -40,6 +45,20 @@ export default function Auth() {
       if (isLogin) {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
+
+        // Check if this account has TOTP enrolled. If so, the session is at
+        // aal1 — we must challenge for the second factor before letting the
+        // user in. Without this step, an attacker with just the password
+        // bypasses MFA entirely.
+        const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+        if (aalData?.nextLevel === "aal2" && aalData.currentLevel !== "aal2") {
+          const { data: factors } = await supabase.auth.mfa.listFactors();
+          const verifiedTotp = factors?.totp?.find((f) => f.status === "verified");
+          if (verifiedTotp) {
+            setMfaFactorId(verifiedTotp.id);
+            return; // Render the TOTP step
+          }
+        }
         navigate("/");
       } else {
         const { error } = await supabase.auth.signUp({
@@ -59,6 +78,29 @@ export default function Auth() {
         description: err.message,
         variant: "destructive",
       });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleMfaSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!mfaFactorId || mfaCode.length !== 6) return;
+    setLoading(true);
+    try {
+      const challenge = await supabase.auth.mfa.challenge({ factorId: mfaFactorId });
+      if (challenge.error) throw challenge.error;
+      const verify = await supabase.auth.mfa.verify({
+        factorId: mfaFactorId,
+        challengeId: challenge.data.id,
+        code: mfaCode,
+      });
+      if (verify.error) throw verify.error;
+      // aal2 reached — proceed to app
+      navigate("/");
+    } catch (err: any) {
+      toast({ title: "Invalid code", description: err.message, variant: "destructive" });
+      setMfaCode("");
     } finally {
       setLoading(false);
     }
@@ -104,6 +146,61 @@ export default function Auth() {
       setLoading(false);
     }
   };
+
+  // ─── MFA challenge step ─────────────────────────────────────────────────
+  if (mfaFactorId) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-background px-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <div className="flex items-center justify-center gap-2 mb-2">
+              <ShieldCheck className="h-6 w-6 text-primary" />
+              <span className="font-serif text-xl font-semibold tracking-tight">Meridian</span>
+            </div>
+            <CardTitle className="text-xl">Two-factor authentication</CardTitle>
+            <CardDescription>
+              Enter the 6-digit code from your authenticator app to continue.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleMfaSubmit} className="space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="mfa-code">Authentication code</Label>
+                <Input
+                  id="mfa-code"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  value={mfaCode}
+                  onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                  placeholder="000000"
+                  maxLength={6}
+                  className="text-center font-mono text-lg tracking-widest"
+                  autoFocus
+                />
+              </div>
+              <Button type="submit" className="w-full" disabled={loading || mfaCode.length !== 6}>
+                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Verify
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                className="w-full"
+                onClick={async () => {
+                  await supabase.auth.signOut();
+                  setMfaFactorId(null);
+                  setMfaCode("");
+                  setPassword("");
+                }}
+              >
+                Cancel and sign in as different user
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-background px-4">
@@ -169,15 +266,26 @@ export default function Auth() {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                required
-                minLength={6}
-              />
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  required
+                  minLength={isLogin ? 6 : 10}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
 
             {isLogin && (

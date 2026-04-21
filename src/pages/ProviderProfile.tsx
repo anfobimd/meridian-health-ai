@@ -147,6 +147,12 @@ export default function ProviderProfile() {
   }
 
   if (!provider) {
+    return <BasicProfileForm />;
+  }
+
+  // (placeholder so the original block below stays intact — return statement
+  // continues with the provider-flavored form)
+  if (false) {
     return (
       <div className="space-y-4">
         <h1 className="text-2xl font-semibold tracking-tight">My Profile</h1>
@@ -280,6 +286,153 @@ export default function ProviderProfile() {
           </CardContent>
         </Card>
       </div>
+    </div>
+  );
+}
+
+// ─── BasicProfileForm ────────────────────────────────────────────────────────
+// Used for users without a `providers` row (super_admin, admin, billing, etc.)
+// Edits the public.profiles + auth user_metadata directly.
+
+const TIMEZONES = [
+  "America/Los_Angeles", "America/Denver", "America/Chicago", "America/New_York",
+  "America/Anchorage", "America/Honolulu", "UTC", "Europe/London", "Europe/Berlin",
+  "Asia/Kolkata", "Asia/Tokyo", "Australia/Sydney",
+];
+
+function BasicProfileForm() {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [displayName, setDisplayName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [title, setTitle] = useState("");
+  const [timezone, setTimezone] = useState("America/Los_Angeles");
+
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      setLoading(true);
+      const { data } = await supabase
+        .from("profiles")
+        .select("display_name, phone, title, timezone")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (data) {
+        setDisplayName(data.display_name || "");
+        setPhone(data.phone || "");
+        setTitle(data.title || "");
+        setTimezone(data.timezone || "America/Los_Angeles");
+      } else {
+        // Seed display_name from auth metadata if profile row missing
+        const meta = (user.user_metadata || {}) as Record<string, string>;
+        setDisplayName(meta.full_name || meta.name || (user.email?.split("@")[0] ?? ""));
+      }
+      setLoading(false);
+    })();
+  }, [user]);
+
+  const save = async () => {
+    if (!user) return;
+    setSaving(true);
+    try {
+      const { error } = await supabase.from("profiles").upsert(
+        { user_id: user.id, display_name: displayName, phone, title, timezone },
+        { onConflict: "user_id" },
+      );
+      if (error) throw error;
+      // Sync display_name to auth.users metadata so it appears in admin lists
+      await supabase.auth.updateUser({ data: { full_name: displayName } });
+      toast({ title: "Profile updated" });
+    } catch (err: any) {
+      toast({ title: "Save failed", description: err.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 max-w-2xl">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">My Profile</h1>
+        <p className="text-sm text-muted-foreground">
+          Manage your name, phone, and personal preferences.
+        </p>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <UserCircle className="h-5 w-5" /> Personal Details
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="bp-name">Full name</Label>
+            <Input
+              id="bp-name"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              placeholder="e.g. Aloysius Fobi"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="bp-title">Title</Label>
+            <Input
+              id="bp-title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="e.g. Owner / Practice Manager"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="bp-phone">Phone</Label>
+            <Input
+              id="bp-phone"
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="(555) 123-4567"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="bp-tz">Personal timezone</Label>
+            <select
+              id="bp-tz"
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              value={timezone}
+              onChange={(e) => setTimezone(e.target.value)}
+            >
+              {TIMEZONES.map((tz) => (
+                <option key={tz} value={tz}>{tz}</option>
+              ))}
+            </select>
+            <p className="text-xs text-muted-foreground">
+              Used for displaying dates and times in your view. Clinic-wide
+              default is set in Settings.
+            </p>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Email</Label>
+            <Input value={user?.email || ""} disabled />
+            <p className="text-xs text-muted-foreground">
+              To change your sign-in email, contact a super admin.
+            </p>
+          </div>
+          <Button onClick={save} disabled={saving || !displayName.trim()}>
+            {saving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving…</> : <><Save className="mr-2 h-4 w-4" />Save</>}
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   );
 }

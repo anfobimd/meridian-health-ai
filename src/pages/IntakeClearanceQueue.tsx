@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -97,9 +96,7 @@ export default function IntakeClearanceQueue() {
 
   return (
     <div className="space-y-6">
-      <Breadcrumbs />
-
-      <div>
+<div>
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <ClipboardList className="h-6 w-6" /> Intake Clearance Queue
         </h1>

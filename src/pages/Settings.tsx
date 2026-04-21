@@ -11,7 +11,7 @@ import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import {
   Shield, ShieldCheck, Loader2, QrCode, Trash2, KeyRound, Check, X, UserCog,
-  AlertTriangle, Lock, Sparkles, Copy,
+  AlertTriangle, Lock, Sparkles, Copy, Globe, Bell, Clock, Save,
 } from "lucide-react";
 import { UserManagement } from "@/components/settings/UserManagement";
 
@@ -453,12 +453,196 @@ export default function Settings() {
       {/* Notification Preferences */}
       <NotificationPreferences />
 
+      {/* Platform Settings (admins only) */}
+      {(role === "admin" || role === "super_admin") && <PlatformSettings />}
+
       {/* Admin: User & Role Management */}
-      {role === "admin" && <UserManagement />}
+      {(role === "admin" || role === "super_admin") && <UserManagement />}
 
       {/* Admin: Reset User Password */}
-      {role === "admin" && <AdminPasswordReset />}
+      {(role === "admin" || role === "super_admin") && <AdminPasswordReset />}
     </div>
+  );
+}
+
+// ─── Platform Settings ─────────────────────────────────────────────────────
+// Clinic-wide config: timezone, session timeout, notification toggles, and a
+// read-only display of the current password policy (set in Supabase project
+// auth config — we surface it here so admins know the rules without leaving
+// the app).
+
+const TIMEZONES = [
+  "America/Los_Angeles", "America/Denver", "America/Chicago", "America/New_York",
+  "America/Anchorage", "America/Honolulu", "UTC", "Europe/London", "Europe/Berlin",
+  "Asia/Kolkata", "Asia/Tokyo", "Australia/Sydney",
+];
+const TIMEOUTS = [
+  { value: 15, label: "15 minutes" },
+  { value: 30, label: "30 minutes" },
+  { value: 60, label: "1 hour" },
+  { value: 120, label: "2 hours" },
+  { value: 240, label: "4 hours" },
+  { value: 480, label: "8 hours" },
+];
+
+function PlatformSettings() {
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [settingsId, setSettingsId] = useState<string | null>(null);
+  const [defaultTz, setDefaultTz] = useState("America/Los_Angeles");
+  const [timeoutMin, setTimeoutMin] = useState(60);
+  const [notifNewAppt, setNotifNewAppt] = useState(true);
+  const [notifIntake, setNotifIntake] = useState(true);
+  const [notifMdApproval, setNotifMdApproval] = useState(true);
+  const [policy, setPolicy] = useState({ minLen: 10, requireUpper: true, requireNumber: true, requireSymbol: false });
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      const { data } = await supabase.from("clinic_settings").select("*").maybeSingle();
+      if (data) {
+        setSettingsId(data.id);
+        setDefaultTz(data.default_timezone || "America/Los_Angeles");
+        setTimeoutMin(data.session_timeout_minutes || 60);
+        setNotifNewAppt(data.notify_on_new_appointment ?? true);
+        setNotifIntake(data.notify_on_intake_submitted ?? true);
+        setNotifMdApproval(data.notify_on_md_approval_due ?? true);
+        setPolicy({
+          minLen: data.password_min_length || 10,
+          requireUpper: !!data.password_require_uppercase,
+          requireNumber: !!data.password_require_number,
+          requireSymbol: !!data.password_require_symbol,
+        });
+      }
+      setLoading(false);
+    })();
+  }, []);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const payload = {
+        default_timezone: defaultTz,
+        session_timeout_minutes: timeoutMin,
+        notify_on_new_appointment: notifNewAppt,
+        notify_on_intake_submitted: notifIntake,
+        notify_on_md_approval_due: notifMdApproval,
+        updated_at: new Date().toISOString(),
+      };
+      const { error } = settingsId
+        ? await supabase.from("clinic_settings").update(payload).eq("id", settingsId)
+        : await supabase.from("clinic_settings").insert(payload);
+      if (error) throw error;
+      toast({ title: "Settings saved" });
+    } catch (err: any) {
+      toast({ title: "Save failed", description: err.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <Card>
+        <CardContent className="py-10 flex justify-center">
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Globe className="h-5 w-5" /> Platform Settings
+        </CardTitle>
+        <CardDescription>Clinic-wide defaults for timezone, sessions, and notifications.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {/* Default timezone */}
+        <div className="space-y-1.5">
+          <Label htmlFor="ps-tz" className="flex items-center gap-1.5">
+            <Globe className="h-3.5 w-3.5" /> Default timezone
+          </Label>
+          <select
+            id="ps-tz"
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            value={defaultTz}
+            onChange={(e) => setDefaultTz(e.target.value)}
+          >
+            {TIMEZONES.map((tz) => (
+              <option key={tz} value={tz}>{tz}</option>
+            ))}
+          </select>
+          <p className="text-xs text-muted-foreground">
+            Used for displaying dates and times across the EHR for users without a personal timezone set.
+          </p>
+        </div>
+
+        {/* Session timeout */}
+        <div className="space-y-1.5">
+          <Label htmlFor="ps-timeout" className="flex items-center gap-1.5">
+            <Clock className="h-3.5 w-3.5" /> Session timeout
+          </Label>
+          <select
+            id="ps-timeout"
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            value={timeoutMin}
+            onChange={(e) => setTimeoutMin(parseInt(e.target.value, 10))}
+          >
+            {TIMEOUTS.map((t) => (
+              <option key={t.value} value={t.value}>{t.label}</option>
+            ))}
+          </select>
+          <p className="text-xs text-muted-foreground">
+            Automatically signs out users after this period of inactivity.
+          </p>
+        </div>
+
+        {/* Notification preferences */}
+        <div className="space-y-2">
+          <Label className="flex items-center gap-1.5">
+            <Bell className="h-3.5 w-3.5" /> Notification preferences
+          </Label>
+          <div className="space-y-2 rounded-md border p-3">
+            <label className="flex items-center justify-between gap-2 text-sm">
+              <span>Notify staff on new appointment</span>
+              <input type="checkbox" checked={notifNewAppt} onChange={(e) => setNotifNewAppt(e.target.checked)} />
+            </label>
+            <label className="flex items-center justify-between gap-2 text-sm">
+              <span>Notify when intake form is submitted</span>
+              <input type="checkbox" checked={notifIntake} onChange={(e) => setNotifIntake(e.target.checked)} />
+            </label>
+            <label className="flex items-center justify-between gap-2 text-sm">
+              <span>Notify MDs when approval is due</span>
+              <input type="checkbox" checked={notifMdApproval} onChange={(e) => setNotifMdApproval(e.target.checked)} />
+            </label>
+          </div>
+        </div>
+
+        {/* Password policy (read-only — managed in Supabase project config) */}
+        <div className="space-y-1.5">
+          <Label className="flex items-center gap-1.5">
+            <Lock className="h-3.5 w-3.5" /> Password policy
+          </Label>
+          <div className="rounded-md border bg-muted/30 p-3 text-xs space-y-1">
+            <p>• Minimum length: <span className="font-mono">{policy.minLen}</span> characters</p>
+            {policy.requireUpper && <p>• Must contain uppercase letter</p>}
+            {policy.requireNumber && <p>• Must contain a number</p>}
+            {policy.requireSymbol && <p>• Must contain a symbol</p>}
+            <p className="text-muted-foreground pt-1">
+              Compromised-password blocking (HIBP) is enforced server-side.
+            </p>
+          </div>
+        </div>
+
+        <Button onClick={save} disabled={saving}>
+          {saving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving…</> : <><Save className="mr-2 h-4 w-4" />Save Settings</>}
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
 

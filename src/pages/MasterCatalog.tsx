@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,6 +48,7 @@ export default function MasterCatalog() {
       if (error) throw error;
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["master-catalog"] }); setAddOpen(false); setForm({ name: "", item_type: "procedure", category: "", platform_rules: "" }); toast.success("Item added to catalog"); },
+    onError: (err: Error) => toast.error("Failed to add item", { description: err.message }),
   });
 
   const deprecate = useMutation({
@@ -99,8 +99,6 @@ export default function MasterCatalog() {
 
   return (
     <div className="space-y-6">
-      <Breadcrumbs />
-
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Master Catalog</h1>
@@ -121,7 +119,9 @@ export default function MasterCatalog() {
               </div>
               <div><Label>Category</Label><Input value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))} placeholder="e.g. Injectables, HRT" /></div>
               <div><Label>Platform Rules (JSON)</Label><Input value={form.platform_rules} onChange={e => setForm(p => ({ ...p, platform_rules: e.target.value }))} placeholder='{"requires_gfe": true}' /></div>
-              <Button onClick={() => addItem.mutate()} disabled={!form.name}>Add</Button>
+              <Button onClick={() => addItem.mutate()} disabled={!form.name || addItem.isPending}>
+                {addItem.isPending ? "Adding…" : "Add"}
+              </Button>
             </div>
           </DialogContent>
         </Dialog>

@@ -469,12 +469,53 @@ export function RBACProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // Idle session timeout. Reads `session_timeout_minutes` from clinic_settings.
+  // Resets on every user interaction — when the timer fires, signs out.
+  useEffect(() => {
+    if (!user) return;
+    let timeoutMs = 60 * 60 * 1000; // default 1h until we read settings
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const reset = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        console.log("[RBAC] Idle timeout reached — signing out");
+        signOut();
+      }, timeoutMs);
+    };
+
+    const events: (keyof WindowEventMap)[] = ["mousemove", "keydown", "click", "scroll", "touchstart"];
+    events.forEach((e) => window.addEventListener(e, reset, { passive: true }));
+
+    // Pull configured timeout (don't block UI on this)
+    supabase.from("clinic_settings").select("session_timeout_minutes").maybeSingle().then(({ data }) => {
+      const m = data?.session_timeout_minutes;
+      if (typeof m === "number" && m > 0) {
+        timeoutMs = m * 60 * 1000;
+        reset();
+      }
+    });
+    reset();
+
+    return () => {
+      events.forEach((e) => window.removeEventListener(e, reset));
+      if (timer) clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
   const signOut = async () => {
-    await supabase.auth.signOut();
+    // scope=global → revokes the refresh token on the server, so an old
+    // password that was just changed elsewhere can't keep this session alive.
+    // Without this, Supabase only clears localStorage, leaving the refresh
+    // token valid until natural expiry.
+    await supabase.auth.signOut({ scope: "global" });
     setUser(null);
     setSession(null);
     setRole(null);
     setClinicId(null);
+    // Hard navigation so any cached query state / route guards re-resolve.
+    window.location.assign("/auth");
   };
 
   /** Check if current user has a specific permission */

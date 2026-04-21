@@ -1,7 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -98,8 +97,7 @@ export default function MultiProviderCalendar() {
 
   return (
     <div className="space-y-6">
-      <Breadcrumbs />
-      <div className="flex items-center justify-between">
+<div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Provider Calendar</h1>
           <p className="text-sm text-muted-foreground">Multi-provider schedule grid with AI delay detection</p>

@@ -1,7 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import {
   Table,
@@ -94,9 +93,7 @@ export function AuditLog() {
 
   return (
     <div className="space-y-6">
-      <Breadcrumbs />
-
-      <Card>
+<Card>
         <CardHeader>
           <div className="flex items-center gap-2">
             <Shield className="h-5 w-5" />

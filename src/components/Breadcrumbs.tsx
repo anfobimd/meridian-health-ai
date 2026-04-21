@@ -22,6 +22,7 @@ const ROUTE_LABELS: Record<string, string> = {
   "md-oversight": "MD Oversight",
   "dashboard": "Dashboard",
   "treatments": "Treatments",
+  "medications": "Medications",
   "rooms-devices": "Rooms & Devices",
   "providers": "Providers",
   "billing": "Billing",
@@ -32,6 +33,30 @@ const ROUTE_LABELS: Record<string, string> = {
   "proforma": "Proforma",
   "front-desk": "Front Desk",
   "provider-day": "My Day",
+  "settings": "Settings",
+  "my-profile": "My Profile",
+  "users": "User Management",
+  "audit-log": "Audit Log",
+  "master-catalog": "Master Catalog",
+  "automation-rules": "Automation Rules",
+  "intake-clearance": "Intake Clearance",
+  "contracts": "Contracts",
+  "md-coverage": "MD Coverage",
+  "benchmarks": "Benchmarks",
+  "clinical-photos": "Clinical Photos",
+  "performance-goals": "Performance Goals",
+  "notifications": "Notifications",
+  "calendar-grid": "Calendar Grid",
+  "patient-inbox": "Patient Inbox",
+  "messages": "Messages",
+  "waitlist": "Waitlist",
+  "time-off": "Time Off",
+  "templates": "Templates",
+  "reports": "Reports",
+  "clinic-hours": "Clinic Hours",
+  "provider-schedule": "Schedules",
+  "check-in": "Check-In",
+  "prescriptions": "Prescriptions",
 };
 
 export function Breadcrumbs() {
@@ -41,9 +66,14 @@ export function Breadcrumbs() {
   // Don't show breadcrumbs on dashboard
   if (segments.length === 0) return null;
 
+  const isUuidLike = (s: string) => /^[0-9a-f-]{20,}$/i.test(s);
+  const humanize = (s: string) =>
+    isUuidLike(s)
+      ? `${s.slice(0, 6)}…`
+      : s.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
   const crumbs = segments.map((seg, i) => {
     const path = "/" + segments.slice(0, i + 1).join("/");
-    const label = ROUTE_LABELS[seg] || (seg.length > 8 ? `${seg.slice(0, 8)}…` : seg);
+    const label = ROUTE_LABELS[seg] || humanize(seg);
     const isLast = i === segments.length - 1;
     return { path, label, isLast };
   });
