@@ -133,12 +133,24 @@ export default function Settings() {
     }
   };
 
-  // MFA
+  // MFA — load with a hard timeout so a hung network call can't leave
+  // "Loading MFA status..." on screen indefinitely (which is exactly what
+  // Faz saw on the published build).
   const fetchFactors = async () => {
     setLoading(true);
-    const { data, error } = await supabase.auth.mfa.listFactors();
-    if (!error && data) setMfaFactors(data.totp || []);
-    setLoading(false);
+    try {
+      const result = await Promise.race([
+        supabase.auth.mfa.listFactors(),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 4000)),
+      ]);
+      if (result && "data" in result && result.data) {
+        setMfaFactors(result.data.totp || []);
+      }
+    } catch {
+      // network error — just show "no MFA configured" state
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { fetchFactors(); }, []);

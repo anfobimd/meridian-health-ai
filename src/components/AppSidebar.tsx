@@ -158,31 +158,41 @@ export function AppSidebar() {
 
   useEffect(() => {
     if (!user) return;
+    let cancelled = false;
     const fetchBadges = async () => {
-      const counts: Record<string, number> = {};
-      const { count: msgCount } = await supabase
+      // Parallelize all badge count queries. Previous implementation fetched
+      // messages, then (provider-only) provider id, then chart reviews
+      // SEQUENTIALLY — up to 3 × round-trip latency. For a user in India
+      // hitting Supabase us-east-2 (~250ms each) that was almost a second of
+      // waiting for a few counts.
+      const msgPromise = supabase
         .from("messages")
         .select("*", { count: "exact", head: true })
         .eq("recipient_id", user.id)
         .eq("is_read", false)
         .is("parent_id", null);
-      if (msgCount) counts.unread_messages = msgCount;
 
-      if (role === "provider") {
-        const { data: prov } = await supabase
-          .from("providers")
-          .select("id")
-          .eq("user_id", user.id)
-          .maybeSingle();
-        if (prov) {
-          const { count: corrCount } = await supabase
-            .from("chart_review_records")
-            .select("*", { count: "exact", head: true })
-            .eq("provider_id", prov.id)
-            .eq("status", "corrected");
-          if (corrCount) counts.md_corrections = corrCount;
-        }
-      }
+      const corrPromise = role === "provider"
+        ? supabase
+            .from("providers")
+            .select("id")
+            .eq("user_id", user.id)
+            .maybeSingle()
+            .then(async ({ data: prov }) => {
+              if (!prov) return { count: null };
+              return await supabase
+                .from("chart_review_records")
+                .select("*", { count: "exact", head: true })
+                .eq("provider_id", prov.id)
+                .eq("status", "corrected");
+            })
+        : Promise.resolve({ count: null });
+
+      const [{ count: msgCount }, { count: corrCount }] = await Promise.all([msgPromise, corrPromise]);
+      if (cancelled) return;
+      const counts: Record<string, number> = {};
+      if (msgCount) counts.unread_messages = msgCount;
+      if (corrCount) counts.md_corrections = corrCount;
       setBadges(counts);
     };
 
@@ -192,7 +202,7 @@ export function AppSidebar() {
       .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, () => fetchBadges())
       .on("postgres_changes", { event: "*", schema: "public", table: "chart_review_records" }, () => fetchBadges())
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => { cancelled = true; supabase.removeChannel(channel); };
   }, [user, role]);
 
   const initials = user?.email ? user.email.substring(0, 2).toUpperCase() : "??";
