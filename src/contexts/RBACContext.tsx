@@ -384,25 +384,37 @@ export function RBACProvider({ children }: { children: ReactNode }) {
 
   const fetchRole = async (userId: string) => {
     try {
-      // Try role_permissions table first (Phase 1 migration), fall back to user_roles
-      const { data: rpData, error: roleError } = await supabase
+      // Some users have multiple rows (e.g. super_admin + front_desk from the
+      // allowlist trigger). Take the highest-privilege one rather than
+      // .maybeSingle() (which errors on >1 row and would wipe the role).
+      const { data: rows, error: roleError } = await supabase
         .from("user_roles")
         .select("role")
-        .eq("user_id", userId)
-        .maybeSingle();
+        .eq("user_id", userId);
 
       if (roleError) {
         console.warn("[RBAC] Failed to fetch user role:", roleError.message);
+        // Important: on transient fetch errors, DO NOT clobber the existing
+        // role. Issue #14 was caused by resetting role → "user" mid-session.
+        return;
       }
 
-      const fetchedRole = (rpData?.role as AppRole) ?? "user";
-      setRole(fetchedRole);
-
-      // Multi-clinic context not yet enabled (no clinic_staff table); leave clinicId unset.
+      const allRoles = (rows ?? []).map((r: { role: AppRole }) => r.role);
+      if (allRoles.length === 0) {
+        setRole("user");
+        return;
+      }
+      const priority: AppRole[] = [
+        "super_admin", "admin", "clinic_owner", "medical_director",
+        "physician", "nurse_practitioner", "physician_assistant",
+        "registered_nurse", "provider", "aesthetician", "front_desk",
+        "billing", "marketing", "user",
+      ];
+      const best = priority.find((r) => allRoles.includes(r)) ?? "user";
+      setRole(best);
     } catch (err) {
       console.error("[RBAC] Unexpected error in fetchRole:", err);
-      // Default to "user" role so the app doesn't hang
-      setRole("user");
+      // Don't reset role on errors — keep last-known-good value
     }
   };
 
@@ -412,13 +424,19 @@ export function RBACProvider({ children }: { children: ReactNode }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, sess) => {
+    } = supabase.auth.onAuthStateChange(async (event, sess) => {
       setSession(sess);
       setUser(sess?.user ?? null);
-      if (sess?.user) {
-        // Await fetchRole so loading state is accurate
+      // Only re-fetch role on genuine sign-in or initial session. TOKEN_REFRESHED
+      // and USER_UPDATED fire frequently while the app is open; re-fetching on
+      // those was causing the role to transiently flip to "user" during the
+      // network round-trip, which blanked the sidebar and triggered "you have
+      // no access" errors (QA issues #12 and #14).
+      const needsRoleFetch =
+        event === "INITIAL_SESSION" || event === "SIGNED_IN";
+      if (sess?.user && needsRoleFetch) {
         await fetchRole(sess.user.id);
-      } else {
+      } else if (!sess?.user) {
         setRole(null);
         setClinicId(null);
       }
@@ -505,16 +523,34 @@ export function RBACProvider({ children }: { children: ReactNode }) {
   }, [user]);
 
   const signOut = async () => {
-    // scope=global → revokes the refresh token on the server, so an old
-    // password that was just changed elsewhere can't keep this session alive.
-    // Without this, Supabase only clears localStorage, leaving the refresh
-    // token valid until natural expiry.
-    await supabase.auth.signOut({ scope: "global" });
+    // Defense in depth: whether or not the network call succeeds, we want to
+    // end up on /auth with no session. Issue #13 (sign-out stops working
+    // after re-login) was caused by the global signOut hanging on a stale
+    // refresh token — we'd await forever, nothing happened on screen.
+    //
+    // Approach:
+    //   1. Fire signOut but don't block indefinitely (race with a 3s timeout)
+    //   2. Clear local state regardless
+    //   3. Purge Supabase's localStorage keys manually so a stale session
+    //      can't rehydrate on reload
+    //   4. Hard-navigate to /auth so route guards re-resolve from scratch
+    try {
+      await Promise.race([
+        supabase.auth.signOut({ scope: "global" }),
+        new Promise((resolve) => setTimeout(resolve, 3000)),
+      ]);
+    } catch (err) {
+      console.warn("[RBAC] signOut network call errored, continuing:", err);
+    }
     setUser(null);
     setSession(null);
     setRole(null);
     setClinicId(null);
-    // Hard navigation so any cached query state / route guards re-resolve.
+    try {
+      Object.keys(localStorage)
+        .filter((k) => k.startsWith("sb-") || k.includes("supabase"))
+        .forEach((k) => localStorage.removeItem(k));
+    } catch { /* localStorage may be unavailable */ }
     window.location.assign("/auth");
   };
 

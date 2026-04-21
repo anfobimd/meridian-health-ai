@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,11 @@ export default function ResetPassword() {
   const [errorMessage, setErrorMessage] = useState<string>("");
   const { toast } = useToast();
   const navigate = useNavigate();
+  // Ref mirror of state so async callbacks see the latest value (the effect
+  // setTimeout was reading a stale "loading" closure and never flipping to
+  // "invalid" — QA #3 "stuck on loading indefinitely").
+  const stateRef = useRef<PageState>("loading");
+  useEffect(() => { stateRef.current = state; }, [state]);
 
   useEffect(() => {
     let cancelled = false;
@@ -66,10 +71,10 @@ export default function ResetPassword() {
         if (session) {
           // We have a session; assume recovery context
           setState("ready");
-        } else if (state === "loading") {
+        } else if (stateRef.current === "loading") {
           // Give the auth listener ~1.5s to fire. If nothing, treat as invalid.
           setTimeout(() => {
-            if (!cancelled && state === "loading") {
+            if (!cancelled && stateRef.current === "loading") {
               setState("invalid");
             }
           }, 1500);
@@ -77,9 +82,20 @@ export default function ResetPassword() {
       });
     }
 
+    // Absolute-last-resort: if something else goes wrong and we're still
+    // "loading" after 5 seconds, show the invalid screen so the user isn't
+    // stuck on a spinner.
+    const hardTimeout = setTimeout(() => {
+      if (!cancelled && stateRef.current === "loading") {
+        setState("invalid");
+        setErrorMessage("The reset link couldn't be verified. Please request a new one.");
+      }
+    }, 5000);
+
     return () => {
       cancelled = true;
       subscription.unsubscribe();
+      clearTimeout(hardTimeout);
     };
   }, []);
 

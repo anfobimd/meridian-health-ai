@@ -337,11 +337,30 @@ function BasicProfileForm() {
     if (!user) return;
     setSaving(true);
     try {
-      const { error } = await supabase.from("profiles").upsert(
-        { user_id: user.id, display_name: displayName, phone, title, timezone },
-        { onConflict: "user_id" },
-      );
-      if (error) throw error;
+      // upsert with onConflict on user_id still hit the unique constraint for
+      // existing rows because id (the primary key) was being inserted as a new
+      // uuid. Switch to explicit check-then-update/insert, which is what this
+      // form actually needs.
+      const payload = { display_name: displayName, phone, title, timezone };
+      const { data: existing } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (existing) {
+        const { error } = await supabase
+          .from("profiles")
+          .update(payload)
+          .eq("user_id", user.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from("profiles")
+          .insert({ ...payload, user_id: user.id });
+        if (error) throw error;
+      }
+
       // Sync display_name to auth.users metadata so it appears in admin lists
       await supabase.auth.updateUser({ data: { full_name: displayName } });
       toast({ title: "Profile updated" });
