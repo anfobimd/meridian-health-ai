@@ -11,7 +11,7 @@ import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import {
   Shield, ShieldCheck, Loader2, QrCode, Trash2, KeyRound, Check, X, UserCog,
-  AlertTriangle, Lock, Sparkles, Copy, Globe, Bell, Clock, Save,
+  AlertTriangle, Lock, Sparkles, Copy, Globe, Bell, Clock, Save, Eye, EyeOff,
 } from "lucide-react";
 import { UserManagement } from "@/components/settings/UserManagement";
 
@@ -49,6 +49,8 @@ export default function Settings() {
   // Password state
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [lockoutEnd, setLockoutEnd] = useState<number | null>(null);
@@ -246,14 +248,26 @@ export default function Settings() {
 
           <div className="space-y-2">
             <Label htmlFor="new-password">New Password</Label>
-            <Input
-              id="new-password"
-              type="password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              placeholder="Enter new password"
-              disabled={isLocked}
-            />
+            <div className="relative">
+              <Input
+                id="new-password"
+                type={showNewPassword ? "text" : "password"}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Enter new password"
+                disabled={isLocked}
+                className="pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowNewPassword((v) => !v)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground disabled:opacity-50"
+                disabled={isLocked}
+                aria-label={showNewPassword ? "Hide password" : "Show password"}
+              >
+                {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
             {newPassword.length > 0 && (
               <div className="space-y-2">
                 <Progress value={displayScore} className="h-1.5" />
@@ -301,14 +315,26 @@ export default function Settings() {
 
           <div className="space-y-2">
             <Label htmlFor="confirm-password">Confirm Password</Label>
-            <Input
-              id="confirm-password"
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Confirm new password"
-              disabled={isLocked}
-            />
+            <div className="relative">
+              <Input
+                id="confirm-password"
+                type={showConfirmPassword ? "text" : "password"}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Confirm new password"
+                disabled={isLocked}
+                className="pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword((v) => !v)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground disabled:opacity-50"
+                disabled={isLocked}
+                aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+              >
+                {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
             {confirmPassword.length > 0 && (
               <p className={`text-xs flex items-center gap-1 ${passwordsMatch ? "text-primary" : "text-destructive"}`}>
                 {passwordsMatch ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
@@ -649,6 +675,7 @@ function PlatformSettings() {
 function AdminPasswordReset() {
   const { toast } = useToast();
   const [newPw, setNewPw] = useState("");
+  const [showNewPw, setShowNewPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState<{ id: string; email: string }[]>([]);
   const [selectedUserId, setSelectedUserId] = useState("");
@@ -704,7 +731,23 @@ function AdminPasswordReset() {
         </div>
         <div>
           <Label>New Password</Label>
-          <Input type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)} placeholder="Min 8 characters" />
+          <div className="relative">
+            <Input
+              type={showNewPw ? "text" : "password"}
+              value={newPw}
+              onChange={(e) => setNewPw(e.target.value)}
+              placeholder="Min 10 characters"
+              className="pr-10"
+            />
+            <button
+              type="button"
+              onClick={() => setShowNewPw((v) => !v)}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              aria-label={showNewPw ? "Hide password" : "Show password"}
+            >
+              {showNewPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
           {newPw && (
             <div className="mt-2 space-y-1">
               <Progress value={strength.score} className="h-1.5" />
@@ -712,7 +755,7 @@ function AdminPasswordReset() {
             </div>
           )}
         </div>
-        <Button onClick={handleReset} disabled={!selectedUserId || newPw.length < 8 || loading}>
+        <Button onClick={handleReset} disabled={!selectedUserId || newPw.length < 10 || loading}>
           {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           Reset Password
         </Button>
