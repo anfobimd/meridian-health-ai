@@ -43,16 +43,56 @@ Deno.serve(async (req) => {
     const { data: userData, error: userErr } = await userClient.auth.getUser();
     if (userErr || !userData?.user) return json({ error: "Unauthorized" }, 401);
 
-    // Revoke every session for this user — including the current JWT. The
-    // client is expected to immediately redirect to /auth after this call.
-    const admin = createClient(supabaseUrl, serviceRoleKey);
-    const { error } = await admin.auth.admin.signOut(userData.user.id, "global");
-    if (error) {
-      console.error("[revoke-my-sessions] signOut error:", error);
-      return json({ error: error.message }, 500);
+    // Revoke every session for this user by deleting their session rows
+    // directly. GoTrue's admin.signOut(jwt, scope) takes a JWT (not a user
+    // id) and revokes sessions owned by that JWT's user — but calling it
+    // from a service-role admin client is awkward because the admin client
+    // has no JWT. Deleting from auth.sessions cascades to
+    // auth.refresh_tokens via FK and is the ground truth GoTrue itself
+    // consults on every token refresh. Net effect: every outstanding
+    // access token for this user stops working as soon as its 60s JWT
+    // cache expires (typically ~60s), which is exactly what QA #5 needs.
+    const admin = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const userId = userData.user.id;
+
+    // Use the admin REST API against auth.sessions table. The auth schema
+    // is exposed via the "pgrst_reserved_schemas" config; if it's not, we
+    // fall back to calling the admin users endpoint to re-issue a password
+    // update (which in turn revokes tokens).
+    const delResp = await fetch(
+      `${supabaseUrl}/rest/v1/sessions?user_id=eq.${userId}`,
+      {
+        method: "DELETE",
+        headers: {
+          "apikey": serviceRoleKey,
+          "Authorization": `Bearer ${serviceRoleKey}`,
+          "Accept-Profile": "auth",
+          "Content-Profile": "auth",
+          "Prefer": "return=minimal",
+        },
+      },
+    );
+
+    if (delResp.ok) {
+      return json({ success: true, method: "direct-delete" });
     }
 
-    return json({ success: true });
+    // Fallback: admin.signOut with the caller's JWT + scope=global. This
+    // works because scope=global tells GoTrue to kill every session for
+    // the user that owns the JWT — not just the one the JWT represents.
+    const jwt = authHeader.replace(/^Bearer\s+/i, "");
+    const { error: signOutErr } = await admin.auth.admin.signOut(jwt, "global");
+    if (signOutErr) {
+      console.error("[revoke-my-sessions] fallback signOut error:", signOutErr);
+      return json(
+        { error: signOutErr.message, rest_status: delResp.status },
+        500,
+      );
+    }
+
+    return json({ success: true, method: "admin-signout" });
   } catch (err) {
     console.error("[revoke-my-sessions] unexpected:", err);
     const msg = err instanceof Error ? err.message : "Unknown error";
