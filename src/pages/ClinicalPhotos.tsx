@@ -144,8 +144,8 @@ export function ClinicalPhotos() {
   });
 
   const filteredPhotos = photos.filter((photo: ClinicalPhoto) => {
-    if (filterPatient && photo.patient_id !== filterPatient) return false;
-    if (filterTreatment && photo.body_area !== filterTreatment) return false;
+    if (filterPatient && filterPatient !== "all" && photo.patient_id !== filterPatient) return false;
+    if (filterTreatment && filterTreatment !== "all" && photo.body_area !== filterTreatment) return false;
     if (filterStartDate) {
       const photoDate = new Date(photo.taken_at);
       if (photoDate < new Date(filterStartDate)) return false;
@@ -354,12 +354,12 @@ export function ClinicalPhotos() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="space-y-2">
               <Label htmlFor="filter-patient">Patient</Label>
-              <Select value={filterPatient} onValueChange={setFilterPatient}>
+              <Select value={filterPatient || "all"} onValueChange={setFilterPatient}>
                 <SelectTrigger id="filter-patient">
                   <SelectValue placeholder="All Patients" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Patients</SelectItem>
+                  <SelectItem value="all">All Patients</SelectItem>
                   {patients.map((p: any) => (
                     <SelectItem key={p.id} value={p.id}>
                       {p.first_name} {p.last_name}
@@ -371,12 +371,12 @@ export function ClinicalPhotos() {
 
             <div className="space-y-2">
               <Label htmlFor="filter-treatment">Treatment Type</Label>
-              <Select value={filterTreatment} onValueChange={setFilterTreatment}>
+              <Select value={filterTreatment || "all"} onValueChange={setFilterTreatment}>
                 <SelectTrigger id="filter-treatment">
                   <SelectValue placeholder="All Treatments" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Treatments</SelectItem>
+                  <SelectItem value="all">All Treatments</SelectItem>
                   {TREATMENT_TYPES.map((t) => (
                     <SelectItem key={t.value} value={t.value}>
                       {t.label}
