@@ -314,7 +314,7 @@ function BasicProfileForm() {
     if (!user) return;
     (async () => {
       setLoading(true);
-      const { data } = await supabase
+      const { data } = await (supabase as any)
         .from("profiles")
         .select("display_name, phone, title, timezone")
         .eq("user_id", user.id)
@@ -349,13 +349,13 @@ function BasicProfileForm() {
         .maybeSingle();
 
       if (existing) {
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from("profiles")
           .update(payload)
           .eq("user_id", user.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from("profiles")
           .insert({ ...payload, user_id: user.id });
         if (error) throw error;

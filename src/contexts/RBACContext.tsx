@@ -506,7 +506,7 @@ export function RBACProvider({ children }: { children: ReactNode }) {
     events.forEach((e) => window.addEventListener(e, reset, { passive: true }));
 
     // Pull configured timeout (don't block UI on this)
-    supabase.from("clinic_settings").select("session_timeout_minutes").maybeSingle().then(({ data }) => {
+    (supabase as any).from("clinic_settings").select("session_timeout_minutes").maybeSingle().then(({ data }: any) => {
       const m = data?.session_timeout_minutes;
       if (typeof m === "number" && m > 0) {
         timeoutMs = m * 60 * 1000;
