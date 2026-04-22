@@ -538,7 +538,7 @@ function PlatformSettings() {
   useEffect(() => {
     (async () => {
       setLoading(true);
-      const { data } = await supabase.from("clinic_settings").select("*").maybeSingle();
+      const { data } = await (supabase as any).from("clinic_settings").select("*").maybeSingle();
       if (data) {
         setSettingsId(data.id);
         setDefaultTz(data.default_timezone || "America/Los_Angeles");
@@ -569,8 +569,8 @@ function PlatformSettings() {
         updated_at: new Date().toISOString(),
       };
       const { error } = settingsId
-        ? await supabase.from("clinic_settings").update(payload).eq("id", settingsId)
-        : await supabase.from("clinic_settings").insert(payload);
+        ? await (supabase as any).from("clinic_settings").update(payload).eq("id", settingsId)
+        : await (supabase as any).from("clinic_settings").insert(payload);
       if (error) throw error;
       toast({ title: "Settings saved" });
     } catch (err: any) {
