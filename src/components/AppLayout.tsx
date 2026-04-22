@@ -1,8 +1,29 @@
-import { useEffect, useRef } from "react";
+import { Suspense, useEffect, useRef } from "react";
 import { Outlet, useLocation } from "react-router-dom";
+import { Loader2 } from "lucide-react";
 import { AppSidebar } from "./AppSidebar";
 import { MobileNav } from "./MobileNav";
 import { Breadcrumbs } from "./Breadcrumbs";
+
+// Skeleton shown while a lazy-loaded route chunk is still downloading. Keeps
+// the sidebar and header visible so only the content area flickers — much
+// less jarring than the whole page going blank between navigations.
+function RouteSkeleton() {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3 text-muted-foreground">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        <span className="text-sm">Loading…</span>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="h-24 rounded-lg bg-muted/40 animate-pulse" />
+        ))}
+      </div>
+      <div className="h-64 rounded-lg bg-muted/30 animate-pulse" />
+    </div>
+  );
+}
 
 export function AppLayout() {
   const { pathname } = useLocation();
@@ -22,7 +43,13 @@ export function AppLayout() {
         <MobileNav />
         <main ref={mainRef} className="flex-1 p-4 md:p-6 lg:p-8 overflow-auto">
           <Breadcrumbs />
-          <Outlet />
+          {/* Suspense lives INSIDE the layout so the sidebar and header stay
+              mounted while the next page's JS chunk downloads. Without this,
+              clicking any sidebar link blanks the whole screen until the
+              chunk arrives (jarring on slow connections). */}
+          <Suspense fallback={<RouteSkeleton />}>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
     </div>

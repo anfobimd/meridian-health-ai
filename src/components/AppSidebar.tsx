@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/RBACContext";
 import { supabase } from "@/integrations/supabase/client";
 import { ClinicSwitcher } from "@/components/admin/ClinicSwitcher";
+import { prefetchRoute } from "@/lib/routePrefetch";
 
 type NavItem = {
   to: string;
@@ -244,6 +245,8 @@ export function AppSidebar() {
                 <NavLink
                   key={item.to}
                   to={item.to}
+                  onMouseEnter={() => prefetchRoute(item.to)}
+                  onFocus={() => prefetchRoute(item.to)}
                   className={cn(
                     "flex items-center gap-2.5 rounded-md px-3 py-2 text-[12.5px] font-normal transition-colors mb-0.5",
                     isActive
