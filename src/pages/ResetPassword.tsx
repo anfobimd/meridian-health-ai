@@ -122,9 +122,25 @@ export default function ResetPassword() {
       clearTimeout(timeoutId);
       if (error) throw error;
       toast({ title: "Password updated", description: "You can now sign in with your new password." });
-      // Sign out so they have to explicitly sign in with the new password
-      await supabase.auth.signOut();
-      navigate("/auth");
+
+      // Purge local session state + redirect. The previous implementation did
+      // `await supabase.auth.signOut()` which was blocking the spinner on
+      // flaky networks (QA #3). We:
+      //   1. Fire-and-forget the admin session revocation — kills every
+      //      access token the user holds, including on other devices still
+      //      running the old password (QA #5).
+      //   2. Fire-and-forget the client signOut — wipes refresh token too.
+      //   3. Purge local storage.
+      //   4. Hard-navigate to /auth so route guards re-resolve fresh.
+      supabase.functions.invoke("revoke-my-sessions", {}).catch(() => { /* swallow */ });
+      supabase.auth.signOut({ scope: "global" }).catch(() => { /* swallow */ });
+      try {
+        Object.keys(localStorage)
+          .filter((k) => k.startsWith("sb-") || k.includes("supabase"))
+          .forEach((k) => localStorage.removeItem(k));
+      } catch { /* ignore */ }
+      window.location.assign("/auth");
+      return;
     } catch (err: unknown) {
       clearTimeout(timeoutId);
       const msg = err instanceof Error ? err.message : "Unknown error";

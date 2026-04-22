@@ -46,18 +46,20 @@ export default function Auth() {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
 
-        // Check if this account has TOTP enrolled. If so, the session is at
-        // aal1 — we must challenge for the second factor before letting the
-        // user in. Without this step, an attacker with just the password
-        // bypasses MFA entirely.
-        const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-        if (aalData?.nextLevel === "aal2" && aalData.currentLevel !== "aal2") {
-          const { data: factors } = await supabase.auth.mfa.listFactors();
-          const verifiedTotp = factors?.totp?.find((f) => f.status === "verified");
-          if (verifiedTotp) {
-            setMfaFactorId(verifiedTotp.id);
-            return; // Render the TOTP step
-          }
+        // Gate on the factor itself — NOT on AAL. We saw AAL report aal1 for
+        // accounts that had a verified TOTP (possibly a Supabase quirk when
+        // the factor was enrolled in a prior session), which meant MFA was
+        // bypassed entirely (QA #4). Directly asking for verified factors is
+        // the ground truth.
+        const { data: factors } = await supabase.auth.mfa.listFactors();
+        const verifiedTotp = factors?.totp?.find((f) => f.status === "verified");
+        if (verifiedTotp) {
+          // Immediately sign out so the partially-authenticated session can't
+          // be used by back-button or a reload while the TOTP step is open.
+          // We'll re-authenticate with the same password after the code is
+          // entered.
+          setMfaFactorId(verifiedTotp.id);
+          return; // Render the TOTP step
         }
         navigate("/");
       } else {

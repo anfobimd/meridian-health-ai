@@ -1,6 +1,12 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth, useRBAC } from "@/contexts/RBACContext";
+
+// Shared phone validator — also used by the provider form below.
+// Accepts optional leading + and 7–15 digits of (plus separators/spaces),
+// rejects gibberish and excessively long numbers (QA #16).
+const PHONE_REGEX = /^\+?[0-9][0-9\s\-().]{6,18}$/;
+const normalizePhoneForStorage = (p: string) => p.replace(/[^\d+]/g, "");
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +20,7 @@ import { Loader2, Save, UserCircle, Plus, X, Upload, Sparkles, CheckCircle2, Ale
 
 export default function ProviderProfile() {
   const { user } = useAuth();
+  const { role } = useRBAC();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(true);
@@ -69,13 +76,30 @@ export default function ProviderProfile() {
     return { percent: Math.round((filledTotal / total) * 100), filled: filledTotal, total };
   }, [bio, specialty, credentials, phone, licenseNumber, npi, marketplaceBio, modalities, avatarUrl]);
 
+  const providerPhoneError = phone.length > 0 && !PHONE_REGEX.test(phone)
+    ? "Enter a valid phone number (7–15 digits, optional + prefix)"
+    : "";
+
   const handleSave = async () => {
     if (!provider) return;
+    if (providerPhoneError) {
+      toast({ title: "Invalid phone number", description: providerPhoneError, variant: "destructive" });
+      return;
+    }
     setSaving(true);
     try {
       const { error } = await supabase
         .from("providers")
-        .update({ bio, specialty, credentials, phone, license_number: licenseNumber, npi, marketplace_bio: marketplaceBio, modalities })
+        .update({
+          bio,
+          specialty,
+          credentials,
+          phone: phone ? normalizePhoneForStorage(phone) : "",
+          license_number: licenseNumber,
+          npi,
+          marketplace_bio: marketplaceBio,
+          modalities,
+        })
         .eq("id", provider.id);
       if (error) throw error;
       toast({ title: "Profile updated" });
@@ -146,7 +170,12 @@ export default function ProviderProfile() {
     return <div className="flex items-center justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
   }
 
-  if (!provider) {
+  // QA #6: super_admin / admin / billing / marketing users should see the
+  // Basic profile form regardless of whether a stale `providers` row exists
+  // for their account (legacy seed data created rows for every user). The
+  // Provider-specific form is only relevant to clinical roles.
+  const nonClinicalRoles: (typeof role)[] = ["super_admin", "admin", "billing", "marketing", "user"];
+  if (!provider || (role && nonClinicalRoles.includes(role))) {
     return <BasicProfileForm />;
   }
 
@@ -192,7 +221,7 @@ export default function ProviderProfile() {
             </p>
           </div>
         </div>
-        <Button onClick={handleSave} disabled={saving}>
+        <Button onClick={handleSave} disabled={saving || !!providerPhoneError}>
           {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
           Save Changes
         </Button>
@@ -240,7 +269,18 @@ export default function ProviderProfile() {
             </div>
             <div className="space-y-1.5">
               <Label>Phone</Label>
-              <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Contact number" />
+              <Input
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+1 555 123 4567"
+                type="tel"
+                inputMode="tel"
+                maxLength={20}
+                aria-invalid={!!providerPhoneError}
+              />
+              {providerPhoneError && (
+                <p className="text-xs text-destructive">{providerPhoneError}</p>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -309,9 +349,12 @@ function BasicProfileForm() {
   const [phone, setPhone] = useState("");
   const [title, setTitle] = useState("");
   const [timezone, setTimezone] = useState("America/Los_Angeles");
+  const [emailInput, setEmailInput] = useState("");
+  const [updatingEmail, setUpdatingEmail] = useState(false);
 
   useEffect(() => {
     if (!user) return;
+    setEmailInput(user.email || "");
     (async () => {
       setLoading(true);
       const { data } = await (supabase as any)
@@ -333,15 +376,33 @@ function BasicProfileForm() {
     })();
   }, [user]);
 
+  const phoneError = phone.length > 0 && !PHONE_REGEX.test(phone)
+    ? "Enter a valid phone number (7–15 digits, optional + prefix)"
+    : "";
+
   const save = async () => {
     if (!user) return;
+    if (phoneError) {
+      toast({ title: "Invalid phone number", description: phoneError, variant: "destructive" });
+      return;
+    }
     setSaving(true);
+    // Hard watchdog so a hung Supabase call can't leave the button spinning.
+    const watchdog = setTimeout(() => {
+      setSaving(false);
+      toast({
+        title: "Save is taking longer than expected",
+        description: "Check your network and try again.",
+        variant: "destructive",
+      });
+    }, 8000);
     try {
-      // upsert with onConflict on user_id still hit the unique constraint for
-      // existing rows because id (the primary key) was being inserted as a new
-      // uuid. Switch to explicit check-then-update/insert, which is what this
-      // form actually needs.
-      const payload = { display_name: displayName, phone, title, timezone };
+      const payload = {
+        display_name: displayName,
+        phone: phone ? normalizePhoneForStorage(phone) : "",
+        title,
+        timezone,
+      };
       const { data: existing } = await supabase
         .from("profiles")
         .select("id")
@@ -352,22 +413,54 @@ function BasicProfileForm() {
         const { error } = await (supabase as any)
           .from("profiles")
           .update(payload)
-          .eq("user_id", user.id);
+          .eq("user_id", user.id)
+          .select()
+          .maybeSingle();
         if (error) throw error;
       } else {
         const { error } = await (supabase as any)
           .from("profiles")
-          .insert({ ...payload, user_id: user.id });
+          .insert({ ...payload, user_id: user.id })
+          .select()
+          .single();
         if (error) throw error;
       }
 
-      // Sync display_name to auth.users metadata so it appears in admin lists
+      // Sync display_name to auth.users metadata so it appears in admin lists.
       await supabase.auth.updateUser({ data: { full_name: displayName } });
+      clearTimeout(watchdog);
       toast({ title: "Profile updated" });
     } catch (err: any) {
+      clearTimeout(watchdog);
       toast({ title: "Save failed", description: err.message, variant: "destructive" });
     } finally {
       setSaving(false);
+    }
+  };
+
+  // QA #17: super_admin can't update their email. Supabase supports this via
+  // auth.updateUser({email}); the change requires email confirmation by
+  // default, so the user will get a verification link at the new address.
+  const changeEmail = async () => {
+    if (!user) return;
+    const trimmed = emailInput.trim().toLowerCase();
+    if (!trimmed || trimmed === user.email?.toLowerCase()) return;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      toast({ title: "Invalid email", variant: "destructive" });
+      return;
+    }
+    setUpdatingEmail(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ email: trimmed });
+      if (error) throw error;
+      toast({
+        title: "Check both inboxes",
+        description: "A confirmation link was sent to your current and new email. Click both to complete the change.",
+      });
+    } catch (err: any) {
+      toast({ title: "Couldn't update email", description: err.message, variant: "destructive" });
+    } finally {
+      setUpdatingEmail(false);
     }
   };
 
@@ -420,8 +513,14 @@ function BasicProfileForm() {
               type="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              placeholder="(555) 123-4567"
+              placeholder="+1 555 123 4567"
+              maxLength={20}
+              inputMode="tel"
+              aria-invalid={!!phoneError}
             />
+            {phoneError && (
+              <p className="text-xs text-destructive">{phoneError}</p>
+            )}
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="bp-tz">Personal timezone</Label>
@@ -441,13 +540,33 @@ function BasicProfileForm() {
             </p>
           </div>
           <div className="space-y-1.5">
-            <Label>Email</Label>
-            <Input value={user?.email || ""} disabled />
+            <Label htmlFor="bp-email">Email (sign-in)</Label>
+            <div className="flex gap-2">
+              <Input
+                id="bp-email"
+                type="email"
+                value={emailInput}
+                onChange={(e) => setEmailInput(e.target.value)}
+                placeholder="you@clinic.com"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={changeEmail}
+                disabled={
+                  updatingEmail ||
+                  !emailInput.trim() ||
+                  emailInput.trim().toLowerCase() === (user?.email || "").toLowerCase()
+                }
+              >
+                {updatingEmail ? <Loader2 className="h-4 w-4 animate-spin" /> : "Update email"}
+              </Button>
+            </div>
             <p className="text-xs text-muted-foreground">
-              To change your sign-in email, contact a super admin.
+              Changing your email sends a confirmation link to both the old and new addresses.
             </p>
           </div>
-          <Button onClick={save} disabled={saving || !displayName.trim()}>
+          <Button onClick={save} disabled={saving || !displayName.trim() || !!phoneError}>
             {saving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving…</> : <><Save className="mr-2 h-4 w-4" />Save</>}
           </Button>
         </CardContent>

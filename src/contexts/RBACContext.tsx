@@ -352,6 +352,10 @@ interface RBACState {
   clinicId: string | null;
   loading: boolean;
   signOut: () => Promise<void>;
+  /** Revokes every server-side session for the current user (kills all
+   *  outstanding access tokens too, unlike signOut({scope:"global"}) which
+   *  only nukes refresh tokens). Used after password change / reset. */
+  revokeAllSessionsAndSignOut: () => Promise<void>;
   hasPermission: (perm: Permission) => boolean;
   hasRole: (...roles: AppRole[]) => boolean;
   hasMinRole: (minRole: AppRole) => boolean;
@@ -364,6 +368,7 @@ const RBACContext = createContext<RBACState>({
   clinicId: null,
   loading: true,
   signOut: async () => {},
+  revokeAllSessionsAndSignOut: async () => {},
   hasPermission: () => false,
   hasRole: () => false,
   hasMinRole: () => false,
@@ -382,26 +387,36 @@ export function RBACProvider({ children }: { children: ReactNode }) {
   const [clinicId, setClinicId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchRole = async (userId: string) => {
+  const fetchRole = async (_userId: string) => {
     try {
-      // Some users have multiple rows (e.g. super_admin + front_desk from the
-      // allowlist trigger). Take the highest-privilege one rather than
-      // .maybeSingle() (which errors on >1 row and would wipe the role).
-      const { data: rows, error: roleError } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", userId);
+      // Use the SECURITY DEFINER RPC `get_my_roles` so the query can't be
+      // blocked by a stale JWT/RLS race on hard refresh or tab-refocus
+      // (QA #12 / #14). Fall back to direct SELECT only if the RPC errors —
+      // e.g. migration not yet deployed.
+      let allRoles: AppRole[] = [];
 
-      if (roleError) {
-        console.warn("[RBAC] Failed to fetch user role:", roleError.message);
-        // Important: on transient fetch errors, DO NOT clobber the existing
-        // role. Issue #14 was caused by resetting role → "user" mid-session.
-        return;
+      const rpc = await supabase.rpc("get_my_roles");
+      if (!rpc.error && Array.isArray(rpc.data)) {
+        allRoles = rpc.data.map((r: { role: AppRole }) => r.role);
+      } else {
+        const fallback = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", _userId);
+        if (fallback.error) {
+          console.warn("[RBAC] Role fetch failed (RPC + direct):", rpc.error, fallback.error);
+          // Do NOT clobber existing role on transient failure. The sidebar
+          // keeps whatever we last resolved (QA #14).
+          return;
+        }
+        allRoles = (fallback.data ?? []).map((r: { role: AppRole }) => r.role);
       }
 
-      const allRoles = (rows ?? []).map((r: { role: AppRole }) => r.role);
       if (allRoles.length === 0) {
-        setRole("user");
+        // Only downgrade to "user" if we have never resolved a real role. If
+        // we already have one cached (role !== null), keep it — the empty
+        // response is almost always RLS starvation, not a real role removal.
+        setRole((prev) => prev ?? "user");
         return;
       }
       const priority: AppRole[] = [
@@ -505,14 +520,28 @@ export function RBACProvider({ children }: { children: ReactNode }) {
     const events: (keyof WindowEventMap)[] = ["mousemove", "keydown", "click", "scroll", "touchstart"];
     events.forEach((e) => window.addEventListener(e, reset, { passive: true }));
 
-    // Pull configured timeout (don't block UI on this)
-    (supabase as any).from("clinic_settings").select("session_timeout_minutes").maybeSingle().then(({ data }: any) => {
-      const m = data?.session_timeout_minutes;
-      if (typeof m === "number" && m > 0) {
-        timeoutMs = m * 60 * 1000;
-        reset();
-      }
-    });
+    // Pull configured timeout (don't block UI on this). Use limit(1) so
+    // multiple settings rows (shouldn't happen, but) don't throw and leave
+    // the default 60-min value in place. `as any` because clinic_settings
+    // isn't in the generated types yet — created by the QA round-two
+    // migration and Lovable hasn't regenerated them.
+    (supabase as any)
+      .from("clinic_settings")
+      .select("session_timeout_minutes")
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data, error }: any) => {
+        if (error) {
+          console.warn("[RBAC] clinic_settings fetch failed, using default timeout:", error.message);
+          return;
+        }
+        const m = data?.session_timeout_minutes;
+        if (typeof m === "number" && m > 0) {
+          timeoutMs = m * 60 * 1000;
+          reset();
+        }
+      });
     reset();
 
     return () => {
@@ -522,26 +551,7 @@ export function RBACProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
-  const signOut = async () => {
-    // Defense in depth: whether or not the network call succeeds, we want to
-    // end up on /auth with no session. Issue #13 (sign-out stops working
-    // after re-login) was caused by the global signOut hanging on a stale
-    // refresh token — we'd await forever, nothing happened on screen.
-    //
-    // Approach:
-    //   1. Fire signOut but don't block indefinitely (race with a 3s timeout)
-    //   2. Clear local state regardless
-    //   3. Purge Supabase's localStorage keys manually so a stale session
-    //      can't rehydrate on reload
-    //   4. Hard-navigate to /auth so route guards re-resolve from scratch
-    try {
-      await Promise.race([
-        supabase.auth.signOut({ scope: "global" }),
-        new Promise((resolve) => setTimeout(resolve, 3000)),
-      ]);
-    } catch (err) {
-      console.warn("[RBAC] signOut network call errored, continuing:", err);
-    }
+  const purgeLocalSessionAndRedirect = () => {
     setUser(null);
     setSession(null);
     setRole(null);
@@ -552,6 +562,46 @@ export function RBACProvider({ children }: { children: ReactNode }) {
         .forEach((k) => localStorage.removeItem(k));
     } catch { /* localStorage may be unavailable */ }
     window.location.assign("/auth");
+  };
+
+  const signOut = async () => {
+    // Defense in depth: whether or not the network call succeeds, we want to
+    // end up on /auth with no session. Issue #13 (sign-out stops working
+    // after re-login) was caused by the global signOut hanging on a stale
+    // refresh token — we'd await forever, nothing happened on screen.
+    try {
+      await Promise.race([
+        supabase.auth.signOut({ scope: "global" }),
+        new Promise((resolve) => setTimeout(resolve, 3000)),
+      ]);
+    } catch (err) {
+      console.warn("[RBAC] signOut network call errored, continuing:", err);
+    }
+    purgeLocalSessionAndRedirect();
+  };
+
+  // Kills *all* active access tokens server-side via the admin API (the only
+  // way to invalidate outstanding JWTs before their natural 1-hour expiry).
+  // Must be called after any password change so the pre-change JWT can't be
+  // used by an attacker who captured it (QA #5).
+  const revokeAllSessionsAndSignOut = async () => {
+    try {
+      await Promise.race([
+        supabase.functions.invoke("revoke-my-sessions", {}),
+        new Promise((resolve) => setTimeout(resolve, 4000)),
+      ]);
+    } catch (err) {
+      console.warn("[RBAC] revoke-my-sessions errored, continuing:", err);
+    }
+    // Still fire the client-side signOut so the local storage is clean even
+    // if the server call didn't return in time.
+    try {
+      await Promise.race([
+        supabase.auth.signOut({ scope: "global" }),
+        new Promise((resolve) => setTimeout(resolve, 2000)),
+      ]);
+    } catch { /* swallow */ }
+    purgeLocalSessionAndRedirect();
   };
 
   /** Check if current user has a specific permission */
@@ -583,7 +633,7 @@ export function RBACProvider({ children }: { children: ReactNode }) {
 
   return (
     <RBACContext.Provider
-      value={{ user, session, role, clinicId, loading, signOut, hasPermission, hasRole, hasMinRole }}
+      value={{ user, session, role, clinicId, loading, signOut, revokeAllSessionsAndSignOut, hasPermission, hasRole, hasMinRole }}
     >
       {children}
     </RBACContext.Provider>

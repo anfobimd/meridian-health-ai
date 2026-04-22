@@ -39,13 +39,30 @@ export default function MasterCatalog() {
     mutationFn: async () => {
       let rules = {};
       if (form.platform_rules) { try { rules = JSON.parse(form.platform_rules); } catch {} }
-      const { error } = await supabase.from("master_catalog_items").insert({
-        name: form.name,
-        item_type: form.item_type,
-        category: form.category || null,
-        platform_rules: rules,
-      });
-      if (error) throw error;
+      // Race the insert against an 8s watchdog so a silently-blocked RLS
+      // check doesn't leave the button in a permanent spinner (QA #10).
+      // .select().single() forces the row to round-trip so a zero-row RLS
+      // rejection surfaces as an error instead of a silent no-op.
+      const insertPromise = supabase
+        .from("master_catalog_items")
+        .insert({
+          name: form.name,
+          item_type: form.item_type,
+          category: form.category || null,
+          platform_rules: rules,
+        })
+        .select()
+        .single();
+      const result = await Promise.race([
+        insertPromise,
+        new Promise<{ error: Error }>((resolve) =>
+          setTimeout(
+            () => resolve({ error: new Error("Request timed out after 8s — check your network or permissions") }),
+            8000,
+          ),
+        ),
+      ]);
+      if ((result as { error?: Error }).error) throw (result as { error: Error }).error;
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["master-catalog"] }); setAddOpen(false); setForm({ name: "", item_type: "procedure", category: "", platform_rules: "" }); toast.success("Item added to catalog"); },
     onError: (err: Error) => toast.error("Failed to add item", { description: err.message }),

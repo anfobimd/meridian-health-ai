@@ -33,7 +33,7 @@ function getLocalStrength(pw: string): { score: number; label: string } {
 }
 
 export default function Settings() {
-  const { user, role, signOut } = useAuth();
+  const { user, role, revokeAllSessionsAndSignOut } = useAuth();
   const { toast } = useToast();
 
   // MFA state
@@ -119,13 +119,15 @@ export default function Settings() {
         }
         throw error;
       }
-      toast({ title: "Password Updated", description: "You'll be signed out for security. Please sign in with your new password." });
+      toast({ title: "Password Updated", description: "Signing you out of all sessions for security." });
       setNewPassword("");
       setConfirmPassword("");
       setAiScore(null);
       setFailedAttempts(0);
-      // Session invalidation — sign out after brief delay
-      setTimeout(() => signOut(), 2000);
+      // Kill every outstanding access token (not just the current one) via the
+      // admin API. signOut({scope:"global"}) alone only revokes refresh tokens
+      // — the pre-change JWT remains valid for up to 1h, which is QA #5.
+      setTimeout(() => revokeAllSessionsAndSignOut(), 1500);
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {
@@ -538,7 +540,16 @@ function PlatformSettings() {
   useEffect(() => {
     (async () => {
       setLoading(true);
-      const { data } = await (supabase as any).from("clinic_settings").select("*").maybeSingle();
+      // .limit(1).maybeSingle() instead of .maybeSingle() so >1 row doesn't
+      // blank the form (which then goes down the INSERT path and creates
+      // duplicates — QA #8). `as any` cast because clinic_settings is not
+      // yet in the generated Supabase types.
+      const { data } = await (supabase as any)
+        .from("clinic_settings")
+        .select("*")
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle();
       if (data) {
         setSettingsId(data.id);
         setDefaultTz(data.default_timezone || "America/Los_Angeles");
@@ -559,6 +570,16 @@ function PlatformSettings() {
 
   const save = async () => {
     setSaving(true);
+    // Hard watchdog: if Supabase hangs (the spinner-forever case Faz hit in
+    // QA #8), release the button and show a clear error instead.
+    const watchdog = setTimeout(() => {
+      setSaving(false);
+      toast({
+        title: "Save is taking longer than expected",
+        description: "Check your network and try again. If it persists, refresh the page.",
+        variant: "destructive",
+      });
+    }, 8000);
     try {
       const payload = {
         default_timezone: defaultTz,
@@ -568,12 +589,33 @@ function PlatformSettings() {
         notify_on_md_approval_due: notifMdApproval,
         updated_at: new Date().toISOString(),
       };
-      const { error } = settingsId
-        ? await (supabase as any).from("clinic_settings").update(payload).eq("id", settingsId)
-        : await (supabase as any).from("clinic_settings").insert(payload);
-      if (error) throw error;
+      // .select().single() forces the driver to return the affected row, so
+      // any RLS rejection surfaces as an error rather than silently matching
+      // zero rows (which the earlier code treated as success).
+      let resp;
+      if (settingsId) {
+        resp = await (supabase as any)
+          .from("clinic_settings")
+          .update(payload)
+          .eq("id", settingsId)
+          .select()
+          .maybeSingle();
+      } else {
+        resp = await (supabase as any)
+          .from("clinic_settings")
+          .insert(payload)
+          .select()
+          .single();
+      }
+      clearTimeout(watchdog);
+      if (resp.error) throw resp.error;
+      if (!resp.data) {
+        throw new Error("Save completed but no row was returned — you may lack permission to update settings.");
+      }
+      if (!settingsId && resp.data?.id) setSettingsId(resp.data.id);
       toast({ title: "Settings saved" });
     } catch (err: any) {
+      clearTimeout(watchdog);
       toast({ title: "Save failed", description: err.message, variant: "destructive" });
     } finally {
       setSaving(false);
