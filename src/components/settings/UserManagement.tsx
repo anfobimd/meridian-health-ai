@@ -84,33 +84,73 @@ export function UserManagement() {
 
   const fetchData = useCallback(async () => {
     setLoading(true);
-    const [profilesRes, rolesRes, providersRes] = await Promise.all([
-      supabase.from("profiles").select("user_id, display_name"),
-      supabase.from("user_roles").select("user_id, role"),
-      supabase.from("providers").select("id, first_name, last_name, user_id"),
-    ]);
+    try {
+      // Pull the full user list + emails + roles from the admin-users edge
+      // function (service-role). The prior implementation read only the
+      // profiles table and hardcoded email to null, so searching by email
+      // returned zero results — QA #6 reopened because Faz couldn't find
+      // himself by `testerfz69@gmail.com`.
+      const [adminRes, providersRes, profilesRes] = await Promise.all([
+        supabase.functions.invoke("admin-users", { body: { action: "list" } }),
+        supabase.from("providers").select("id, first_name, last_name, user_id"),
+        supabase.from("profiles").select("user_id, display_name"),
+      ]);
 
-    const profiles = profilesRes.data ?? [];
-    const roles = rolesRes.data ?? [];
-    const roleMap = new Map(roles.map((r) => [r.user_id, r.role as AppRole]));
+      // Build a display_name map from profiles (auth.users has no name).
+      const nameMap = new Map<string, string | null>();
+      for (const p of (profilesRes.data ?? [])) {
+        nameMap.set(p.user_id, p.display_name);
+      }
 
-    setUsers(
-      profiles.map((p) => ({
-        user_id: p.user_id,
-        display_name: p.display_name,
-        email: null,
-        role: roleMap.get(p.user_id) ?? null,
-      }))
-    );
-    setProviders(
-      (providersRes.data ?? []).map((p) => ({
-        id: p.id,
-        name: `${p.first_name} ${p.last_name}`,
-        user_id: p.user_id,
-      }))
-    );
-    setLoading(false);
-  }, []);
+      type AdminUser = { id: string; email: string | null; roles: string[] };
+      const rows: UserRow[] = [];
+      if (adminRes.error || adminRes.data?.error) {
+        // Fall back to the old profiles-only shape if the edge function
+        // isn't deployed / caller isn't super_admin. Better than nothing.
+        const rolesRes = await supabase.from("user_roles").select("user_id, role");
+        const roleMap = new Map((rolesRes.data ?? []).map((r) => [r.user_id, r.role as AppRole]));
+        for (const p of (profilesRes.data ?? [])) {
+          rows.push({
+            user_id: p.user_id,
+            display_name: p.display_name,
+            email: null,
+            role: roleMap.get(p.user_id) ?? null,
+          });
+        }
+      } else {
+        for (const u of (adminRes.data?.users ?? []) as AdminUser[]) {
+          // Pick the single highest-privilege role for the badge. The
+          // admin-users function returns an array.
+          const priority: AppRole[] = [
+            "super_admin", "admin", "clinic_owner", "medical_director",
+            "physician", "nurse_practitioner", "physician_assistant",
+            "registered_nurse", "provider", "aesthetician", "front_desk",
+            "billing", "marketing", "user",
+          ];
+          const best = (priority.find((r) => u.roles.includes(r)) ?? null) as AppRole | null;
+          rows.push({
+            user_id: u.id,
+            display_name: nameMap.get(u.id) ?? null,
+            email: u.email,
+            role: best,
+          });
+        }
+      }
+
+      setUsers(rows);
+      setProviders(
+        (providersRes.data ?? []).map((p) => ({
+          id: p.id,
+          name: `${p.first_name} ${p.last_name}`,
+          user_id: p.user_id,
+        })),
+      );
+    } catch (err: any) {
+      toast({ title: "Couldn't load users", description: err.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  }, [toast]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 

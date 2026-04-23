@@ -37,12 +37,17 @@ export default function MasterCatalog() {
 
   const addItem = useMutation({
     mutationFn: async () => {
-      let rules = {};
-      if (form.platform_rules) { try { rules = JSON.parse(form.platform_rules); } catch {} }
+      let rules: Record<string, unknown> = {};
+      if (form.platform_rules) {
+        try { rules = JSON.parse(form.platform_rules); } catch {
+          throw new Error("Platform Rules must be valid JSON");
+        }
+      }
       // Race the insert against an 8s watchdog so a silently-blocked RLS
-      // check doesn't leave the button in a permanent spinner (QA #10).
-      // .select().single() forces the row to round-trip so a zero-row RLS
-      // rejection surfaces as an error instead of a silent no-op.
+      // check doesn't leave the button in a permanent "Adding…" spinner
+      // (QA #10). .select().single() forces the row to round-trip so a
+      // zero-row RLS rejection surfaces as an error instead of a silent
+      // no-op.
       const insertPromise = supabase
         .from("master_catalog_items")
         .insert({
@@ -53,19 +58,36 @@ export default function MasterCatalog() {
         })
         .select()
         .single();
-      const result = await Promise.race([
-        insertPromise,
-        new Promise<{ error: Error }>((resolve) =>
-          setTimeout(
-            () => resolve({ error: new Error("Request timed out after 8s — check your network or permissions") }),
-            8000,
-          ),
+      const timeoutPromise = new Promise<{ error: { message: string } }>((resolve) =>
+        setTimeout(
+          () =>
+            resolve({
+              error: {
+                message:
+                  "Request timed out after 8s. Possible causes: you're at AAL1 while MFA is required, RLS blocked the insert, or the network is unreachable. Refresh and re-authenticate, then retry.",
+              },
+            }),
+          8000,
         ),
-      ]);
-      if ((result as { error?: Error }).error) throw (result as { error: Error }).error;
+      );
+      const result = (await Promise.race([insertPromise, timeoutPromise])) as {
+        error?: { message: string } | null;
+        data?: unknown;
+      };
+      if (result.error) throw new Error(result.error.message);
+      if (!result.data) throw new Error("Insert returned no row — you may lack permission to add catalog items.");
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["master-catalog"] }); setAddOpen(false); setForm({ name: "", item_type: "procedure", category: "", platform_rules: "" }); toast.success("Item added to catalog"); },
-    onError: (err: Error) => toast.error("Failed to add item", { description: err.message }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["master-catalog"] });
+      setAddOpen(false);
+      setForm({ name: "", item_type: "procedure", category: "", platform_rules: "" });
+      toast.success("Item added to catalog");
+    },
+    onError: (err: Error) => {
+      // Keep the dialog open so the user can retry without re-typing. The
+      // `Adding…` state resets automatically once this handler runs.
+      toast.error("Failed to add item", { description: err.message });
+    },
   });
 
   const deprecate = useMutation({
