@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { Navigate, Outlet } from "react-router-dom";
-import { Loader2, ShieldAlert } from "lucide-react";
+import { Loader2, ShieldAlert, RefreshCw } from "lucide-react";
 import { useAuth, type AppRole, type Permission } from "@/contexts/RBACContext";
 import { MfaUpgradeGate } from "./MfaUpgradeGate";
+import { Button } from "@/components/ui/button";
 
 interface ProtectedRouteProps {
   /** Require a specific permission */
@@ -13,7 +15,8 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ require, roles, minRole }: ProtectedRouteProps) {
-  const { user, role, loading, mfaUpgradeRequired, hasPermission, hasRole, hasMinRole } = useAuth();
+  const { user, role, loading, mfaUpgradeRequired, refreshRole, hasPermission, hasRole, hasMinRole } = useAuth();
+  const [retrying, setRetrying] = useState(false);
 
   if (loading) {
     return (
@@ -41,14 +44,22 @@ export function ProtectedRoute({ require, roles, minRole }: ProtectedRouteProps)
   if (minRole) allowed = hasMinRole(minRole);
 
   if (!allowed) {
+    const handleRetry = async () => {
+      setRetrying(true);
+      try { await refreshRole(); } finally { setRetrying(false); }
+    };
     return (
       <div className="flex flex-col items-center justify-center min-h-screen text-center p-8">
         <ShieldAlert className="h-12 w-12 text-destructive mb-4 mx-auto" />
         <h2 className="text-xl font-semibold mb-2">Access Denied</h2>
-        <p className="text-muted-foreground max-w-md">
+        <p className="text-muted-foreground max-w-md mb-4">
           Your role ({role || "none"}) does not have permission to access this page.
-          Contact your administrator if you believe this is an error.
+          {!role && " This can happen during a session refresh — click Retry to reload your role."}
         </p>
+        <Button variant="outline" onClick={handleRetry} disabled={retrying}>
+          {retrying ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+          Retry
+        </Button>
       </div>
     );
   }

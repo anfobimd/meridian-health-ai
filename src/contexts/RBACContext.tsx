@@ -363,6 +363,10 @@ interface RBACState {
   revokeAllSessionsAndSignOut: () => Promise<void>;
   /** Clears the mfaUpgradeRequired flag after a successful TOTP verify. */
   markMfaUpgraded: () => void;
+  /** Force an immediate re-fetch of the current user's roles. Used by the
+   *  Access Denied screen's "Retry" button so users can recover from a
+   *  transient role clobber without fully signing out (QA #14). */
+  refreshRole: () => Promise<void>;
   hasPermission: (perm: Permission) => boolean;
   hasRole: (...roles: AppRole[]) => boolean;
   hasMinRole: (minRole: AppRole) => boolean;
@@ -378,10 +382,32 @@ const RBACContext = createContext<RBACState>({
   signOut: async () => {},
   revokeAllSessionsAndSignOut: async () => {},
   markMfaUpgraded: () => {},
+  refreshRole: async () => {},
   hasPermission: () => false,
   hasRole: () => false,
   hasMinRole: () => false,
 });
+
+// Ranks for deciding whether a new role fetch represents a downgrade we
+// should treat with suspicion. When a previously-resolved super_admin
+// suddenly returns as "user" or null on a re-fetch, that's almost always
+// a stale-JWT/RLS race — not an actual role change.
+const ROLE_SUSPICION_RANK: Record<string, number> = {
+  super_admin: 100,
+  admin: 90,
+  clinic_owner: 85,
+  medical_director: 80,
+  physician: 75,
+  nurse_practitioner: 70,
+  physician_assistant: 65,
+  registered_nurse: 60,
+  provider: 55,
+  aesthetician: 50,
+  front_desk: 40,
+  billing: 35,
+  marketing: 30,
+  user: 10,
+};
 
 /** Drop-in replacement for useAuth() — same interface + new RBAC helpers */
 export const useAuth = () => useContext(RBACContext);
@@ -422,35 +448,45 @@ export function RBACProvider({ children }: { children: ReactNode }) {
 
   const markMfaUpgraded = useCallback(() => setMfaUpgradeRequired(false), []);
 
-  const fetchRole = async (_userId: string) => {
-    try {
-      // Use the SECURITY DEFINER RPC `get_my_roles` so the query can't be
-      // blocked by a stale JWT/RLS race on hard refresh or tab-refocus
-      // (QA #12 / #14). Fall back to direct SELECT only if the RPC errors —
-      // e.g. migration not yet deployed.
-      let allRoles: AppRole[] = [];
+  const fetchRoleOnce = async (_userId: string): Promise<AppRole[] | null> => {
+    // Returns null on transient failure (caller should keep existing role),
+    // or an array of roles (possibly empty → user has truly no roles).
+    const rpc = await supabase.rpc("get_my_roles");
+    if (!rpc.error && Array.isArray(rpc.data)) {
+      return rpc.data.map((r: { role: AppRole }) => r.role);
+    }
+    const fallback = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", _userId);
+    if (fallback.error) {
+      console.warn("[RBAC] Role fetch failed (RPC + direct):", rpc.error, fallback.error);
+      return null;
+    }
+    return (fallback.data ?? []).map((r: { role: AppRole }) => r.role);
+  };
 
-      const rpc = await supabase.rpc("get_my_roles");
-      if (!rpc.error && Array.isArray(rpc.data)) {
-        allRoles = rpc.data.map((r: { role: AppRole }) => r.role);
-      } else {
-        const fallback = await supabase
-          .from("user_roles")
-          .select("role")
-          .eq("user_id", _userId);
-        if (fallback.error) {
-          console.warn("[RBAC] Role fetch failed (RPC + direct):", rpc.error, fallback.error);
-          // Do NOT clobber existing role on transient failure. The sidebar
-          // keeps whatever we last resolved (QA #14).
-          return;
-        }
-        allRoles = (fallback.data ?? []).map((r: { role: AppRole }) => r.role);
+  const fetchRole = useCallback(async (userId: string) => {
+    try {
+      let allRoles = await fetchRoleOnce(userId);
+
+      // Retry once on transient failure after a 400ms delay — token refresh
+      // races can briefly cause RLS to return empty/error on user_roles.
+      if (allRoles === null) {
+        await new Promise((r) => setTimeout(r, 400));
+        allRoles = await fetchRoleOnce(userId);
+      }
+
+      if (allRoles === null) {
+        // Both tries failed — keep whatever we had. Never clobber to null/user.
+        return;
       }
 
       if (allRoles.length === 0) {
-        // Only downgrade to "user" if we have never resolved a real role. If
-        // we already have one cached (role !== null), keep it — the empty
-        // response is almost always RLS starvation, not a real role removal.
+        // Empty is treated with suspicion: if we had any resolved role,
+        // keep it. Only downgrade to "user" if we have literally never
+        // resolved (role is null). This guards against the TOKEN_REFRESHED
+        // race that clobbered super_admin → user mid-session (QA #14).
         setRole((prev) => prev ?? "user");
         return;
       }
@@ -460,13 +496,33 @@ export function RBACProvider({ children }: { children: ReactNode }) {
         "registered_nurse", "provider", "aesthetician", "front_desk",
         "billing", "marketing", "user",
       ];
-      const best = priority.find((r) => allRoles.includes(r)) ?? "user";
-      setRole(best);
+      const best = priority.find((r) => allRoles!.includes(r)) ?? "user";
+
+      // Suspicion check: if the new role is dramatically lower than what
+      // we previously resolved, don't apply it. E.g. super_admin (100) →
+      // user (10) on a single flaky re-fetch is not a real demotion.
+      setRole((prev) => {
+        if (!prev) return best;
+        const prevRank = ROLE_SUSPICION_RANK[prev] ?? 0;
+        const newRank = ROLE_SUSPICION_RANK[best] ?? 0;
+        if (prevRank >= 80 && newRank < prevRank - 40) {
+          console.warn(
+            `[RBAC] Refusing to downgrade ${prev} → ${best} from a single re-fetch; keeping ${prev}.`,
+          );
+          return prev;
+        }
+        return best;
+      });
     } catch (err) {
       console.error("[RBAC] Unexpected error in fetchRole:", err);
       // Don't reset role on errors — keep last-known-good value
     }
-  };
+  }, []);
+
+  const refreshRole = useCallback(async () => {
+    if (!user?.id) return;
+    await fetchRole(user.id);
+  }, [user?.id, fetchRole]);
 
   useEffect(() => {
     // Track whether the initial session has been handled to avoid double-loading
@@ -674,7 +730,7 @@ export function RBACProvider({ children }: { children: ReactNode }) {
 
   return (
     <RBACContext.Provider
-      value={{ user, session, role, clinicId, loading, mfaUpgradeRequired, signOut, revokeAllSessionsAndSignOut, markMfaUpgraded, hasPermission, hasRole, hasMinRole }}
+      value={{ user, session, role, clinicId, loading, mfaUpgradeRequired, signOut, revokeAllSessionsAndSignOut, markMfaUpgraded, refreshRole, hasPermission, hasRole, hasMinRole }}
     >
       {children}
     </RBACContext.Provider>
