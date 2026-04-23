@@ -109,65 +109,27 @@ export default function Settings() {
     if (!canSubmitPassword) return;
     setChangingPassword(true);
 
-    // Hard watchdog — never leave the button spinning. If the network call
-    // hangs or the SDK never resolves (we've seen Supabase's updateUser
-    // silently stall when MFA is enrolled and the session is at AAL1), the
-    // watchdog releases the UI after 10s with a clear error. QA #3.
+    // Hard watchdog — never leave the button spinning.
     const watchdog = setTimeout(() => {
       setChangingPassword(false);
       toast({
         title: "Password update timed out",
-        description: "The server didn't respond. If you have MFA enabled, sign out and sign in again with your authenticator code, then retry.",
+        description: "The server didn't respond. Please try again.",
         variant: "destructive",
       });
-    }, 10000);
+    }, 15000);
 
     try {
-      // Pre-flight: if the account has a verified MFA factor but the current
-      // session is AAL1, `updateUser({password})` will be rejected server-side
-      // with "AAL2 required" — but in practice this surfaces as a hang in
-      // some SDK versions. Detect it before calling and surface a clear
-      // actionable message instead of a spinner that never ends. The
-      // pre-flight itself is capped at 3s so a flaky network can't stall.
-      try {
-        const preflight = await Promise.race([
-          Promise.all([
-            supabase.auth.mfa.listFactors(),
-            supabase.auth.mfa.getAuthenticatorAssuranceLevel(),
-          ]).then((r) => ({ ok: true as const, r })),
-          new Promise<{ ok: false }>((resolve) =>
-            setTimeout(() => resolve({ ok: false }), 3000),
-          ),
-        ]);
-        if (preflight.ok) {
-          const [fRes, aRes] = preflight.r;
-          const hasVerifiedTotp = !!fRes.data?.totp?.find((f) => f.status === "verified");
-          const atAal1 = aRes.data?.currentLevel !== "aal2";
-          if (hasVerifiedTotp && atAal1) {
-            clearTimeout(watchdog);
-            toast({
-              title: "Re-authenticate with MFA first",
-              description: "Password changes require a verified MFA session. Sign out, sign back in, enter your authenticator code, then retry.",
-              variant: "destructive",
-            });
-            setChangingPassword(false);
-            return;
-          }
-        }
-      } catch { /* if pre-flight fails, still try the update — don't block the happy path */ }
-
-      const resp = await Promise.race([
-        supabase.auth.updateUser({ password: newPassword }),
-        new Promise<{ error: { message: string } }>((resolve) =>
-          setTimeout(
-            () => resolve({ error: { message: "Request timed out after 8s — check your connection or MFA state" } }),
-            8000,
-          ),
-        ),
-      ]);
+      // Call the server-side self-change-password function. It updates
+      // the password with the service role (bypassing the AAL2 constraint
+      // that silently stalled the client-side updateUser call for users
+      // with MFA — QA #3 / #5), verifies the change actually took, and
+      // revokes every outstanding session atomically.
+      const { data, error } = await supabase.functions.invoke("self-change-password", {
+        body: { new_password: newPassword },
+      });
       clearTimeout(watchdog);
 
-      const error = (resp as { error?: { message: string } }).error;
       if (error) {
         const next = failedAttempts + 1;
         setFailedAttempts(next);
@@ -175,17 +137,23 @@ export default function Settings() {
           setLockoutEnd(Date.now() + LOCKOUT_SECONDS * 1000);
           toast({ title: "Too many attempts", description: `Locked for ${LOCKOUT_SECONDS}s`, variant: "destructive" });
         }
-        throw new Error(error.message);
+        throw error;
       }
-      toast({ title: "Password Updated", description: "Signing you out of all sessions for security." });
+      if (data?.error) throw new Error(data.error);
+      if (!data?.success) throw new Error("Password update did not complete — please try again.");
+
+      toast({
+        title: "Password Updated",
+        description: "Verified change + revoked all sessions. Signing you out.",
+      });
       setNewPassword("");
       setConfirmPassword("");
       setAiScore(null);
       setFailedAttempts(0);
-      // Kill every outstanding access token (not just the current one) via
-      // the admin API. signOut({scope:"global"}) alone only revokes refresh
-      // tokens — the pre-change JWT stays valid for up to 1h (QA #5).
-      setTimeout(() => revokeAllSessionsAndSignOut(), 1500);
+      // The edge function already revoked every session server-side, but
+      // we still need to drop the local storage + hard-redirect so the
+      // SPA re-resolves auth from a clean slate.
+      setTimeout(() => revokeAllSessionsAndSignOut(), 1200);
     } catch (err: any) {
       clearTimeout(watchdog);
       toast({ title: "Error", description: err.message, variant: "destructive" });

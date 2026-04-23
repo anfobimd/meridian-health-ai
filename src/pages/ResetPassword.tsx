@@ -118,22 +118,25 @@ export default function ResetPassword() {
     }, 10000);
 
     try {
-      const { error } = await supabase.auth.updateUser({ password });
+      // Route through the self-change-password edge function. It updates
+      // the password server-side with the service role (bypassing the
+      // AAL2 constraint that silently stalls supabase.auth.updateUser for
+      // MFA-enrolled users — that was QA #5's real root cause: the hash
+      // never changed so the "old" password kept working), verifies the
+      // new password actually takes, and revokes every session atomically.
+      const { data, error } = await supabase.functions.invoke("self-change-password", {
+        body: { new_password: password },
+      });
       clearTimeout(timeoutId);
       if (error) throw error;
-      toast({ title: "Password updated", description: "You can now sign in with your new password." });
+      if (data?.error) throw new Error(data.error);
+      if (!data?.success) throw new Error("Password update did not complete — please request a new reset link.");
 
-      // Purge local session state + redirect. The previous implementation did
-      // `await supabase.auth.signOut()` which was blocking the spinner on
-      // flaky networks (QA #3). We:
-      //   1. Fire-and-forget the admin session revocation — kills every
-      //      access token the user holds, including on other devices still
-      //      running the old password (QA #5).
-      //   2. Fire-and-forget the client signOut — wipes refresh token too.
-      //   3. Purge local storage.
-      //   4. Hard-navigate to /auth so route guards re-resolve fresh.
-      supabase.functions.invoke("revoke-my-sessions", {}).catch(() => { /* swallow */ });
-      supabase.auth.signOut({ scope: "global" }).catch(() => { /* swallow */ });
+      toast({ title: "Password updated", description: "All sessions revoked. Sign in with your new password." });
+
+      // Clean up local storage + hard-navigate. Sessions are already
+      // revoked server-side by the edge function, so we don't need to
+      // await signOut.
       try {
         Object.keys(localStorage)
           .filter((k) => k.startsWith("sb-") || k.includes("supabase"))
