@@ -219,9 +219,27 @@ export default function Settings() {
   const handleEnroll = async () => {
     setEnrolling(true);
     try {
+      // Clean up any leftover UNVERIFIED factors from previous abandoned
+      // enrollments. These occupy the friendly-name slot and cause GoTrue
+      // to reject a fresh enroll with "factor already exists".
+      const { data: existingFactors } = await supabase.auth.mfa.listFactors();
+      const stale = (existingFactors?.totp || []).filter((f) => f.status !== "verified");
+      for (const f of stale) {
+        try { await supabase.auth.mfa.unenroll({ factorId: f.id }); } catch { /* swallow */ }
+      }
+
+      // Generate a unique friendlyName — including the existing verified
+      // factors in the count so "Add Another Device" doesn't collide with
+      // the original "Meridian Authenticator".
+      const verifiedCount = (existingFactors?.totp || []).filter((f) => f.status === "verified").length;
+      const friendlyName =
+        verifiedCount === 0
+          ? "Meridian Authenticator"
+          : `Meridian Authenticator #${verifiedCount + 1} (${new Date().toLocaleDateString()})`;
+
       const { data, error } = await supabase.auth.mfa.enroll({
         factorType: "totp",
-        friendlyName: "Meridian Authenticator",
+        friendlyName,
       });
       if (error) throw error;
       setQrUri(data.totp.uri);

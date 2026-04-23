@@ -351,11 +351,18 @@ interface RBACState {
   role: AppRole | null;
   clinicId: string | null;
   loading: boolean;
+  /** True if the account has a verified MFA factor but the current session
+   *  is only AAL1. The app should force a TOTP challenge before showing any
+   *  protected content — catches stale sessions from before the MFA fix
+   *  was deployed (QA #4). */
+  mfaUpgradeRequired: boolean;
   signOut: () => Promise<void>;
   /** Revokes every server-side session for the current user (kills all
    *  outstanding access tokens too, unlike signOut({scope:"global"}) which
    *  only nukes refresh tokens). Used after password change / reset. */
   revokeAllSessionsAndSignOut: () => Promise<void>;
+  /** Clears the mfaUpgradeRequired flag after a successful TOTP verify. */
+  markMfaUpgraded: () => void;
   hasPermission: (perm: Permission) => boolean;
   hasRole: (...roles: AppRole[]) => boolean;
   hasMinRole: (minRole: AppRole) => boolean;
@@ -367,8 +374,10 @@ const RBACContext = createContext<RBACState>({
   role: null,
   clinicId: null,
   loading: true,
+  mfaUpgradeRequired: false,
   signOut: async () => {},
   revokeAllSessionsAndSignOut: async () => {},
+  markMfaUpgraded: () => {},
   hasPermission: () => false,
   hasRole: () => false,
   hasMinRole: () => false,
@@ -386,6 +395,32 @@ export function RBACProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<AppRole | null>(null);
   const [clinicId, setClinicId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [mfaUpgradeRequired, setMfaUpgradeRequired] = useState(false);
+
+  // Runs whenever the user/session changes. Checks whether the account has
+  // a verified MFA factor while the current session is only AAL1 — in that
+  // state the session is "under-authenticated" and must complete a TOTP
+  // challenge before getting access to protected content (QA #4 for stale
+  // sessions that predate the Auth.tsx enforce-on-login fix).
+  const evaluateMfaGate = useCallback(async (userId: string | undefined) => {
+    if (!userId) { setMfaUpgradeRequired(false); return; }
+    try {
+      const [{ data: factors }, { data: aal }] = await Promise.all([
+        supabase.auth.mfa.listFactors(),
+        supabase.auth.mfa.getAuthenticatorAssuranceLevel(),
+      ]);
+      const hasVerifiedTotp = !!factors?.totp?.find((f) => f.status === "verified");
+      const atAal1 = aal?.currentLevel !== "aal2";
+      setMfaUpgradeRequired(hasVerifiedTotp && atAal1);
+    } catch {
+      // Network errors — fail open (don't lock users out due to transient
+      // connectivity). The Auth.tsx login-time gate still enforces MFA on
+      // fresh sign-ins.
+      setMfaUpgradeRequired(false);
+    }
+  }, []);
+
+  const markMfaUpgraded = useCallback(() => setMfaUpgradeRequired(false), []);
 
   const fetchRole = async (_userId: string) => {
     try {
@@ -451,9 +486,14 @@ export function RBACProvider({ children }: { children: ReactNode }) {
         event === "INITIAL_SESSION" || event === "SIGNED_IN";
       if (sess?.user && needsRoleFetch) {
         await fetchRole(sess.user.id);
+        // Re-evaluate the MFA gate on every initial/sign-in event so that
+        // stale AAL1 sessions are caught and a fresh AAL2 session flips
+        // the gate off.
+        evaluateMfaGate(sess.user.id);
       } else if (!sess?.user) {
         setRole(null);
         setClinicId(null);
+        setMfaUpgradeRequired(false);
       }
       // Mark initial load complete after first auth event
       if (!initialSessionHandled) {
@@ -473,6 +513,7 @@ export function RBACProvider({ children }: { children: ReactNode }) {
           setUser(existing?.user ?? null);
           if (existing?.user) {
             await fetchRole(existing.user.id);
+            evaluateMfaGate(existing.user.id);
           }
           initialSessionHandled = true;
           setLoading(false);
@@ -633,7 +674,7 @@ export function RBACProvider({ children }: { children: ReactNode }) {
 
   return (
     <RBACContext.Provider
-      value={{ user, session, role, clinicId, loading, signOut, revokeAllSessionsAndSignOut, hasPermission, hasRole, hasMinRole }}
+      value={{ user, session, role, clinicId, loading, mfaUpgradeRequired, signOut, revokeAllSessionsAndSignOut, markMfaUpgraded, hasPermission, hasRole, hasMinRole }}
     >
       {children}
     </RBACContext.Provider>

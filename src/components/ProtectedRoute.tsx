@@ -1,6 +1,7 @@
 import { Navigate, Outlet } from "react-router-dom";
 import { Loader2, ShieldAlert } from "lucide-react";
 import { useAuth, type AppRole, type Permission } from "@/contexts/RBACContext";
+import { MfaUpgradeGate } from "./MfaUpgradeGate";
 
 interface ProtectedRouteProps {
   /** Require a specific permission */
@@ -12,7 +13,7 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ require, roles, minRole }: ProtectedRouteProps) {
-  const { user, role, loading, hasPermission, hasRole, hasMinRole } = useAuth();
+  const { user, role, loading, mfaUpgradeRequired, hasPermission, hasRole, hasMinRole } = useAuth();
 
   if (loading) {
     return (
@@ -24,6 +25,13 @@ export function ProtectedRoute({ require, roles, minRole }: ProtectedRouteProps)
 
   if (!user) {
     return <Navigate to="/auth" replace />;
+  }
+
+  // Stale AAL1 sessions (signed in before MFA was enrolled, or from before
+  // the Auth.tsx MFA enforcement fix was deployed) need to complete a TOTP
+  // challenge before accessing any protected content (QA #4).
+  if (mfaUpgradeRequired) {
+    return <MfaUpgradeGate />;
   }
 
   // Check RBAC if specified
