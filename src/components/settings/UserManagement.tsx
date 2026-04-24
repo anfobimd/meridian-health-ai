@@ -11,7 +11,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Users, Loader2, Link2, Unlink, Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { Users, Loader2, Link2, Unlink, Search, ChevronLeft, ChevronRight, Pencil, Check as CheckIcon, X as XIcon } from "lucide-react";
 
 type AppRole =
   | "super_admin"
@@ -74,6 +74,12 @@ export function UserManagement() {
   // Bulk selection
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkRole, setBulkRole] = useState<string>("");
+
+  // Inline name editing — QA #6 secondary: super admin / admin users
+  // expected to edit display names from this table, not just their own.
+  const [editingNameFor, setEditingNameFor] = useState<string | null>(null);
+  const [editingNameValue, setEditingNameValue] = useState<string>("");
+  const [savingName, setSavingName] = useState<string | null>(null);
 
   // Confirmation dialog
   const [confirmAction, setConfirmAction] = useState<{
@@ -172,6 +178,46 @@ export function UserManagement() {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {
       setSaving(null);
+    }
+  };
+
+  const startEditName = (userId: string, currentName: string | null) => {
+    setEditingNameFor(userId);
+    setEditingNameValue(currentName ?? "");
+  };
+  const cancelEditName = () => {
+    setEditingNameFor(null);
+    setEditingNameValue("");
+  };
+  const saveName = async (userId: string) => {
+    const trimmed = editingNameValue.trim();
+    if (!trimmed) {
+      toast({ title: "Name can't be empty", variant: "destructive" });
+      return;
+    }
+    setSavingName(userId);
+    try {
+      // Upsert the profile row so users without an existing profile row
+      // (rare, but possible for accounts created outside the normal
+      // signup flow) still get a display name.
+      const { data: existing } = await supabase
+        .from("profiles").select("id").eq("user_id", userId).maybeSingle();
+      if (existing) {
+        const { error } = await supabase
+          .from("profiles").update({ display_name: trimmed }).eq("user_id", userId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from("profiles").insert({ user_id: userId, display_name: trimmed });
+        if (error) throw error;
+      }
+      toast({ title: "Name updated" });
+      cancelEditName();
+      await fetchData();
+    } catch (err: any) {
+      toast({ title: "Couldn't update name", description: err.message, variant: "destructive" });
+    } finally {
+      setSavingName(null);
     }
   };
 
@@ -378,7 +424,52 @@ export function UserManagement() {
                             </TableCell>
                             <TableCell>
                               <div>
-                                <p className="font-medium text-sm">{u.display_name || "—"}</p>
+                                {editingNameFor === u.user_id ? (
+                                  <div className="flex items-center gap-1 mb-0.5">
+                                    <Input
+                                      value={editingNameValue}
+                                      onChange={(e) => setEditingNameValue(e.target.value)}
+                                      onKeyDown={(e) => {
+                                        if (e.key === "Enter") saveName(u.user_id);
+                                        if (e.key === "Escape") cancelEditName();
+                                      }}
+                                      placeholder="Full name"
+                                      className="h-7 text-sm"
+                                      autoFocus
+                                      disabled={savingName === u.user_id}
+                                    />
+                                    <Button
+                                      size="icon" variant="ghost" className="h-7 w-7"
+                                      onClick={() => saveName(u.user_id)}
+                                      disabled={savingName === u.user_id}
+                                      aria-label="Save name"
+                                    >
+                                      {savingName === u.user_id
+                                        ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                        : <CheckIcon className="h-3.5 w-3.5 text-primary" />}
+                                    </Button>
+                                    <Button
+                                      size="icon" variant="ghost" className="h-7 w-7"
+                                      onClick={cancelEditName}
+                                      disabled={savingName === u.user_id}
+                                      aria-label="Cancel"
+                                    >
+                                      <XIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-1 group">
+                                    <p className="font-medium text-sm">{u.display_name || "—"}</p>
+                                    <Button
+                                      size="icon" variant="ghost"
+                                      className="h-6 w-6 opacity-60 hover:opacity-100"
+                                      onClick={() => startEditName(u.user_id, u.display_name)}
+                                      aria-label="Edit name"
+                                    >
+                                      <Pencil className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                )}
                                 {u.email && <p className="text-xs text-muted-foreground">{u.email}</p>}
                                 <p className="text-[10px] text-muted-foreground/60 truncate max-w-[180px]">{u.user_id}</p>
                               </div>
