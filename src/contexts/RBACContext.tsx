@@ -426,22 +426,35 @@ export function RBACProvider({ children }: { children: ReactNode }) {
   // Runs whenever the user/session changes. Checks whether the account has
   // a verified MFA factor while the current session is only AAL1 — in that
   // state the session is "under-authenticated" and must complete a TOTP
-  // challenge before getting access to protected content (QA #4 for stale
-  // sessions that predate the Auth.tsx enforce-on-login fix).
-  const evaluateMfaGate = useCallback(async (userId: string | undefined) => {
-    if (!userId) { setMfaUpgradeRequired(false); return; }
+  // challenge before getting access to protected content (QA #4, #17).
+  //
+  // IMPORTANT: we prefer factors read from the User object that Supabase
+  // already delivered with the session (no extra round-trip, no race).
+  // Falling back to mfa.listFactors() only if the User has no factors
+  // array. Earlier code hit listFactors unconditionally, which raced
+  // against Auth.tsx's "user is set → navigate" redirect and allowed MFA
+  // bypass on re-sign-in after a failed verify.
+  const evaluateMfaGate = useCallback(async (sessionUser?: User | null) => {
+    if (!sessionUser?.id) { setMfaUpgradeRequired(false); return; }
     try {
-      const [{ data: factors }, { data: aal }] = await Promise.all([
-        supabase.auth.mfa.listFactors(),
-        supabase.auth.mfa.getAuthenticatorAssuranceLevel(),
-      ]);
-      const hasVerifiedTotp = !!factors?.totp?.find((f) => f.status === "verified");
+      type SessionFactor = { id: string; factor_type: string; status: string };
+      const embedded = (sessionUser as unknown as { factors?: SessionFactor[] }).factors || [];
+      let hasVerifiedTotp = embedded.some(
+        (f) => f.factor_type === "totp" && f.status === "verified",
+      );
+      if (!hasVerifiedTotp) {
+        try {
+          const { data: factors } = await supabase.auth.mfa.listFactors();
+          hasVerifiedTotp = !!factors?.totp?.find((f) => f.status === "verified");
+        } catch { /* fall through */ }
+      }
+      const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
       const atAal1 = aal?.currentLevel !== "aal2";
       setMfaUpgradeRequired(hasVerifiedTotp && atAal1);
     } catch {
-      // Network errors — fail open (don't lock users out due to transient
-      // connectivity). The Auth.tsx login-time gate still enforces MFA on
-      // fresh sign-ins.
+      // Network errors — fail open so transient connectivity doesn't lock
+      // people out. Auth.tsx's login-time gate is the primary line of
+      // defense; this is the runtime backstop.
       setMfaUpgradeRequired(false);
     }
   }, []);
@@ -590,7 +603,7 @@ export function RBACProvider({ children }: { children: ReactNode }) {
           ]);
         } catch { /* swallow — fetchRole retries handle transient errors */ }
         await fetchRole(sess.user.id);
-        evaluateMfaGate(sess.user.id);
+        evaluateMfaGate(sess.user);
       } else if (!sess?.user) {
         setRole(null);
         setClinicId(null);

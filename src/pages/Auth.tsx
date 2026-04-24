@@ -33,7 +33,13 @@ export default function Auth() {
     );
   }
 
-  if (user) {
+  // Only redirect to "/" when there's a user AND no in-flight MFA
+  // challenge. Without the mfaFactorId guard, the onAuthStateChange
+  // listener sets `user` right after signInWithPassword and Auth.tsx
+  // re-renders → <Navigate to="/" /> fires BEFORE our factors check
+  // puts up the TOTP prompt. Result: MFA bypassed on the first login
+  // after a failed verify → sign-out → re-login sequence (QA #17).
+  if (user && !mfaFactorId) {
     return <Navigate to="/" replace />;
   }
 
@@ -43,21 +49,32 @@ export default function Auth() {
 
     try {
       if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const { data: signInData, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
 
-        // Gate on the factor itself — NOT on AAL. We saw AAL report aal1 for
-        // accounts that had a verified TOTP (possibly a Supabase quirk when
-        // the factor was enrolled in a prior session), which meant MFA was
-        // bypassed entirely (QA #4). Directly asking for verified factors is
-        // the ground truth.
-        const { data: factors } = await supabase.auth.mfa.listFactors();
-        const verifiedTotp = factors?.totp?.find((f) => f.status === "verified");
+        // Read factors straight from the signInWithPassword response —
+        // it's included in the user object and doesn't require a second
+        // round-trip to /auth/v1/factors (which was racing with the
+        // onAuthStateChange SIGNED_IN redirect and allowed MFA bypass on
+        // re-sign-in after a failed verify — QA #17).
+        //
+        // Fall back to mfa.listFactors() only if the response somehow
+        // didn't include factors.
+        type SessionFactor = { id: string; factor_type: string; status: string };
+        const embeddedFactors = (signInData?.user as { factors?: SessionFactor[] } | undefined)?.factors || [];
+        let verifiedTotp = embeddedFactors.find(
+          (f) => f.factor_type === "totp" && f.status === "verified",
+        ) as SessionFactor | undefined;
+
+        if (!verifiedTotp) {
+          try {
+            const { data: factors } = await supabase.auth.mfa.listFactors();
+            const fromApi = factors?.totp?.find((f) => f.status === "verified");
+            if (fromApi) verifiedTotp = fromApi as SessionFactor;
+          } catch { /* swallow — if both sources miss we proceed without MFA */ }
+        }
+
         if (verifiedTotp) {
-          // Immediately sign out so the partially-authenticated session can't
-          // be used by back-button or a reload while the TOTP step is open.
-          // We'll re-authenticate with the same password after the code is
-          // entered.
           setMfaFactorId(verifiedTotp.id);
           return; // Render the TOTP step
         }
