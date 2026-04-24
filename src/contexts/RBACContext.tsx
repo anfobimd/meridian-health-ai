@@ -599,51 +599,91 @@ export function RBACProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // Idle session timeout. Reads `session_timeout_minutes` from clinic_settings.
-  // Resets on every user interaction — when the timer fires, signs out.
+  // Idle session timeout (QA #15). Previous implementation relied solely
+  // on setTimeout, which browsers throttle or suspend entirely in
+  // background tabs — so a user who walked away with the tab still open
+  // could stay "logged in" far past the configured window because the
+  // timer never fired.
+  //
+  // New approach:
+  //   - Record the timestamp of the last user interaction in a ref.
+  //   - Poll every 30s: compare now() vs lastActivityAt; if the gap
+  //     exceeds the configured timeout, sign out.
+  //   - Also fire a signOut when the tab regains visibility if the gap
+  //     exceeded the timeout while we were away (setInterval is
+  //     throttled in hidden tabs too, so this is the belt to the poll's
+  //     suspenders).
+  //   - Re-read clinic_settings on every visibility-regained event, so
+  //     changing the timeout in Settings actually applies without the
+  //     user having to sign out and back in.
   useEffect(() => {
     if (!user) return;
-    let timeoutMs = 60 * 60 * 1000; // default 1h until we read settings
-    let timer: ReturnType<typeof setTimeout> | null = null;
 
-    const reset = () => {
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(() => {
-        console.log("[RBAC] Idle timeout reached — signing out");
+    let timeoutMs = 60 * 60 * 1000; // default 1h
+    let lastActivityAt = Date.now();
+    let signedOutByIdle = false;
+
+    const recordActivity = () => {
+      lastActivityAt = Date.now();
+    };
+
+    const checkIdle = () => {
+      if (signedOutByIdle) return;
+      const idleFor = Date.now() - lastActivityAt;
+      if (idleFor >= timeoutMs) {
+        signedOutByIdle = true;
+        console.log(`[RBAC] Idle for ${Math.round(idleFor / 1000)}s (limit ${Math.round(timeoutMs / 1000)}s) — signing out`);
         signOut();
-      }, timeoutMs);
+      }
+    };
+
+    const refreshTimeoutFromSettings = () => {
+      (supabase as any)
+        .from("clinic_settings")
+        .select("session_timeout_minutes")
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle()
+        .then(({ data, error }: any) => {
+          if (error) {
+            console.warn("[RBAC] clinic_settings fetch failed, using previous timeout:", error.message);
+            return;
+          }
+          const m = data?.session_timeout_minutes;
+          if (typeof m === "number" && m > 0) {
+            const nextMs = m * 60 * 1000;
+            if (nextMs !== timeoutMs) {
+              console.log(`[RBAC] session timeout updated: ${Math.round(nextMs / 60000)} min`);
+              timeoutMs = nextMs;
+            }
+          }
+        });
+    };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        // Re-read the setting (in case it was changed in another tab)
+        // and evaluate idle immediately.
+        refreshTimeoutFromSettings();
+        checkIdle();
+      }
     };
 
     const events: (keyof WindowEventMap)[] = ["mousemove", "keydown", "click", "scroll", "touchstart"];
-    events.forEach((e) => window.addEventListener(e, reset, { passive: true }));
+    events.forEach((e) => window.addEventListener(e, recordActivity, { passive: true }));
+    document.addEventListener("visibilitychange", onVisibilityChange);
 
-    // Pull configured timeout (don't block UI on this). Use limit(1) so
-    // multiple settings rows (shouldn't happen, but) don't throw and leave
-    // the default 60-min value in place. `as any` because clinic_settings
-    // isn't in the generated types yet — created by the QA round-two
-    // migration and Lovable hasn't regenerated them.
-    (supabase as any)
-      .from("clinic_settings")
-      .select("session_timeout_minutes")
-      .order("created_at", { ascending: true })
-      .limit(1)
-      .maybeSingle()
-      .then(({ data, error }: any) => {
-        if (error) {
-          console.warn("[RBAC] clinic_settings fetch failed, using default timeout:", error.message);
-          return;
-        }
-        const m = data?.session_timeout_minutes;
-        if (typeof m === "number" && m > 0) {
-          timeoutMs = m * 60 * 1000;
-          reset();
-        }
-      });
-    reset();
+    // Poll every 30s — if mouse/keyboard stopped but the tab is still
+    // foregrounded, we'll catch the idle.
+    const poll = setInterval(checkIdle, 30_000);
+
+    // Initial load
+    refreshTimeoutFromSettings();
 
     return () => {
-      events.forEach((e) => window.removeEventListener(e, reset));
-      if (timer) clearTimeout(timer);
+      events.forEach((e) => window.removeEventListener(e, recordActivity));
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      clearInterval(poll);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
