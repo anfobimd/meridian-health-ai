@@ -43,11 +43,11 @@ export default function MasterCatalog() {
           throw new Error("Platform Rules must be valid JSON");
         }
       }
-      // Race the insert against an 8s watchdog so a silently-blocked RLS
-      // check doesn't leave the button in a permanent "Adding…" spinner
-      // (QA #10). .select().single() forces the row to round-trip so a
-      // zero-row RLS rejection surfaces as an error instead of a silent
-      // no-op.
+      // Plain insert — deliberately NO .select() round-trip. Earlier the
+      // .select().single() pipe was hanging for Faz even though the
+      // INSERT itself landed in <400ms via REST. Server is fine; the
+      // client-side read-back was the culprit. We invalidate the list
+      // query on success so the new row appears via the list fetch.
       const insertPromise = supabase
         .from("master_catalog_items")
         .insert({
@@ -55,27 +55,23 @@ export default function MasterCatalog() {
           item_type: form.item_type,
           category: form.category || null,
           platform_rules: rules,
-        })
-        .select()
-        .single();
+        });
       const timeoutPromise = new Promise<{ error: { message: string } }>((resolve) =>
         setTimeout(
           () =>
             resolve({
               error: {
                 message:
-                  "Request timed out after 8s. Possible causes: you're at AAL1 while MFA is required, RLS blocked the insert, or the network is unreachable. Refresh and re-authenticate, then retry.",
+                  "Request timed out after 6s. If you have MFA enabled, sign out and sign in again (completing the TOTP step) before retrying.",
               },
             }),
-          8000,
+          6000,
         ),
       );
       const result = (await Promise.race([insertPromise, timeoutPromise])) as {
         error?: { message: string } | null;
-        data?: unknown;
       };
       if (result.error) throw new Error(result.error.message);
-      if (!result.data) throw new Error("Insert returned no row — you may lack permission to add catalog items.");
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["master-catalog"] });
@@ -84,9 +80,12 @@ export default function MasterCatalog() {
       toast.success("Item added to catalog");
     },
     onError: (err: Error) => {
-      // Keep the dialog open so the user can retry without re-typing. The
-      // `Adding…` state resets automatically once this handler runs.
+      // Keep the dialog open so the user can retry without re-typing.
       toast.error("Failed to add item", { description: err.message });
+      // Even on a client-side timeout, the server may have actually
+      // accepted the insert. Force-refresh the list so the row shows up
+      // if it really did land.
+      qc.invalidateQueries({ queryKey: ["master-catalog"] });
     },
   });
 
