@@ -468,25 +468,48 @@ export function RBACProvider({ children }: { children: ReactNode }) {
 
   const fetchRole = useCallback(async (userId: string) => {
     try {
-      let allRoles = await fetchRoleOnce(userId);
-
-      // Retry once on transient failure after a 400ms delay — token refresh
-      // races can briefly cause RLS to return empty/error on user_roles.
-      if (allRoles === null) {
-        await new Promise((r) => setTimeout(r, 400));
-        allRoles = await fetchRoleOnce(userId);
+      // Retry loop — on cold page load, the JWT stored in localStorage
+      // is being refreshed by Supabase in the background, and RLS/RPC
+      // calls made during that window can come back EMPTY even when the
+      // user genuinely has roles. A single fetch is not enough for a
+      // page refresh. We try up to 4 times with back-off, accepting an
+      // empty response only if we see it consistently (2+ times) which
+      // signals it really is an empty-role user and not a race. QA #12.
+      const MAX_ATTEMPTS = 4;
+      const BACKOFFS = [0, 300, 700, 1200];
+      let allRoles: AppRole[] | null = null;
+      let emptyCount = 0;
+      for (let i = 0; i < MAX_ATTEMPTS; i++) {
+        if (BACKOFFS[i]) await new Promise((r) => setTimeout(r, BACKOFFS[i]));
+        const result = await fetchRoleOnce(userId);
+        if (result === null) {
+          // transient failure — keep trying
+          continue;
+        }
+        if (result.length === 0) {
+          emptyCount++;
+          // One empty response could still be a race. Only trust it
+          // after a second confirming empty, AND only for cold loads
+          // where we don't already have a role cached.
+          if (emptyCount >= 2) {
+            allRoles = [];
+            break;
+          }
+          continue;
+        }
+        allRoles = result;
+        break;
       }
 
       if (allRoles === null) {
-        // Both tries failed — keep whatever we had. Never clobber to null/user.
+        // All retries failed to get a definitive answer — keep whatever
+        // role we already had rather than clobbering to null/user.
         return;
       }
 
       if (allRoles.length === 0) {
-        // Empty is treated with suspicion: if we had any resolved role,
-        // keep it. Only downgrade to "user" if we have literally never
-        // resolved (role is null). This guards against the TOKEN_REFRESHED
-        // race that clobbered super_admin → user mid-session (QA #14).
+        // Consistently empty across retries — safe to conclude the user
+        // really has no roles. Still honor prev if set (paranoia).
         setRole((prev) => prev ?? "user");
         return;
       }
