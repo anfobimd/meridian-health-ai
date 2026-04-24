@@ -206,8 +206,43 @@ export function AppSidebar() {
     return () => { cancelled = true; supabase.removeChannel(channel); };
   }, [user, role]);
 
+  // Fetch profile display_name so sidebar stays in sync when an admin
+  // edits names via User & Role Management (which writes to profiles,
+  // not to auth.user_metadata). Falls back to user_metadata → email.
+  const [profileName, setProfileName] = useState<string | null>(null);
+  useEffect(() => {
+    if (!user?.id) { setProfileName(null); return; }
+    let cancelled = false;
+    supabase
+      .from("profiles")
+      .select("display_name")
+      .eq("user_id", user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!cancelled) setProfileName(data?.display_name ?? null);
+      });
+    // Realtime: re-pull when this user's profile row updates.
+    const ch = supabase
+      .channel(`sidebar-profile-${user.id}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "profiles", filter: `user_id=eq.${user.id}` },
+        (payload) => {
+          const next = (payload.new as { display_name?: string | null })?.display_name ?? null;
+          if (!cancelled) setProfileName(next);
+        },
+      )
+      .subscribe();
+    return () => { cancelled = true; supabase.removeChannel(ch); };
+  }, [user?.id]);
+
   const initials = user?.email ? user.email.substring(0, 2).toUpperCase() : "??";
-  const displayName = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split("@")[0] || "User";
+  const displayName =
+    profileName ||
+    user?.user_metadata?.full_name ||
+    user?.user_metadata?.name ||
+    user?.email?.split("@")[0] ||
+    "User";
 
   return (
     <aside className="hidden md:flex w-56 flex-col bg-sidebar text-sidebar-foreground min-h-screen flex-shrink-0">

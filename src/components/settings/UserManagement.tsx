@@ -211,6 +211,18 @@ export function UserManagement() {
           .from("profiles").insert({ user_id: userId, display_name: trimmed });
         if (error) throw error;
       }
+
+      // If the admin is editing their OWN row, also update auth.users
+      // metadata so surfaces that read from user_metadata (sidebar
+      // profile card, admin listings, etc.) reflect the change
+      // immediately. For other users, the realtime profiles
+      // subscription in AppSidebar will pick up the new name on their
+      // next session.
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (currentUser?.id === userId) {
+        await supabase.auth.updateUser({ data: { full_name: trimmed } });
+      }
+
       toast({ title: "Name updated" });
       cancelEditName();
       await fetchData();
