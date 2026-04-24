@@ -58,11 +58,15 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const newPassword = body?.new_password;
     const oldPassword = body?.old_password;
+    // All user-visible validation errors use HTTP 200 + {success:false} so
+    // the Supabase JS client doesn't replace the message with its generic
+    // "non-2xx status code" wrapper. Reserve non-2xx for truly unexpected
+    // server failures.
     if (typeof newPassword !== "string" || newPassword.length < 10) {
-      return json({ error: "new_password must be a string of at least 10 characters" }, 400);
+      return json({ success: false, error: "Password must be at least 10 characters" }, 200);
     }
     if (newPassword === oldPassword) {
-      return json({ error: "New password must differ from the old password" }, 400);
+      return json({ success: false, error: "New password must differ from the old password" }, 200);
     }
 
     // Optional old-password verification — proves the caller knows the
@@ -76,10 +80,8 @@ Deno.serve(async (req) => {
         password: oldPassword,
       });
       if (verErr) {
-        return json({ error: "Current password is incorrect" }, 400);
+        return json({ success: false, error: "Current password is incorrect" }, 200);
       }
-      // Immediately sign out the ephemeral session we just created to
-      // verify — we don't need it hanging around.
       try { await verifyClient.auth.signOut(); } catch { /* swallow */ }
     }
 
@@ -92,7 +94,12 @@ Deno.serve(async (req) => {
     });
     if (updateErr) {
       console.error("[self-change-password] update failed:", updateErr);
-      return json({ error: updateErr.message }, 500);
+      // Return HTTP 200 so the browser SDK doesn't swallow the message with
+      // its generic "Edge Function returned a non-2xx status code" wrapper.
+      // We distinguish success from policy rejection via the `success` flag.
+      // Typical causes: HIBP compromised-password match, fails
+      // password_required_characters, or below password_min_length.
+      return json({ success: false, error: updateErr.message }, 200);
     }
 
     // Verify the change actually took: try signing in with the NEW password.
@@ -107,7 +114,7 @@ Deno.serve(async (req) => {
     });
     if (verNewErr) {
       console.error("[self-change-password] new password verification failed:", verNewErr);
-      return json({ error: "Password update appeared to succeed but verification failed — please try again" }, 500);
+      return json({ success: false, error: "Password update appeared to succeed but verification failed — please try again" }, 200);
     }
     try { await verifyNew.auth.signOut(); } catch { /* swallow */ }
 

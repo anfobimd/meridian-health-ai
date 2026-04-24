@@ -130,16 +130,24 @@ export default function Settings() {
       });
       clearTimeout(watchdog);
 
-      if (error) {
+      // The function returns HTTP 200 with {success:false,error:"..."} for
+      // user-visible policy failures (weak/compromised password, below
+      // min length, etc.) so the specific message reaches the user.
+      // Treat an unstructured `error` from the SDK as a transport failure
+      // but still check `data` first in case the body has a friendly
+      // message.
+      const serverError = (data && typeof data === "object" && data.error) ? String(data.error) : null;
+      if (serverError || data?.success === false) {
+        const msg = serverError || "Password update failed — please try again.";
         const next = failedAttempts + 1;
         setFailedAttempts(next);
         if (next >= MAX_ATTEMPTS) {
           setLockoutEnd(Date.now() + LOCKOUT_SECONDS * 1000);
           toast({ title: "Too many attempts", description: `Locked for ${LOCKOUT_SECONDS}s`, variant: "destructive" });
         }
-        throw error;
+        throw new Error(msg);
       }
-      if (data?.error) throw new Error(data.error);
+      if (error) throw error;
       if (!data?.success) throw new Error("Password update did not complete — please try again.");
 
       toast({

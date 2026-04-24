@@ -128,8 +128,13 @@ export default function ResetPassword() {
         body: { new_password: password },
       });
       clearTimeout(timeoutId);
+      // Friendly {success:false,error} bodies arrive as HTTP 200 so the
+      // real policy message (weak password, HIBP match, etc.) reaches
+      // the user. Only treat `error` as authoritative if `data` has no
+      // structured message.
+      const serverError = (data && typeof data === "object" && data.error) ? String(data.error) : null;
+      if (serverError) throw new Error(serverError);
       if (error) throw error;
-      if (data?.error) throw new Error(data.error);
       if (!data?.success) throw new Error("Password update did not complete — please request a new reset link.");
 
       toast({ title: "Password updated", description: "All sessions revoked. Sign in with your new password." });
