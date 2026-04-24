@@ -481,30 +481,31 @@ export function RBACProvider({ children }: { children: ReactNode }) {
 
   const fetchRole = useCallback(async (userId: string) => {
     try {
-      // Retry loop — on cold page load, the JWT stored in localStorage
-      // is being refreshed by Supabase in the background, and RLS/RPC
-      // calls made during that window can come back EMPTY even when the
-      // user genuinely has roles. A single fetch is not enough for a
-      // page refresh. We try up to 4 times with back-off, accepting an
-      // empty response only if we see it consistently (2+ times) which
-      // signals it really is an empty-role user and not a race. QA #12.
-      const MAX_ATTEMPTS = 4;
-      const BACKOFFS = [0, 300, 700, 1200];
+      // Retry loop — on cold page load after the tab was backgrounded
+      // for a while, the JWT stored in localStorage is near expiry and
+      // Supabase-JS kicks off an internal refresh. RPC/RLS calls made
+      // during that window return EMPTY even for users with roles. On
+      // a fresh mount there's no "previous role" to preserve, so we
+      // need enough retries to outlast the refresh window. QA #12, #15
+      // (Access Denied after tab backgrounding).
+      const MAX_ATTEMPTS = 6;
+      const BACKOFFS = [0, 400, 800, 1500, 2500, 4000]; // up to ~9s total
       let allRoles: AppRole[] | null = null;
       let emptyCount = 0;
+      let nullCount = 0;
       for (let i = 0; i < MAX_ATTEMPTS; i++) {
         if (BACKOFFS[i]) await new Promise((r) => setTimeout(r, BACKOFFS[i]));
         const result = await fetchRoleOnce(userId);
         if (result === null) {
-          // transient failure — keep trying
+          nullCount++;
           continue;
         }
         if (result.length === 0) {
           emptyCount++;
-          // One empty response could still be a race. Only trust it
-          // after a second confirming empty, AND only for cold loads
-          // where we don't already have a role cached.
-          if (emptyCount >= 2) {
+          // Require 3 consecutive empty responses before trusting an
+          // empty role — far safer than giving up early and showing
+          // Access Denied to a super_admin.
+          if (emptyCount >= 3) {
             allRoles = [];
             break;
           }
@@ -515,14 +516,39 @@ export function RBACProvider({ children }: { children: ReactNode }) {
       }
 
       if (allRoles === null) {
-        // All retries failed to get a definitive answer — keep whatever
-        // role we already had rather than clobbering to null/user.
+        // All retries hit transient errors — keep the cached role.
+        console.warn(`[RBAC] Role fetch: ${nullCount} transient failures, keeping existing role`);
         return;
       }
 
       if (allRoles.length === 0) {
-        // Consistently empty across retries — safe to conclude the user
-        // really has no roles. Still honor prev if set (paranoia).
+        // Consistently empty across retries. On a cold load with no
+        // cached role, rather than silently downgrading to "user"
+        // (which renders as Access Denied on privileged pages), assume
+        // the session is in a bad state — force a fresh session refresh
+        // and try ONCE more. If still empty, only then accept it.
+        setRole((prev) => {
+          if (prev) return prev; // Keep existing role if we have one
+          return null; // Stay null; we'll retry via session refresh below
+        });
+        try {
+          await supabase.auth.refreshSession();
+          const secondChance = await fetchRoleOnce(userId);
+          if (secondChance && secondChance.length > 0) {
+            const priority: AppRole[] = [
+              "super_admin", "admin", "clinic_owner", "medical_director",
+              "physician", "nurse_practitioner", "physician_assistant",
+              "registered_nurse", "provider", "aesthetician", "front_desk",
+              "billing", "marketing", "user",
+            ];
+            const best = priority.find((r) => secondChance.includes(r)) ?? "user";
+            setRole(best);
+            return;
+          }
+        } catch { /* swallow — fall through to accepting empty */ }
+        // Still empty after forced session refresh — this user really
+        // has no roles OR the session is compromised. Set to "user" so
+        // we at least render something instead of staying null forever.
         setRole((prev) => prev ?? "user");
         return;
       }

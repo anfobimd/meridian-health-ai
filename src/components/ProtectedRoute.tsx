@@ -60,18 +60,27 @@ export function ProtectedRoute({ require, roles, minRole }: ProtectedRouteProps)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allowed, loading, user, mfaUpgradeRequired, autoRetries]);
 
-  // Re-fetch role whenever the tab regains focus — catches the case
-  // where a background token refresh completed and the role state is
-  // out of sync.
+  // Re-fetch role whenever the tab regains focus AND when window gets
+  // focus — catches the case where a background token refresh completed
+  // and the role state is out of sync. Two events because some browsers
+  // fire only one or the other. Also reset auto-retry budget so if the
+  // first fetch returns empty during the tab-wake race, the silent
+  // retries get a fresh chance.
   useEffect(() => {
     if (!user) return;
+    const refresh = () => {
+      refreshRole();
+      setAutoRetries(0);
+    };
     const onVisible = () => {
-      if (document.visibilityState === "visible") {
-        refreshRole();
-      }
+      if (document.visibilityState === "visible") refresh();
     };
     document.addEventListener("visibilitychange", onVisible);
-    return () => document.removeEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", refresh);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", refresh);
+    };
   }, [user, refreshRole]);
 
   if (loading) {
