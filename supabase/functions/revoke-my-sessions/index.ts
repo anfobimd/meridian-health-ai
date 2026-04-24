@@ -11,7 +11,7 @@
 // This function runs the admin signOut for the *caller's own* user id, so it's
 // safe to expose to authenticated users.
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.104.1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

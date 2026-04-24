@@ -20,7 +20,7 @@
 //     the change — gives us a definitive "the change really took" signal
 //     the client can trust.
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.104.1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
