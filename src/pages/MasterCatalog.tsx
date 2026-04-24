@@ -43,35 +43,60 @@ export default function MasterCatalog() {
           throw new Error("Platform Rules must be valid JSON");
         }
       }
-      // Plain insert — deliberately NO .select() round-trip. Earlier the
-      // .select().single() pipe was hanging for Faz even though the
-      // INSERT itself landed in <400ms via REST. Server is fine; the
-      // client-side read-back was the culprit. We invalidate the list
-      // query on success so the new row appears via the list fetch.
-      const insertPromise = supabase
-        .from("master_catalog_items")
-        .insert({
-          name: form.name,
-          item_type: form.item_type,
-          category: form.category || null,
-          platform_rules: rules,
+      // Bypass the Supabase JS client and hit PostgREST directly with
+      // raw fetch + AbortController. The JS client was stalling for Faz
+      // even on a plain insert (server returns <400ms in REST testing),
+      // most likely due to an internal auth-refresh or retry loop in
+      // some supabase-js versions. A raw fetch has none of that.
+      const { data: { session } } = await supabase.auth.getSession();
+      const accessToken = session?.access_token;
+      if (!accessToken) throw new Error("No active session — please sign in again.");
+
+      const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL
+        || "https://oqjupcgtxsbyelaigrxn.supabase.co";
+      const anonKey = (import.meta as any).env?.VITE_SUPABASE_PUBLISHABLE_KEY
+        || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9xanVwY2d0eHNieWVsYWlncnhuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwMjQxMzYsImV4cCI6MjA5MTYwMDEzNn0.iThG8ucsnDYBUNFCFDVg2UEL4qCv114tTIBS7-j6mt8";
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 6000);
+
+      let resp: Response;
+      try {
+        resp = await fetch(`${supabaseUrl}/rest/v1/master_catalog_items`, {
+          method: "POST",
+          headers: {
+            "apikey": anonKey,
+            "Authorization": `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+            "Prefer": "return=minimal",
+          },
+          body: JSON.stringify({
+            name: form.name,
+            item_type: form.item_type,
+            category: form.category || null,
+            platform_rules: rules,
+          }),
+          signal: controller.signal,
         });
-      const timeoutPromise = new Promise<{ error: { message: string } }>((resolve) =>
-        setTimeout(
-          () =>
-            resolve({
-              error: {
-                message:
-                  "Request timed out after 6s. If you have MFA enabled, sign out and sign in again (completing the TOTP step) before retrying.",
-              },
-            }),
-          6000,
-        ),
-      );
-      const result = (await Promise.race([insertPromise, timeoutPromise])) as {
-        error?: { message: string } | null;
-      };
-      if (result.error) throw new Error(result.error.message);
+      } catch (err: any) {
+        clearTimeout(timeout);
+        if (err.name === "AbortError") {
+          throw new Error("Request timed out after 6s. Try hard-refreshing the page (Ctrl+Shift+R) and signing in again.");
+        }
+        throw err;
+      }
+      clearTimeout(timeout);
+
+      if (!resp.ok) {
+        const body = await resp.text().catch(() => "");
+        let friendly = `Insert failed (HTTP ${resp.status})`;
+        try {
+          const parsed = JSON.parse(body);
+          if (parsed?.message) friendly = parsed.message;
+          else if (parsed?.error) friendly = parsed.error;
+        } catch { if (body) friendly = body.slice(0, 200); }
+        throw new Error(friendly);
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["master-catalog"] });
