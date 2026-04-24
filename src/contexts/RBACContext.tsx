@@ -550,71 +550,99 @@ export function RBACProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Track whether the initial session has been handled to avoid double-loading
     let initialSessionHandled = false;
+    let safetyFired = false;
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, sess) => {
+    // When Supabase JS boots, it reads the stored session from localStorage
+    // and — if the access token is near/past expiry — kicks off an internal
+    // refresh. If the refresh token has been revoked (e.g. by a global
+    // sign-out from another device, or a password change), that refresh
+    // can loop internally and NEVER resolve getSession() or emit an
+    // INITIAL_SESSION event. That's the state Faz's console showed:
+    // "[RBAC] Safety timeout reached" — auth stuck, role-gated UI empty.
+    //
+    // Recovery: if we hit the safety timeout with nothing resolved, purge
+    // the stored session and hard-redirect to /auth. Better to re-login
+    // than leave the user staring at a half-broken Settings page.
+    const recoverFromStuckAuth = () => {
+      console.warn("[RBAC] Auth stuck on cold load — purging session and redirecting to /auth");
+      try {
+        Object.keys(localStorage)
+          .filter((k) => k.startsWith("sb-") || k.includes("supabase"))
+          .forEach((k) => localStorage.removeItem(k));
+      } catch { /* ignore */ }
+      window.location.assign("/auth");
+    };
+
+    const handleAuth = async (sess: Session | null, event: string) => {
       setSession(sess);
       setUser(sess?.user ?? null);
-      // Only re-fetch role on genuine sign-in or initial session. TOKEN_REFRESHED
-      // and USER_UPDATED fire frequently while the app is open; re-fetching on
-      // those was causing the role to transiently flip to "user" during the
-      // network round-trip, which blanked the sidebar and triggered "you have
-      // no access" errors (QA issues #12 and #14).
       const needsRoleFetch =
         event === "INITIAL_SESSION" || event === "SIGNED_IN";
       if (sess?.user && needsRoleFetch) {
+        // Explicitly refresh the session before fetching role. This
+        // forces Supabase to complete any pending JWT rotation BEFORE
+        // we hit user_roles, so RLS sees a clean JWT instead of an
+        // in-flight one (which returns empty results — QA #12).
+        try {
+          await Promise.race([
+            supabase.auth.refreshSession(),
+            new Promise((r) => setTimeout(r, 3000)),
+          ]);
+        } catch { /* swallow — fetchRole retries handle transient errors */ }
         await fetchRole(sess.user.id);
-        // Re-evaluate the MFA gate on every initial/sign-in event so that
-        // stale AAL1 sessions are caught and a fresh AAL2 session flips
-        // the gate off.
         evaluateMfaGate(sess.user.id);
       } else if (!sess?.user) {
         setRole(null);
         setClinicId(null);
         setMfaUpgradeRequired(false);
       }
-      // Mark initial load complete after first auth event
       if (!initialSessionHandled) {
         initialSessionHandled = true;
         setLoading(false);
       }
+    };
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, sess) => {
+      handleAuth(sess, event);
     });
 
-    // Fallback: if onAuthStateChange doesn't fire, use getSession
-    // (handles broken Supabase connections, network issues, etc.)
-    supabase.auth
-      .getSession()
-      .then(async ({ data: { session: existing } }) => {
-        // Only process if onAuthStateChange hasn't already handled it
+    // Race getSession() against a 4s timeout — if Supabase can't resolve
+    // the stored session within 4s, treat it as stuck and kick recovery
+    // rather than waiting the full 8s safety window.
+    Promise.race([
+      supabase.auth.getSession().then(({ data: { session: existing } }) => ({
+        ok: true as const,
+        session: existing,
+      })),
+      new Promise<{ ok: false }>((r) => setTimeout(() => r({ ok: false }), 4000)),
+    ])
+      .then((r) => {
+        if (!r.ok) {
+          // getSession hung — likely stuck refreshing a revoked token.
+          // Fall through to safetyTimeout which triggers recovery.
+          return;
+        }
         if (!initialSessionHandled) {
-          setSession(existing);
-          setUser(existing?.user ?? null);
-          if (existing?.user) {
-            await fetchRole(existing.user.id);
-            evaluateMfaGate(existing.user.id);
-          }
-          initialSessionHandled = true;
-          setLoading(false);
+          handleAuth(r.session, "INITIAL_SESSION");
         }
       })
       .catch((err) => {
         console.error("[RBAC] Failed to get session:", err);
-        // Ensure loading state is cleared even on error
         if (!initialSessionHandled) {
           initialSessionHandled = true;
           setLoading(false);
         }
       });
 
-    // Safety timeout: if nothing resolves within 8 seconds, stop the spinner
+    // Safety timeout: if nothing resolved in 6s, we're in the "stuck
+    // auth" scenario — purge + redirect rather than leaving the user
+    // on a broken Settings page with empty sidebar.
     const safetyTimeout = setTimeout(() => {
-      if (!initialSessionHandled) {
-        console.warn("[RBAC] Safety timeout reached - forcing loading=false");
-        initialSessionHandled = true;
-        setLoading(false);
+      if (!initialSessionHandled && !safetyFired) {
+        safetyFired = true;
+        recoverFromStuckAuth();
       }
-    }, 8000);
+    }, 6000);
 
     return () => {
       subscription.unsubscribe();
