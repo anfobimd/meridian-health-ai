@@ -350,6 +350,22 @@ function QuickChart({ encounterId, patientId, readOnly = false }: { encounterId:
   const [saving, setSaving] = useState(false);
   const queryClient = useQueryClient();
 
+  // Latest labs (for reference-range chips above Objective)
+  const { data: latestLabs } = useQuery({
+    queryKey: ["telehealth-soap-labs", patientId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("hormone_visits")
+        .select("lab_tt, lab_ft, lab_e2, lab_tsh, lab_a1c, lab_psa, lab_dhea, lab_vitd, lab_fsh, lab_hgb, lab_hct, lab_igf1, visit_date")
+        .eq("patient_id", patientId)
+        .order("visit_date", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!patientId,
+  });
+
   // Load existing note
   const { data: existingNote } = useQuery({
     queryKey: ["telehealth-note", encounterId],
@@ -418,6 +434,23 @@ function QuickChart({ encounterId, patientId, readOnly = false }: { encounterId:
               </Button>
             )}
           </div>
+          {section === "objective" && latestLabs && (
+            <LabReferenceStrip
+              className="mb-1.5"
+              compact
+              labs={[
+                { key: "tt",   value: latestLabs.lab_tt,   shortLabel: "TT" },
+                { key: "ft",   value: latestLabs.lab_ft,   shortLabel: "FT" },
+                { key: "e2",   value: latestLabs.lab_e2,   shortLabel: "E2" },
+                { key: "tsh",  value: latestLabs.lab_tsh,  shortLabel: "TSH" },
+                { key: "a1c",  value: latestLabs.lab_a1c,  shortLabel: "A1c" },
+                { key: "psa",  value: latestLabs.lab_psa,  shortLabel: "PSA" },
+                { key: "hgb",  value: latestLabs.lab_hgb,  shortLabel: "Hgb" },
+                { key: "hct",  value: latestLabs.lab_hct,  shortLabel: "Hct" },
+                { key: "igf1", value: latestLabs.lab_igf1, shortLabel: "IGF-1" },
+              ]}
+            />
+          )}
           <Textarea
             value={soap[section]}
             onChange={e => setSoap(p => ({ ...p, [section]: e.target.value }))}
