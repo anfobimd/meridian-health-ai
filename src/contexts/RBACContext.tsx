@@ -464,7 +464,8 @@ export function RBACProvider({ children }: { children: ReactNode }) {
   const fetchRoleOnce = async (_userId: string): Promise<AppRole[] | null> => {
     // Returns null on transient failure (caller should keep existing role),
     // or an array of roles (possibly empty → user has truly no roles).
-    const rpc = await supabase.rpc("get_my_roles");
+    // get_my_roles is not in generated types yet — cast to bypass overload check.
+    const rpc = await (supabase.rpc as unknown as (fn: string) => Promise<{ data: unknown; error: unknown }>)("get_my_roles");
     if (!rpc.error && Array.isArray(rpc.data)) {
       return rpc.data.map((r: { role: AppRole }) => r.role);
     }
