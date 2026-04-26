@@ -20,6 +20,7 @@ import {
 import { toast } from "sonner";
 import { format, parseISO, differenceInYears, differenceInSeconds } from "date-fns";
 import { TelehealthRx } from "@/pages/Prescriptions";
+import { LabReferenceStrip } from "@/components/clinical/LabReferenceChip";
 
 // ── Intake Review Panel (reusable) ──
 export function IntakeReviewPanel({ appointmentId, patientId }: { appointmentId?: string; patientId: string }) {
@@ -160,18 +161,19 @@ export function IntakeReviewPanel({ appointmentId, patientId }: { appointmentId?
         <Card>
           <CardContent className="p-3 space-y-2">
             <p className="text-xs font-semibold flex items-center gap-1"><Activity className="h-3 w-3 text-primary" /> Latest Labs ({format(parseISO(hormoneVisit.visit_date), "M/d/yy")})</p>
-            <div className="grid grid-cols-3 gap-1 text-xs">
-              {[
-                ["TT", hormoneVisit.lab_tt], ["FT", hormoneVisit.lab_ft], ["E2", hormoneVisit.lab_e2],
-                ["TSH", hormoneVisit.lab_tsh], ["A1c", hormoneVisit.lab_a1c], ["PSA", hormoneVisit.lab_psa],
-                ["DHEA", hormoneVisit.lab_dhea], ["Vit D", hormoneVisit.lab_vitd], ["FSH", hormoneVisit.lab_fsh],
-              ].filter(([, v]) => v != null).map(([label, val]) => (
-                <div key={label as string} className="bg-muted/50 rounded p-1 text-center">
-                  <span className="text-muted-foreground text-[10px]">{label}</span>
-                  <p className="font-semibold">{val}</p>
-                </div>
-              ))}
-            </div>
+            <LabReferenceStrip
+              labs={[
+                { key: "tt",   value: hormoneVisit.lab_tt,   shortLabel: "TT" },
+                { key: "ft",   value: hormoneVisit.lab_ft,   shortLabel: "FT" },
+                { key: "e2",   value: hormoneVisit.lab_e2,   shortLabel: "E2" },
+                { key: "tsh",  value: hormoneVisit.lab_tsh,  shortLabel: "TSH" },
+                { key: "a1c",  value: hormoneVisit.lab_a1c,  shortLabel: "A1c" },
+                { key: "psa",  value: hormoneVisit.lab_psa,  shortLabel: "PSA" },
+                { key: "dhea", value: hormoneVisit.lab_dhea, shortLabel: "DHEA" },
+                { key: "vitd", value: hormoneVisit.lab_vitd, shortLabel: "Vit D" },
+                { key: "fsh",  value: hormoneVisit.lab_fsh,  shortLabel: "FSH" },
+              ]}
+            />
             {hormoneVisit.intake_symptoms?.length > 0 && (
               <div>
                 <p className="text-[10px] text-muted-foreground">Symptoms</p>
@@ -348,6 +350,22 @@ function QuickChart({ encounterId, patientId, readOnly = false }: { encounterId:
   const [saving, setSaving] = useState(false);
   const queryClient = useQueryClient();
 
+  // Latest labs (for reference-range chips above Objective)
+  const { data: latestLabs } = useQuery({
+    queryKey: ["telehealth-soap-labs", patientId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("hormone_visits")
+        .select("lab_tt, lab_ft, lab_e2, lab_tsh, lab_a1c, lab_psa, lab_dhea, lab_vitd, lab_fsh, lab_hgb, lab_hct, lab_igf1, visit_date")
+        .eq("patient_id", patientId)
+        .order("visit_date", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!patientId,
+  });
+
   // Load existing note
   const { data: existingNote } = useQuery({
     queryKey: ["telehealth-note", encounterId],
@@ -416,6 +434,23 @@ function QuickChart({ encounterId, patientId, readOnly = false }: { encounterId:
               </Button>
             )}
           </div>
+          {section === "objective" && latestLabs && (
+            <LabReferenceStrip
+              className="mb-1.5"
+              compact
+              labs={[
+                { key: "tt",   value: latestLabs.lab_tt,   shortLabel: "TT" },
+                { key: "ft",   value: latestLabs.lab_ft,   shortLabel: "FT" },
+                { key: "e2",   value: latestLabs.lab_e2,   shortLabel: "E2" },
+                { key: "tsh",  value: latestLabs.lab_tsh,  shortLabel: "TSH" },
+                { key: "a1c",  value: latestLabs.lab_a1c,  shortLabel: "A1c" },
+                { key: "psa",  value: latestLabs.lab_psa,  shortLabel: "PSA" },
+                { key: "hgb",  value: latestLabs.lab_hgb,  shortLabel: "Hgb" },
+                { key: "hct",  value: latestLabs.lab_hct,  shortLabel: "Hct" },
+                { key: "igf1", value: latestLabs.lab_igf1, shortLabel: "IGF-1" },
+              ]}
+            />
+          )}
           <Textarea
             value={soap[section]}
             onChange={e => setSoap(p => ({ ...p, [section]: e.target.value }))}
