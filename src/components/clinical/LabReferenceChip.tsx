@@ -71,8 +71,8 @@ export function classifyLab(key: string, value: number | null | undefined): LabS
 const STATUS_STYLES: Record<LabStatus, { dot: string; ring: string; text: string; label: string }> = {
   critical:   { dot: "bg-destructive",          ring: "ring-destructive/40",          text: "text-destructive",          label: "Critical" },
   out:        { dot: "bg-destructive/80",       ring: "ring-destructive/30",          text: "text-destructive",          label: "Out of range" },
-  borderline: { dot: "bg-amber-500",            ring: "ring-amber-500/30",            text: "text-amber-600 dark:text-amber-400", label: "Borderline" },
-  in:         { dot: "bg-emerald-500",          ring: "ring-emerald-500/30",          text: "text-emerald-600 dark:text-emerald-400", label: "In range" },
+  borderline: { dot: "bg-warning",               ring: "ring-warning/30",               text: "text-warning",               label: "Borderline" },
+  in:         { dot: "bg-success",               ring: "ring-success/30",               text: "text-success",               label: "In range" },
   unknown:    { dot: "bg-muted-foreground/40",  ring: "ring-muted-foreground/20",     text: "text-muted-foreground",     label: "No reference" },
 };
 
@@ -140,7 +140,7 @@ export function LabReferenceChip({ labKey, value, shortLabel, className, compact
                 {/* Reference band */}
                 {refLowPct != null && refHighPct != null && (
                   <div
-                    className="absolute inset-y-0 bg-emerald-500/30"
+                    className="absolute inset-y-0 bg-success/30"
                     style={{ left: `${refLowPct}%`, width: `${refHighPct - refLowPct}%` }}
                   />
                 )}
@@ -206,8 +206,8 @@ export function LabReferenceStrip({ labs, hideEmpty = true, className, compact =
         <span className="font-semibold uppercase tracking-wider">Reference Check</span>
         {counts.critical > 0 && <span className="text-destructive font-medium">● {counts.critical} critical</span>}
         {counts.out > 0 && <span className="text-destructive">● {counts.out} out</span>}
-        {counts.borderline > 0 && <span className="text-amber-600 dark:text-amber-400">● {counts.borderline} borderline</span>}
-        {counts.in > 0 && <span className="text-emerald-600 dark:text-emerald-400">● {counts.in} in range</span>}
+        {counts.borderline > 0 && <span className="text-warning">● {counts.borderline} borderline</span>}
+        {counts.in > 0 && <span className="text-success">● {counts.in} in range</span>}
       </div>
       <div className="grid grid-cols-3 gap-1">
         {visible.map(l => (
