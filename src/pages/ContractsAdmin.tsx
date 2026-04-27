@@ -81,18 +81,27 @@ export default function ContractsAdmin() {
 
   const addClinic = useMutation({
     mutationFn: async () => {
+      const name = clinicForm.name.trim();
+      const address = clinicForm.address.trim();
+      const city = clinicForm.city.trim();
+      const state = clinicForm.state.trim();
+      if (!name) throw new Error("Clinic name is required");
+      if (!address) throw new Error("Address is required");
+      if (!city) throw new Error("City is required");
+      if (!state) throw new Error("State is required");
       const { error } = await supabase.from("clinics").insert({
-        name: clinicForm.name,
-        address: clinicForm.address || null,
+        name,
+        address,
+        city,
+        state,
         contract_id: clinicForm.contract_id || null,
         phone: clinicForm.phone || null,
-        city: clinicForm.city || null,
-        state: clinicForm.state || null,
         timezone: clinicForm.timezone || "America/New_York",
       });
       if (error) throw error;
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["clinics"] }); setClinicOpen(false); setClinicForm({ name: "", address: "", contract_id: "", phone: "", city: "", state: "", timezone: "America/New_York" }); toast.success("Clinic created"); },
+    onError: (e: Error) => toast.error(e.message || "Failed to create clinic"),
   });
 
   const addAssignment = useMutation({
@@ -165,11 +174,11 @@ export default function ContractsAdmin() {
             <DialogContent>
               <DialogHeader><DialogTitle>New Clinic</DialogTitle></DialogHeader>
               <div className="space-y-3">
-                <div><Label>Name</Label><Input value={clinicForm.name} onChange={e => setClinicForm(p => ({ ...p, name: e.target.value }))} /></div>
-                <div><Label>Address</Label><Input value={clinicForm.address} onChange={e => setClinicForm(p => ({ ...p, address: e.target.value }))} /></div>
+                <div><Label>Name <span className="text-destructive">*</span></Label><Input value={clinicForm.name} onChange={e => setClinicForm(p => ({ ...p, name: e.target.value }))} required /></div>
+                <div><Label>Address <span className="text-destructive">*</span></Label><Input value={clinicForm.address} onChange={e => setClinicForm(p => ({ ...p, address: e.target.value }))} placeholder="Street address" required /></div>
                 <div className="grid grid-cols-2 gap-3">
-                  <div><Label>City</Label><Input value={clinicForm.city} onChange={e => setClinicForm(p => ({ ...p, city: e.target.value }))} /></div>
-                  <div><Label>State</Label><Input value={clinicForm.state} onChange={e => setClinicForm(p => ({ ...p, state: e.target.value }))} placeholder="e.g. FL" /></div>
+                  <div><Label>City <span className="text-destructive">*</span></Label><Input value={clinicForm.city} onChange={e => setClinicForm(p => ({ ...p, city: e.target.value }))} required /></div>
+                  <div><Label>State <span className="text-destructive">*</span></Label><Input value={clinicForm.state} onChange={e => setClinicForm(p => ({ ...p, state: e.target.value }))} placeholder="e.g. FL" required /></div>
                 </div>
                 <div><Label>Phone</Label><Input value={clinicForm.phone} onChange={e => setClinicForm(p => ({ ...p, phone: e.target.value }))} placeholder="(555) 123-4567" /></div>
                 <div><Label>Timezone</Label>
@@ -189,7 +198,18 @@ export default function ContractsAdmin() {
                     </SelectContent>
                   </Select>
                 </div>
-                <Button onClick={() => addClinic.mutate()} disabled={!clinicForm.name}>Create</Button>
+                <Button
+                  onClick={() => addClinic.mutate()}
+                  disabled={
+                    !clinicForm.name.trim() ||
+                    !clinicForm.address.trim() ||
+                    !clinicForm.city.trim() ||
+                    !clinicForm.state.trim() ||
+                    addClinic.isPending
+                  }
+                >
+                  {addClinic.isPending ? "Creating…" : "Create"}
+                </Button>
               </div>
             </DialogContent>
           </Dialog>
