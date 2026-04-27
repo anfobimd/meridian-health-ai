@@ -29,10 +29,13 @@ const QUEUE_COLUMNS: { status: QueueStatus; label: string; icon: React.ElementTy
   { status: "completed", label: "Completed", icon: CheckCircle2, color: "border-t-success" },
 ];
 
+type StatusFilter = "all" | "checked_in" | "completed" | "no_show";
+
 export default function FrontDesk() {
   const queryClient = useQueryClient();
   const [walkinOpen, setWalkinOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 
   const { data: appointments, isLoading } = useQuery({
     queryKey: ["frontdesk-today"],
@@ -172,40 +175,88 @@ export default function FrontDesk() {
         </div>
       </div>
 
-      {/* KPI Strip */}
+      {/* KPI Strip — click a card to filter the queue */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <Card className="p-3">
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center"><Users className="h-4 w-4 text-primary" /></div>
-            <div><p className="text-[10px] text-muted-foreground font-medium uppercase">Total</p><p className="text-lg font-bold">{stats.total}</p></div>
-          </div>
-        </Card>
-        <Card className="p-3">
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-warning/10 flex items-center justify-center"><Clock className="h-4 w-4 text-warning" /></div>
-            <div><p className="text-[10px] text-muted-foreground font-medium uppercase">Waiting</p><p className="text-lg font-bold">{stats.waiting}</p></div>
-          </div>
-        </Card>
-        <Card className="p-3">
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-success/10 flex items-center justify-center"><CheckCircle2 className="h-4 w-4 text-success" /></div>
-            <div><p className="text-[10px] text-muted-foreground font-medium uppercase">Completed</p><p className="text-lg font-bold">{stats.completed}</p></div>
-          </div>
-        </Card>
-        <Card className="p-3">
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-destructive/10 flex items-center justify-center"><AlertTriangle className="h-4 w-4 text-destructive" /></div>
-            <div><p className="text-[10px] text-muted-foreground font-medium uppercase">No-Show</p><p className="text-lg font-bold">{stats.noShow}</p></div>
-          </div>
-        </Card>
+        {([
+          { key: "all" as const, label: "Total", value: stats.total, icon: Users,
+            iconBg: "bg-primary/10", iconText: "text-primary",
+            activeRing: "ring-2 ring-primary bg-primary/5" },
+          { key: "checked_in" as const, label: "Waiting", value: stats.waiting, icon: Clock,
+            iconBg: "bg-warning/10", iconText: "text-warning",
+            activeRing: "ring-2 ring-warning bg-warning/5" },
+          { key: "completed" as const, label: "Completed", value: stats.completed, icon: CheckCircle2,
+            iconBg: "bg-success/10", iconText: "text-success",
+            activeRing: "ring-2 ring-success bg-success/5" },
+          { key: "no_show" as const, label: "No-Show", value: stats.noShow, icon: AlertTriangle,
+            iconBg: "bg-destructive/10", iconText: "text-destructive",
+            activeRing: "ring-2 ring-destructive bg-destructive/5" },
+        ]).map((kpi) => {
+          const active = statusFilter === kpi.key;
+          return (
+            <button
+              key={kpi.key}
+              type="button"
+              onClick={() => setStatusFilter(active && kpi.key !== "all" ? "all" : kpi.key)}
+              aria-pressed={active ? "true" : "false"}
+              title={kpi.key === "all" ? "Show all appointments" : `Filter to ${kpi.label}`}
+              className="text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg"
+            >
+              <Card className={`p-3 transition-all hover:shadow-md hover:-translate-y-0.5 cursor-pointer ${active ? kpi.activeRing : ""}`}>
+                <div className="flex items-center gap-2">
+                  <div className={`h-8 w-8 rounded-lg ${kpi.iconBg} flex items-center justify-center`}>
+                    <kpi.icon className={`h-4 w-4 ${kpi.iconText}`} />
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-muted-foreground font-medium uppercase">{kpi.label}</p>
+                    <p className="text-lg font-bold">{kpi.value}</p>
+                  </div>
+                </div>
+              </Card>
+            </button>
+          );
+        })}
       </div>
+      {statusFilter !== "all" && (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span>
+            Filtered to <strong className="text-foreground">{
+              statusFilter === "checked_in" ? "Waiting" : statusFilter === "completed" ? "Completed" : "No-Show"
+            }</strong>
+          </span>
+          <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => setStatusFilter("all")}>
+            Clear filter
+          </Button>
+        </div>
+      )}
 
       {/* Queue Board */}
       {isLoading ? (
         <div className="flex items-center justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+      ) : statusFilter === "no_show" ? (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 px-1">
+            <AlertTriangle className="h-3.5 w-3.5 text-destructive" />
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">No-Show</span>
+            <Badge variant="secondary" className="ml-auto text-[10px] h-5">{stats.noShow}</Badge>
+          </div>
+          <div className="space-y-2 min-h-[120px] rounded-lg border-t-2 border-t-destructive bg-muted/20 p-2">
+            {filtered.filter((a: any) => a.status === "no_show").length === 0 ? (
+              <p className="text-[11px] text-muted-foreground/50 text-center py-6">No patients</p>
+            ) : (
+              filtered.filter((a: any) => a.status === "no_show").map((apt: any) => (
+                <QueueCard
+                  key={apt.id}
+                  apt={apt}
+                  onStatusChange={(id, status) => updateStatus.mutate({ id, status })}
+                  onNoShow={(id) => markNoShow.mutate(id)}
+                />
+              ))
+            )}
+          </div>
+        </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-          {QUEUE_COLUMNS.map((col) => {
+        <div className={`grid grid-cols-1 gap-4 ${statusFilter === "all" ? "md:grid-cols-3 lg:grid-cols-5" : ""}`}>
+          {QUEUE_COLUMNS.filter((col) => statusFilter === "all" || col.status === statusFilter).map((col) => {
             const colApts = filtered.filter((a: any) => a.status === col.status);
             return (
               <div key={col.status} className="space-y-2">
