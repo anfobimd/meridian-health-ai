@@ -92,7 +92,12 @@ export function PatientRegistrationDialog({ open, onOpenChange }: Props) {
       onOpenChange(false);
       resetForm();
     },
-    onError: () => toast.error("Failed to register patient"),
+    // Surface the real DB/RLS error message so future schema mismatches
+    // (the QA #19 root cause was a column that didn't exist) don't get
+    // swallowed into a generic "Failed to register patient" toast.
+    onError: (err: Error) => toast.error("Failed to register patient", {
+      description: err.message || "Unknown error",
+    }),
   });
 
   const resetForm = () => {
