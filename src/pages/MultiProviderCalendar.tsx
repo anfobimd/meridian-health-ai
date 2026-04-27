@@ -204,12 +204,35 @@ export default function MultiProviderCalendar() {
                   {providers.map(p => {
                     const appts = getApptForSlot(p.id, hour, selectedDay);
                     const hasDelay = delays.some(d => d.appointment_id && appts.some((a: any) => a.id === d.appointment_id));
+                    const isEmpty = appts.length === 0;
                     return (
-                      <div key={`${p.id}-${hour}`} className={cn("border-b min-h-[48px] p-0.5", hasDelay && "bg-warning/5")}>
+                      <div
+                        key={`${p.id}-${hour}`}
+                        className={cn(
+                          "border-b min-h-[48px] p-0.5 transition-colors",
+                          hasDelay && "bg-warning/5",
+                          // Hover feedback (QA #20). Empty slots get a soft
+                          // primary tint + cursor-pointer to signal "click
+                          // to book"; populated slots get a subtle muted
+                          // tint so the user knows the row is interactive.
+                          isEmpty
+                            ? "hover:bg-primary/5 hover:cursor-pointer"
+                            : "hover:bg-muted/40",
+                        )}
+                        title={isEmpty ? `${p.first_name} ${p.last_name} — ${format(new Date(2000, 0, 1, hour), "h a")} (available)` : undefined}
+                      >
                         {appts.map((a: any) => {
                           const delay = delays.find(d => d.appointment_id === a.id);
                           return (
-                            <div key={a.id} className={cn("rounded px-1.5 py-0.5 text-[10px] border mb-0.5", statusColor(a.status), delay && "ring-1 ring-warning")}>
+                            <div
+                              key={a.id}
+                              className={cn(
+                                "rounded px-1.5 py-0.5 text-[10px] border mb-0.5 transition-all hover:shadow-sm hover:scale-[1.02] hover:cursor-pointer",
+                                statusColor(a.status),
+                                delay && "ring-1 ring-warning",
+                              )}
+                              title={`${(a.patients as any)?.first_name} ${(a.patients as any)?.last_name} • ${(a.treatments as any)?.name || ""} • ${format(parseISO(a.scheduled_at), "h:mm a")}`}
+                            >
                               <p className="font-medium truncate">{(a.patients as any)?.first_name} {(a.patients as any)?.last_name?.charAt(0)}.</p>
                               <p className="truncate opacity-70">{(a.treatments as any)?.name || "—"}</p>
                               {delay && <p className="text-warning font-medium">⚠ {delay.delay_minutes}m late</p>}
@@ -240,8 +263,18 @@ export default function MultiProviderCalendar() {
                   <div className="border-b border-r p-2 text-xs font-medium">{p.first_name} {p.last_name?.charAt(0)}.</div>
                   {weekDays.map(d => {
                     const dayAppts = appointments.filter((a: any) => a.provider_id === p.id && isSameDay(parseISO(a.scheduled_at), d));
+                    const isEmpty = dayAppts.length === 0;
                     return (
-                      <div key={`${p.id}-${d.toISOString()}`} className="border-b min-h-[40px] p-0.5">
+                      <div
+                        key={`${p.id}-${d.toISOString()}`}
+                        className={cn(
+                          "border-b min-h-[40px] p-0.5 transition-colors",
+                          isEmpty
+                            ? "hover:bg-primary/5 hover:cursor-pointer"
+                            : "hover:bg-muted/40 hover:cursor-pointer",
+                        )}
+                        title={`${p.first_name} ${p.last_name} — ${format(d, "EEE MMM d")}${isEmpty ? " (available)" : ` • ${dayAppts.length} appt(s)`}`}
+                      >
                         {dayAppts.length > 0 && (
                           <Badge variant="secondary" className="text-[10px]">{dayAppts.length} appt{dayAppts.length > 1 ? "s" : ""}</Badge>
                         )}
