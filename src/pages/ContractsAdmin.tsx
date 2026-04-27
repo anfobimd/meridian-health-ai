@@ -11,8 +11,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { Plus, Building2, FileText, Users, UserPlus, X, MapPin, Phone as PhoneIcon } from "lucide-react";
+import { Plus, Building2, FileText, Users, UserPlus, X, MapPin, Phone as PhoneIcon, Pencil, Trash2, Power } from "lucide-react";
 import { format } from "date-fns";
 
 export default function ContractsAdmin() {
@@ -27,6 +28,9 @@ export default function ContractsAdmin() {
   const [form, setForm] = useState({ name: "", start_date: "", end_date: "", notes: "" });
   const [clinicForm, setClinicForm] = useState({ name: "", address: "", contract_id: "", phone: "", city: "", state: "", timezone: "America/New_York" });
   const [selectedClinicId, setSelectedClinicId] = useState<string | null>(null);
+  const [editClinicOpen, setEditClinicOpen] = useState(false);
+  const [editClinicId, setEditClinicId] = useState<string | null>(null);
+  const [deleteClinicId, setDeleteClinicId] = useState<string | null>(null);
 
   const { data: contracts = [] } = useQuery({
     queryKey: ["contracts"],
@@ -103,6 +107,88 @@ export default function ContractsAdmin() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["clinics"] }); setClinicOpen(false); setClinicForm({ name: "", address: "", contract_id: "", phone: "", city: "", state: "", timezone: "America/New_York" }); toast.success("Clinic created"); },
     onError: (e: Error) => toast.error(e.message || "Failed to create clinic"),
   });
+
+  const updateClinic = useMutation({
+    mutationFn: async () => {
+      if (!editClinicId) throw new Error("No clinic selected");
+      const name = clinicForm.name.trim();
+      const address = clinicForm.address.trim();
+      const city = clinicForm.city.trim();
+      const state = clinicForm.state.trim();
+      if (!name) throw new Error("Clinic name is required");
+      if (!address) throw new Error("Address is required");
+      if (!city) throw new Error("City is required");
+      if (!state) throw new Error("State is required");
+      const { error } = await supabase.from("clinics").update({
+        name,
+        address,
+        city,
+        state,
+        contract_id: clinicForm.contract_id || null,
+        phone: clinicForm.phone || null,
+        timezone: clinicForm.timezone || "America/New_York",
+      }).eq("id", editClinicId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["clinics"] });
+      setEditClinicOpen(false);
+      setEditClinicId(null);
+      setClinicForm({ name: "", address: "", contract_id: "", phone: "", city: "", state: "", timezone: "America/New_York" });
+      toast.success("Clinic updated");
+    },
+    onError: (e: Error) => toast.error(e.message || "Failed to update clinic"),
+  });
+
+  const toggleClinicActive = useMutation({
+    mutationFn: async ({ id, is_active }: { id: string; is_active: boolean }) => {
+      const { error } = await supabase.from("clinics").update({ is_active: !is_active }).eq("id", id);
+      if (error) throw error;
+      return !is_active;
+    },
+    onSuccess: (next) => {
+      qc.invalidateQueries({ queryKey: ["clinics"] });
+      toast.success(next ? "Clinic activated" : "Clinic deactivated");
+    },
+    onError: (e: Error) => toast.error(e.message || "Failed to update status"),
+  });
+
+  const deleteClinic = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("clinics").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["clinics"] });
+      qc.invalidateQueries({ queryKey: ["provider-clinic-assignments"] });
+      setDeleteClinicId(null);
+      toast.success("Clinic deleted");
+    },
+    onError: (e: any) => {
+      const msg: string = e?.message || "";
+      if (msg.includes("foreign key") || msg.includes("violates") || e?.code === "23503") {
+        toast.error("Can't delete clinic", {
+          description: "It still has appointments or encounters tied to it. Deactivate it instead, or remove the linked records first.",
+        });
+      } else {
+        toast.error(msg || "Failed to delete clinic");
+      }
+    },
+  });
+
+  const openEditClinic = (c: any) => {
+    setEditClinicId(c.id);
+    setClinicForm({
+      name: c.name ?? "",
+      address: c.address ?? "",
+      contract_id: c.contract_id ?? "",
+      phone: c.phone ?? "",
+      city: c.city ?? "",
+      state: c.state ?? "",
+      timezone: c.timezone ?? "America/New_York",
+    });
+    setEditClinicOpen(true);
+  };
 
   const addAssignment = useMutation({
     mutationFn: async () => {
@@ -321,9 +407,33 @@ export default function ContractsAdmin() {
                         {(c as any).contracts?.name && <span>Contract: {(c as any).contracts.name}</span>}
                       </div>
                     </div>
-                    <Button size="sm" variant="outline" onClick={() => { setAssignClinicId(c.id); setAssignOpen(true); }}>
-                      <UserPlus className="h-3 w-3 mr-1" />Add Staff
-                    </Button>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <Button size="sm" variant="outline" onClick={() => { setAssignClinicId(c.id); setAssignOpen(true); }}>
+                        <UserPlus className="h-3 w-3 mr-1" />Add Staff
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => openEditClinic(c)} title="Edit clinic" aria-label="Edit clinic">
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => toggleClinicActive.mutate({ id: c.id, is_active: !!(c as any).is_active })}
+                        title={(c as any).is_active ? "Deactivate clinic" : "Activate clinic"}
+                        aria-label={(c as any).is_active ? "Deactivate clinic" : "Activate clinic"}
+                      >
+                        <Power className={`h-3.5 w-3.5 ${(c as any).is_active ? "" : "text-muted-foreground"}`} />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => setDeleteClinicId(c.id)}
+                        title="Delete clinic"
+                        aria-label="Delete clinic"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent className="pt-0">
@@ -391,6 +501,74 @@ export default function ContractsAdmin() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Edit Clinic Dialog */}
+      <Dialog open={editClinicOpen} onOpenChange={(o) => { setEditClinicOpen(o); if (!o) { setEditClinicId(null); setClinicForm({ name: "", address: "", contract_id: "", phone: "", city: "", state: "", timezone: "America/New_York" }); } }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Edit Clinic</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div><Label>Name <span className="text-destructive">*</span></Label><Input value={clinicForm.name} onChange={e => setClinicForm(p => ({ ...p, name: e.target.value }))} required /></div>
+            <div><Label>Address <span className="text-destructive">*</span></Label><Input value={clinicForm.address} onChange={e => setClinicForm(p => ({ ...p, address: e.target.value }))} placeholder="Street address" required /></div>
+            <div className="grid grid-cols-2 gap-3">
+              <div><Label>City <span className="text-destructive">*</span></Label><Input value={clinicForm.city} onChange={e => setClinicForm(p => ({ ...p, city: e.target.value }))} required /></div>
+              <div><Label>State <span className="text-destructive">*</span></Label><Input value={clinicForm.state} onChange={e => setClinicForm(p => ({ ...p, state: e.target.value }))} placeholder="e.g. FL" required /></div>
+            </div>
+            <div><Label>Phone</Label><Input value={clinicForm.phone} onChange={e => setClinicForm(p => ({ ...p, phone: e.target.value }))} placeholder="(555) 123-4567" /></div>
+            <div>
+              <Label>Timezone</Label>
+              <Select value={clinicForm.timezone} onValueChange={v => setClinicForm(p => ({ ...p, timezone: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {["America/New_York","America/Chicago","America/Denver","America/Los_Angeles","America/Phoenix","Pacific/Honolulu"].map(tz => <SelectItem key={tz} value={tz}>{tz.replace("America/","").replace("Pacific/","").replace(/_/g," ")}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Contract</Label>
+              <Select value={clinicForm.contract_id || "__none__"} onValueChange={v => setClinicForm(p => ({ ...p, contract_id: v === "__none__" ? "" : v }))}>
+                <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">None</SelectItem>
+                  {contracts.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              onClick={() => updateClinic.mutate()}
+              disabled={
+                !clinicForm.name.trim() ||
+                !clinicForm.address.trim() ||
+                !clinicForm.city.trim() ||
+                !clinicForm.state.trim() ||
+                updateClinic.isPending
+              }
+            >
+              {updateClinic.isPending ? "Saving…" : "Save Changes"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Clinic Confirmation */}
+      <AlertDialog open={!!deleteClinicId} onOpenChange={(o) => { if (!o) setDeleteClinicId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this clinic?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently removes the clinic and all of its provider assignments. Appointments and encounters tied to it must be removed first, otherwise the deletion will fail. Consider deactivating the clinic instead.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); if (deleteClinicId) deleteClinic.mutate(deleteClinicId); }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteClinic.isPending ? "Deleting…" : "Delete clinic"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
