@@ -36,7 +36,6 @@ export function QueueCard({ apt, onStatusChange, onNoShow }: {
   const isLongWait = waitTime !== null && waitTime >= 15;
 
   const isWalkin = apt.notes?.includes("Walk-in");
-  const noShowRisk = (apt.patients?.no_show_count || 0) >= 2;
   const risk = getNoShowRisk(apt.patients?.no_show_count);
 
   const handleAction = () => {
