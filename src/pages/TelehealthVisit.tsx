@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import QuickTextExpander from "@/components/charting/QuickTextExpander";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
@@ -451,9 +452,9 @@ function QuickChart({ encounterId, patientId, readOnly = false }: { encounterId:
               ]}
             />
           )}
-          <Textarea
+          <QuickTextExpander
             value={soap[section]}
-            onChange={e => setSoap(p => ({ ...p, [section]: e.target.value }))}
+            onChange={value => setSoap(p => ({ ...p, [section]: value }))}
             rows={3}
             className="text-xs resize-none"
             readOnly={readOnly}
