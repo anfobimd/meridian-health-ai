@@ -484,7 +484,7 @@ export default function EncounterChart() {
 
       toast.success("Chart reopened for editing");
       queryClient.invalidateQueries({ queryKey: ["encounter", encounterId] });
-      queryClient.invalidateQueries({ queryKey: ["clinical-note", encounter?.appointment_id] });
+      queryClient.invalidateQueries({ queryKey: ["clinical-note", encounterId] });
     } catch (err: any) {
       toast.error(`Reopen failed: ${err.message}`);
     } finally {
