@@ -462,6 +462,37 @@ export default function EncounterChart() {
     }
   };
 
+  // Reopen a signed encounter for editing (status toggle back to in_progress)
+  const reopenEncounter = async () => {
+    if (!encounterId) return;
+    if (!confirm("Reopen this signed chart for editing? The chart will be returned to in-progress status.")) return;
+    try {
+      setSaving(true);
+      const { error: encErr } = await supabase
+        .from("encounters")
+        .update({ status: "in_progress", signed_at: null, completed_at: null })
+        .eq("id", encounterId);
+      if (encErr) throw encErr;
+
+      if (clinicalNote?.id) {
+        const { error: noteErr } = await supabase
+          .from("clinical_notes")
+          .update({ status: "draft", signed_at: null })
+          .eq("id", clinicalNote.id);
+        if (noteErr) throw noteErr;
+      }
+
+      toast.success("Chart reopened for editing");
+      // Refresh local state
+      setEncounter((prev: any) => prev ? { ...prev, status: "in_progress", signed_at: null, completed_at: null } : prev);
+      if (clinicalNote) setClinicalNote({ ...clinicalNote, status: "draft", signed_at: null });
+    } catch (err: any) {
+      toast.error(`Reopen failed: ${err.message}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   // Save encounter
   const saveEncounter = async (sign = false) => {
     if (sign) {
