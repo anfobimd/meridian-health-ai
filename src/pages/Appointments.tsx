@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { format, parseISO, addMinutes } from "date-fns";
 import { Calendar as CalendarWidget } from "@/components/ui/calendar";
 import { getAvailableSlots, checkConflicts, type TimeSlot } from "@/lib/scheduling";
+import { getNoShowRisk } from "@/lib/no-show-risk";
 
 const statusColors: Record<string, string> = {
   booked: "bg-primary/10 text-primary",
@@ -72,7 +73,7 @@ export default function Appointments() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("appointments")
-        .select("*, patients(id, first_name, last_name, date_of_birth, gender, allergies, medications), providers(id, first_name, last_name, credentials, specialty), treatments(id, name, description, category), rooms:room_id(id, name), devices:device_id(id, name)")
+        .select("*, patients(id, first_name, last_name, date_of_birth, gender, allergies, medications, no_show_count), providers(id, first_name, last_name, credentials, specialty), treatments(id, name, description, category), rooms:room_id(id, name), devices:device_id(id, name)")
         .order("scheduled_at", { ascending: false })
         .limit(50);
       if (error) throw error;
@@ -816,8 +817,22 @@ export default function Appointments() {
                   <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
                     <Calendar className="h-5 w-5 text-primary" />
                   </div>
-                  <div>
-                    <p className="font-medium text-sm">{apt.patients?.first_name} {apt.patients?.last_name}</p>
+                   <div>
+                     <p className="font-medium text-sm flex items-center flex-wrap">
+                       <span>{apt.patients?.first_name} {apt.patients?.last_name}</span>
+                       {(() => {
+                         const risk = getNoShowRisk(apt.patients?.no_show_count);
+                         return risk ? (
+                           <Badge
+                             variant={risk.variant}
+                             className="ml-2 text-[10px] h-5"
+                             title={`${apt.patients?.no_show_count} prior no-show(s)`}
+                           >
+                             {risk.label}
+                           </Badge>
+                         ) : null;
+                       })()}
+                     </p>
                     <p className="text-xs text-muted-foreground">
                       {apt.treatments?.name ?? "General"} • Dr. {apt.providers?.last_name ?? "Unassigned"} • {format(parseISO(apt.scheduled_at), "MMM d, yyyy 'at' h:mm a")}
                     </p>
