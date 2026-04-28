@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,7 @@ import { QueueCard } from "@/components/front-desk/QueueCard";
 import { ActionBar } from "@/components/front-desk/ActionBar";
 import { QuickDock } from "@/components/front-desk/QuickDock";
 import { InvitationTracker } from "@/components/front-desk/InvitationTracker";
+import { CheckInPanel } from "@/components/front-desk/CheckInPanel";
 import {
   UserPlus, CheckCircle2, DoorOpen, Play, Flag, Clock, Users,
   Loader2, AlertTriangle, Search, RefreshCw,
@@ -36,6 +38,10 @@ export default function FrontDesk() {
   const [walkinOpen, setWalkinOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const focusedPatientId = searchParams.get("patientId");
+  const returnTo = searchParams.get("returnTo") || undefined;
+  const [focusOpen, setFocusOpen] = useState(false);
 
   const { data: appointments, isLoading } = useQuery({
     queryKey: ["frontdesk-today"],
@@ -54,6 +60,45 @@ export default function FrontDesk() {
     },
     refetchInterval: 15000,
   });
+
+  // When ?patientId=… is present, build a check-in context for that patient
+  // (uses today's appointment if one exists, otherwise a minimal patient-only stub).
+  const { data: focusedPatient } = useQuery({
+    queryKey: ["fd-focused-patient", focusedPatientId],
+    enabled: !!focusedPatientId,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("patients")
+        .select("id, first_name, last_name, date_of_birth, phone, no_show_count")
+        .eq("id", focusedPatientId!)
+        .maybeSingle();
+      return data;
+    },
+  });
+
+  const focusedAppointment = useMemo(() => {
+    if (!focusedPatientId) return null;
+    const todayApt = (appointments ?? []).find(
+      (a: any) => a.patient_id === focusedPatientId || a.patients?.id === focusedPatientId,
+    );
+    if (todayApt) return todayApt;
+    if (!focusedPatient) return null;
+    // Synthetic appointment so CheckInPanel can render consent for this patient.
+    return {
+      id: null,
+      patient_id: focusedPatient.id,
+      patients: focusedPatient,
+      treatments: null,
+      providers: null,
+      rooms: null,
+      status: "booked",
+      notes: "",
+    };
+  }, [focusedPatientId, focusedPatient, appointments]);
+
+  useEffect(() => {
+    if (focusedPatientId && focusedAppointment) setFocusOpen(true);
+  }, [focusedPatientId, focusedAppointment]);
 
   const { data: patients } = useQuery({
     queryKey: ["all-patients-fd"],
@@ -325,6 +370,26 @@ export default function FrontDesk() {
 
       {/* Quick Action Dock */}
       <QuickDock onWalkIn={() => setWalkinOpen(true)} patients={patients || []} />
+
+      {/* Auto-opened consent panel when navigated here with ?patientId=… */}
+      {focusedAppointment && (
+        <CheckInPanel
+          appointment={focusedAppointment}
+          open={focusOpen}
+          onOpenChange={(o) => {
+            setFocusOpen(o);
+            if (!o) {
+              // Clear the deep-link params so the panel doesn't re-open on re-render.
+              const next = new URLSearchParams(searchParams);
+              next.delete("patientId");
+              next.delete("returnTo");
+              setSearchParams(next, { replace: true });
+            }
+          }}
+          defaultTab="consent"
+          returnTo={returnTo}
+        />
+      )}
     </div>
   );
 }

@@ -18,17 +18,24 @@ import {
   Package, Heart,
 } from "lucide-react";
 
-export function CheckInPanel({ appointment, open, onOpenChange }: {
+export function CheckInPanel({ appointment, open, onOpenChange, defaultTab, returnTo }: {
   appointment: any;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  defaultTab?: "checkin" | "identity" | "consent" | "insurance";
+  returnTo?: string;
 }) {
   const queryClient = useQueryClient();
   const [roomId, setRoomId] = useState(appointment?.room_id || "");
   const [notes, setNotes] = useState("");
   const [showBrief, setShowBrief] = useState(true); // Auto-show AI brief
   const [checking, setChecking] = useState(false);
-  const [tab, setTab] = useState("checkin");
+  const [tab, setTab] = useState<string>(defaultTab || "checkin");
+
+  // Sync tab when defaultTab changes (e.g. dialog reopened with a different intent)
+  useEffect(() => {
+    if (open && defaultTab) setTab(defaultTab);
+  }, [open, defaultTab]);
 
   const { data: rooms } = useQuery({
     queryKey: ["rooms-list"],
@@ -252,6 +259,7 @@ export function CheckInPanel({ appointment, open, onOpenChange }: {
                 patientId={appointment.patients.id}
                 patientName={patientName}
                 appointmentId={appointment.id}
+                returnTo={returnTo}
               />
             )}
           </TabsContent>

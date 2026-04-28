@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,17 +10,20 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import SignaturePad from "@/components/SignaturePad";
 import {
-  FileCheck, Send, CheckCircle2, Clock, Loader2, PenLine,
+  FileCheck, Send, CheckCircle2, Clock, Loader2, PenLine, ArrowLeft,
 } from "lucide-react";
 
 interface Props {
   patientId: string;
   patientName: string;
   appointmentId?: string;
+  /** Optional path to navigate back to after consent capture (e.g. an encounter chart with reopenPhotos=1). */
+  returnTo?: string;
 }
 
-export function ConsentWorkflow({ patientId, patientName, appointmentId }: Props) {
+export function ConsentWorkflow({ patientId, patientName, appointmentId, returnTo }: Props) {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [signOpen, setSignOpen] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
   const [signature, setSignature] = useState<string | null>(null);
@@ -97,6 +101,17 @@ export function ConsentWorkflow({ patientId, patientName, appointmentId }: Props
 
   return (
     <div className="space-y-3">
+      {returnTo && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 px-2 text-xs gap-1 -ml-1"
+          onClick={() => navigate(returnTo)}
+        >
+          <ArrowLeft className="h-3 w-3" />
+          Back to chart
+        </Button>
+      )}
       <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
         <FileCheck className="h-3 w-3" />Consent Forms
       </h3>

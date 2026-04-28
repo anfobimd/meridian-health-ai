@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -234,6 +234,8 @@ function AftercareModal({
 export default function EncounterChart() {
   const { encounterId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const { role } = useAuth();
   const isReadOnly = role === "front_desk";
@@ -249,6 +251,17 @@ export default function EncounterChart() {
   const [showAftercareModal, setShowAftercareModal] = useState(false);
   const [safetyWarnings, setSafetyWarnings] = useState<string[]>([]);
   const [photosOpen, setPhotosOpen] = useState(false);
+
+  // Auto-reopen the photos modal if we returned from the consent workflow
+  // with ?reopenPhotos=1 in the URL.
+  useEffect(() => {
+    if (searchParams.get("reopenPhotos") === "1") {
+      setPhotosOpen(true);
+      const next = new URLSearchParams(searchParams);
+      next.delete("reopenPhotos");
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   // Fetch encounter
   const { data: encounter } = useQuery({
@@ -1117,7 +1130,11 @@ export default function EncounterChart() {
                     size="sm"
                     onClick={() => {
                       setPhotosOpen(false);
-                      navigate("/front-desk");
+                      const returnTo = `${location.pathname}?reopenPhotos=1`;
+                      navigate(
+                        `/front-desk?patientId=${encounter.patient_id}` +
+                          `&returnTo=${encodeURIComponent(returnTo)}`,
+                      );
                     }}
                     className="gap-1"
                   >
