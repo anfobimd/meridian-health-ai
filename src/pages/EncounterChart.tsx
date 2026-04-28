@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import {
   ChevronDown, ChevronRight, Sparkles, FileText, Save, CheckCircle2,
   ArrowLeft, Loader2, ClipboardList, AlertTriangle, ShieldAlert, Send, X, Eye,
+  Lock, Unlock, Info,
 } from "lucide-react";
 import { VitalsPanel } from "@/components/encounter/VitalsPanel";
 import { AddendumSection } from "@/components/clinical/AddendumSection";
