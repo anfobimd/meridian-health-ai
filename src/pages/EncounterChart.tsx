@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import QuickTextExpander from "@/components/charting/QuickTextExpander";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
@@ -889,9 +890,9 @@ export default function EncounterChart() {
                       </Button>
                     )}
                   </div>
-                  <Textarea
+                  <QuickTextExpander
                     value={soapNotes[section]}
-                    onChange={(e) => setSoapNotes(prev => ({ ...prev, [section]: e.target.value }))}
+                    onChange={(value) => setSoapNotes(prev => ({ ...prev, [section]: value }))}
                     placeholder={`Enter ${section}...`}
                     className="min-h-[80px] text-sm"
                     readOnly={isSigned}
