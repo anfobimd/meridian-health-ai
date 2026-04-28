@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import {
   ChevronDown, ChevronRight, Sparkles, FileText, Save, CheckCircle2,
   ArrowLeft, Loader2, ClipboardList, AlertTriangle, ShieldAlert, Send, X, Eye,
+  Lock, Unlock, Info,
 } from "lucide-react";
 import { VitalsPanel } from "@/components/encounter/VitalsPanel";
 import { AddendumSection } from "@/components/clinical/AddendumSection";
@@ -461,6 +462,36 @@ export default function EncounterChart() {
     }
   };
 
+  // Reopen a signed encounter for editing (status toggle back to in_progress)
+  const reopenEncounter = async () => {
+    if (!encounterId) return;
+    if (!confirm("Reopen this signed chart for editing? The chart will be returned to in-progress status.")) return;
+    try {
+      setSaving(true);
+      const { error: encErr } = await supabase
+        .from("encounters")
+        .update({ status: "in_progress", signed_at: null, completed_at: null })
+        .eq("id", encounterId);
+      if (encErr) throw encErr;
+
+      if (clinicalNote?.id) {
+        const { error: noteErr } = await supabase
+          .from("clinical_notes")
+          .update({ status: "draft", signed_at: null })
+          .eq("id", clinicalNote.id);
+        if (noteErr) throw noteErr;
+      }
+
+      toast.success("Chart reopened for editing");
+      queryClient.invalidateQueries({ queryKey: ["encounter", encounterId] });
+      queryClient.invalidateQueries({ queryKey: ["clinical-note", encounterId] });
+    } catch (err: any) {
+      toast.error(`Reopen failed: ${err.message}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   // Save encounter
   const saveEncounter = async (sign = false) => {
     if (sign) {
@@ -876,6 +907,48 @@ export default function EncounterChart() {
                   </Button>
                 )}
               </div>
+
+              {/* Inline helper / status banner */}
+              {isReadOnly ? (
+                <div className="flex items-start gap-2 rounded-md border border-muted bg-muted/40 p-2.5 text-xs">
+                  <Eye className="h-3.5 w-3.5 mt-0.5 shrink-0 text-muted-foreground" />
+                  <p className="text-muted-foreground">
+                    <span className="font-medium text-foreground">View-only access.</span>{" "}
+                    Your role can view this chart but cannot edit clinical fields. Ask a provider to make changes.
+                  </p>
+                </div>
+              ) : encounter?.status === "signed" ? (
+                <div className="flex items-start justify-between gap-3 rounded-md border border-green-600/30 bg-green-600/5 p-2.5 text-xs">
+                  <div className="flex items-start gap-2">
+                    <Lock className="h-3.5 w-3.5 mt-0.5 shrink-0 text-green-700" />
+                    <p className="text-muted-foreground">
+                      <span className="font-medium text-green-700">Chart signed &amp; locked.</span>{" "}
+                      SOAP fields are read-only. To make corrections, add an{" "}
+                      <span className="font-medium text-foreground">Addendum</span> below, or reopen the chart to edit.
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs shrink-0"
+                    onClick={reopenEncounter}
+                    disabled={saving}
+                  >
+                    <Unlock className="h-3 w-3 mr-1" />
+                    Reopen
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex items-start gap-2 rounded-md border border-primary/20 bg-primary/5 p-2.5 text-xs">
+                  <Info className="h-3.5 w-3.5 mt-0.5 shrink-0 text-primary" />
+                  <p className="text-muted-foreground">
+                    <span className="font-medium text-foreground">Editing draft.</span>{" "}
+                    Use <span className="font-medium">Save Draft</span> to keep working later, or{" "}
+                    <span className="font-medium">Sign &amp; Lock</span> when the note is final
+                    (this locks all clinical fields — only addenda can be added afterward).
+                  </p>
+                </div>
+              )}
 
               {(["subjective", "objective", "assessment", "plan"] as const).map((section) => (
                 <div key={section} className="space-y-1.5">
