@@ -554,6 +554,27 @@ export default function Settings() {
 
       {/* Admin: Reset User Password */}
       {(role === "admin" || role === "super_admin") && <AdminPasswordReset />}
+
+      {/* Developer Tools — temporary, remove before launch */}
+      <Card className="mt-6 border-dashed">
+        <CardHeader>
+          <CardTitle className="text-sm text-muted-foreground">Developer Tools</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-xs text-muted-foreground mb-3">
+            For testing only — these will be removed before launch.
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              throw new Error("Sentry test error from Settings page — manual trigger");
+            }}
+          >
+            Trigger Test Error
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   );
 }
