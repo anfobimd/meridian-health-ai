@@ -120,24 +120,29 @@ export function IntakeReviewPanel({ appointmentId, patientId }: { appointmentId?
         </Card>
       ) : null}
 
-      {((patient?.allergies?.length ?? 0) > 0 || (patient?.medications?.length ?? 0) > 0) && (
-        <Card>
-          <CardContent className="p-3 space-y-2">
-            {(patient?.allergies?.length ?? 0) > 0 && (
-              <div>
-                <p className="text-xs font-semibold text-destructive flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> Allergies</p>
-                <p className="text-xs">{patient!.allergies.join(", ")}</p>
-              </div>
-            )}
-            {(patient?.medications?.length ?? 0) > 0 && (
-              <div>
-                <p className="text-xs font-semibold flex items-center gap-1"><Pill className="h-3 w-3 text-primary" /> Current Meds</p>
-                <p className="text-xs text-muted-foreground">{patient!.medications.join(", ")}</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
+      {(() => {
+        const allergies: string[] = Array.isArray(patient?.allergies) ? (patient!.allergies as string[]) : [];
+        const medications: string[] = Array.isArray(patient?.medications) ? (patient!.medications as string[]) : [];
+        if (allergies.length === 0 && medications.length === 0) return null;
+        return (
+          <Card>
+            <CardContent className="p-3 space-y-2">
+              {allergies.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-destructive flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> Allergies</p>
+                  <p className="text-xs">{allergies.join(", ")}</p>
+                </div>
+              )}
+              {medications.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold flex items-center gap-1"><Pill className="h-3 w-3 text-primary" /> Current Meds</p>
+                  <p className="text-xs text-muted-foreground">{medications.join(", ")}</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {/* Intake Form Responses */}
       {intakeForm && (
