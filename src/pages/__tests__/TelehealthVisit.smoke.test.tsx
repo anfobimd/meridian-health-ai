@@ -4,6 +4,29 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
+// ─────────────────────────────────────────────────────────────────────────────
+// TelehealthVisit smoke test
+//
+// PURPOSE
+//   Catch the "blank-render" class of bug on /telehealth/:appointmentId by
+//   mounting <TelehealthVisit /> with mocked Supabase / auth / router and
+//   asserting the page shell renders the patient header + chart tabs.
+//
+// WHY VITEST AND NOT PLAYWRIGHT
+//   Vitest can't actually load the sandbox or production URL — it runs the
+//   component in jsdom/happy-dom in-process. The trade-off is fast feedback
+//   on render-time crashes (which is what caused the blank screen seen in the
+//   live preview). For end-to-end coverage of sandbox vs production with real
+//   auth, a separate Playwright suite would be needed.
+//
+// KNOWN FAILURE (intentional)
+//   At time of writing, this test fails because IntakeReviewPanel does
+//   `consents.length > 0` without a fallback for `useQuery`'s initial
+//   `data: undefined`. That synchronous throw is exactly what blanks the page
+//   in the preview. Fix the source (default consents to []), then this test
+//   should pass without modification.
+// ─────────────────────────────────────────────────────────────────────────────
+
 // ── Hardcoded seeded telehealth appointment id (smoke fixture) ──
 const APPOINTMENT_ID = "00000000-0000-0000-0000-0000000000aa";
 const PATIENT_ID = "00000000-0000-0000-0000-0000000000bb";
