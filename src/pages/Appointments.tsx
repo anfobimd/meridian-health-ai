@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,7 @@ const statusColors: Record<string, string> = {
 
 export default function Appointments() {
   const [dialogOpen, setDialogOpen] = useState(false);
+  const navigate = useNavigate();
   const [soapDialogOpen, setSoapDialogOpen] = useState(false);
   const [roomingDialogOpen, setRoomingDialogOpen] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
@@ -845,6 +847,17 @@ export default function Appointments() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
+                  {apt.visit_type === "telehealth" && !["cancelled", "no_show"].includes(apt.status) && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-xs gap-1 border-primary/30 text-primary hover:bg-primary/10"
+                      onClick={() => navigate(`/telehealth/${apt.id}`)}
+                      title="Open telehealth visit"
+                    >
+                      <Video className="h-3 w-3" /> Join
+                    </Button>
+                  )}
                   {apt.status === "completed" && (
                     <Button size="sm" variant="outline" className="text-xs gap-1" onClick={() => generateSoapNote(apt)}><Sparkles className="h-3 w-3" /> Generate Note</Button>
                   )}
