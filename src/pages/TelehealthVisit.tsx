@@ -579,7 +579,7 @@ export default function TelehealthVisit() {
   const patient = appointment.patients;
 
   return (
-    <div className="h-[calc(100vh-4rem)] flex flex-col">
+    <div className="h-full min-h-[600px] flex flex-col">
       {/* Top bar */}
       <div className="flex items-center justify-between border-b px-4 py-2 bg-card shrink-0">
         <div className="flex items-center gap-3">
