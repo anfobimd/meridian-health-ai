@@ -163,6 +163,7 @@ const App = () => (
                   <Route path="/waitlist" element={<Waitlist />} />
                   <Route path="/settings" element={<Settings />} />
                   <Route path="/my-profile" element={<ProviderProfile />} />
+                  <Route path="/me/quick-texts" element={<QuickTexts />} />
                   <Route path="/templates" element={<TemplateManager />} />
                   <Route path="/time-off" element={<TimeOff />} />
                   <Route path="/md-feedback" element={<MdFeedbackInbox />} />
