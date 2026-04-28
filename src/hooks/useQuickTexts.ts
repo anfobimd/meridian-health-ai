@@ -33,15 +33,39 @@ export type UpdateQuickTextInput = Partial<
 >;
 
 // The generated Supabase types may not yet include `provider_quick_texts`.
-// Cast through `unknown` to a narrowly-typed query builder so the rest of
-// the hook stays strictly typed without using `any`.
-type QuickTextRow = QuickText;
-const quickTextsTable = () =>
-  (supabase.from as unknown as (
-    table: "provider_quick_texts"
-  ) => ReturnType<typeof supabase.from<QuickTextRow, QuickTextRow>>)(
-    "provider_quick_texts"
-  );
+// Use a minimal untyped client view for this single table so the rest of
+// the hook stays strictly typed without leaking `any` into callers.
+type UntypedFrom = {
+  from: (table: string) => {
+    select: (cols: string) => {
+      eq: (col: string, val: unknown) => {
+        eq: (col: string, val: unknown) => {
+          order: (
+            col: string,
+            opts: { ascending: boolean }
+          ) => Promise<{ data: QuickText[] | null; error: { message: string } | null }>;
+        };
+      };
+    };
+    insert: (row: Record<string, unknown>) => {
+      select: (cols: string) => {
+        single: () => Promise<{ data: QuickText | null; error: { message: string } | null }>;
+      };
+    };
+    update: (row: Record<string, unknown>) => {
+      eq: (col: string, val: unknown) => {
+        select: (cols: string) => {
+          single: () => Promise<{ data: QuickText | null; error: { message: string } | null }>;
+        };
+      };
+    };
+    delete: () => {
+      eq: (col: string, val: unknown) => Promise<{ error: { message: string } | null }>;
+    };
+  };
+};
+const db = supabase as unknown as UntypedFrom;
+const quickTextsTable = () => db.from("provider_quick_texts");
 
 export function useQuickTexts() {
   const { user } = useAuth();
