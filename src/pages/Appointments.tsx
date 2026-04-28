@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,7 @@ const statusColors: Record<string, string> = {
 
 export default function Appointments() {
   const [dialogOpen, setDialogOpen] = useState(false);
+  const navigate = useNavigate();
   const [soapDialogOpen, setSoapDialogOpen] = useState(false);
   const [roomingDialogOpen, setRoomingDialogOpen] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
