@@ -21,11 +21,13 @@ import { toast } from "sonner";
 import {
   ChevronDown, ChevronRight, Sparkles, FileText, Save, CheckCircle2,
   ArrowLeft, Loader2, ClipboardList, AlertTriangle, ShieldAlert, Send, X, Eye,
-  Lock, Unlock, Info,
+  Lock, Unlock, Info, Camera,
 } from "lucide-react";
 import { VitalsPanel } from "@/components/encounter/VitalsPanel";
 import { AddendumSection } from "@/components/clinical/AddendumSection";
 import { AdminNotesPanel } from "@/components/front-desk/AdminNotesPanel";
+import { PhotoConsentGate } from "@/components/clinical/PhotoConsentGate";
+import { PhotoGallery } from "@/components/clinical-photos/PhotoGallery";
 
 type FieldConfig = {
   options?: string[];
@@ -246,6 +248,7 @@ export default function EncounterChart() {
   const [drugAlertDismissed, setDrugAlertDismissed] = useState(false);
   const [showAftercareModal, setShowAftercareModal] = useState(false);
   const [safetyWarnings, setSafetyWarnings] = useState<string[]>([]);
+  const [photosOpen, setPhotosOpen] = useState(false);
 
   // Fetch encounter
   const { data: encounter } = useQuery({
@@ -756,21 +759,26 @@ export default function EncounterChart() {
               </p>
             </div>
           </div>
-          {!isSigned && !isReadOnly && (
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => saveEncounter(false)} disabled={saving}>
-                {saving ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />}
-                Save Draft
-              </Button>
-              <Button
-                size="sm"
-                onClick={() => saveEncounter(true)}
-                disabled={saving || (completeness.total > 0 && completeness.percent < 100)}
-              >
-                <CheckCircle2 className="h-4 w-4 mr-1" /> Sign & Lock
-              </Button>
-            </div>
-          )}
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => setPhotosOpen(true)} className="gap-1">
+              <Camera className="h-4 w-4" /> View Photos
+            </Button>
+            {!isSigned && !isReadOnly && (
+              <>
+                <Button variant="outline" size="sm" onClick={() => saveEncounter(false)} disabled={saving}>
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />}
+                  Save Draft
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => saveEncounter(true)}
+                  disabled={saving || (completeness.total > 0 && completeness.percent < 100)}
+                >
+                  <CheckCircle2 className="h-4 w-4 mr-1" /> Sign & Lock
+                </Button>
+              </>
+            )}
+          </div>
         </div>
 
         {/* Completeness bar */}
@@ -1087,6 +1095,33 @@ export default function EncounterChart() {
           )}
         </div>
       </div>
+
+      {/* Clinical Photos modal */}
+      <Dialog open={photosOpen} onOpenChange={setPhotosOpen}>
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Camera className="h-5 w-5" /> Clinical Photos
+            </DialogTitle>
+          </DialogHeader>
+          {encounter?.patient_id ? (
+            <PhotoConsentGate
+              patientId={encounter.patient_id}
+              fallback={
+                <p className="text-sm text-muted-foreground p-4">
+                  Photo viewing is gated by patient consent. Please ensure consent is on file.
+                </p>
+              }
+            >
+              <PhotoGallery patientId={encounter.patient_id} />
+            </PhotoConsentGate>
+          ) : (
+            <p className="text-sm text-muted-foreground p-4">
+              Patient information not loaded.
+            </p>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 
