@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CheckInPanel } from "./CheckInPanel";
 import { CheckoutPanel } from "./CheckoutPanel";
+import { getNoShowRisk } from "@/lib/no-show-risk";
 import {
   CheckCircle2, DoorOpen, Play, Flag, Clock, CreditCard, UserCheck,
   AlertTriangle, Eye,
@@ -36,6 +37,7 @@ export function QueueCard({ apt, onStatusChange, onNoShow }: {
 
   const isWalkin = apt.notes?.includes("Walk-in");
   const noShowRisk = (apt.patients?.no_show_count || 0) >= 2;
+  const risk = getNoShowRisk(apt.patients?.no_show_count);
 
   const handleAction = () => {
     if (apt.status === "booked") {
@@ -55,6 +57,15 @@ export function QueueCard({ apt, onStatusChange, onNoShow }: {
             <div className="min-w-0 flex-1">
               <p className="font-medium text-sm leading-tight flex items-center gap-1 flex-wrap">
                 <span className="truncate">{apt.patients?.first_name} {apt.patients?.last_name}</span>
+                {risk && (
+                  <Badge
+                    variant={risk.variant}
+                    className="text-[10px] h-5"
+                    title={`${apt.patients?.no_show_count} prior no-show(s)`}
+                  >
+                    {risk.label}
+                  </Badge>
+                )}
                 {isWalkin && (
                   <Badge variant="outline" className="text-[9px] h-4 px-1 border-accent text-accent-foreground">
                     <UserCheck className="h-2.5 w-2.5 mr-0.5" />Walk-in
