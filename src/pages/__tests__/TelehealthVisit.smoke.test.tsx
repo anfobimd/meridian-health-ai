@@ -19,12 +19,12 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 //   live preview). For end-to-end coverage of sandbox vs production with real
 //   auth, a separate Playwright suite would be needed.
 //
-// KNOWN FAILURE (intentional)
-//   At time of writing, this test fails because IntakeReviewPanel does
-//   `consents.length > 0` without a fallback for `useQuery`'s initial
-//   `data: undefined`. That synchronous throw is exactly what blanks the page
-//   in the preview. Fix the source (default consents to []), then this test
-//   should pass without modification.
+// REGRESSION GUARDED
+//   This test originally exposed a blank-render caused by IntakeReviewPanel
+//   accessing `consents.length` (and similar) before useQuery had data. That
+//   panel now defaults its query results (consents = [], patient = null, etc.)
+//   so the page renders even while data is in flight. Keep this test green to
+//   guard the regression.
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ── Hardcoded seeded telehealth appointment id (smoke fixture) ──
