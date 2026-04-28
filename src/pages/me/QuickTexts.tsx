@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
+import { toast as sonnerToast } from "sonner";
 
 const TRIGGER_RE = /^\.[a-z][a-z0-9_]{0,30}$/;
 const PREVIEW_LEN = 100;
@@ -105,14 +106,19 @@ export default function QuickTextsPage() {
         });
       }
       toast({ title: "Quick text saved" });
+      sonnerToast.success("Quick text saved");
       setDialogMode(null);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Unknown error";
+      const raw = e instanceof Error ? e.message : "Unknown error";
+      const friendly = /duplicate key|unique|23505|conflict/i.test(raw)
+        ? `Trigger "${trigger}" already exists. Pick a different one.`
+        : raw;
       toast({
         title: "Couldn't save",
-        description: msg,
+        description: friendly,
         variant: "destructive",
       });
+      sonnerToast.error("Couldn't save quick text", { description: friendly });
     } finally {
       setSaving(false);
     }
