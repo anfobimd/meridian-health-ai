@@ -50,6 +50,7 @@ const Auth = lazy(() => import("./pages/Auth"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Settings = lazy(() => import("./pages/Settings"));
 const ProviderProfile = lazy(() => import("./pages/ProviderProfile"));
+const QuickTexts = lazy(() => import("./pages/me/QuickTexts"));
 const TemplateManager = lazy(() => import("./pages/TemplateManager"));
 const TimeOff = lazy(() => import("./pages/TimeOff"));
 const MdFeedbackInbox = lazy(() => import("./pages/MdFeedbackInbox"));
@@ -162,6 +163,7 @@ const App = () => (
                   <Route path="/waitlist" element={<Waitlist />} />
                   <Route path="/settings" element={<Settings />} />
                   <Route path="/my-profile" element={<ProviderProfile />} />
+                  <Route path="/me/quick-texts" element={<QuickTexts />} />
                   <Route path="/templates" element={<TemplateManager />} />
                   <Route path="/time-off" element={<TimeOff />} />
                   <Route path="/md-feedback" element={<MdFeedbackInbox />} />
