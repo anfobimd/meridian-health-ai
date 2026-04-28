@@ -60,20 +60,15 @@ export function QueueCard({ apt, onStatusChange, onNoShow }: {
                 {risk && (
                   <Badge
                     variant={risk.variant}
-                    className="text-[10px] h-5"
+                    className="text-[9px] h-4 px-1"
                     title={`${apt.patients?.no_show_count} prior no-show(s)`}
                   >
-                    {risk.label}
+                    <AlertTriangle className="h-2.5 w-2.5 mr-0.5" />{risk.label}
                   </Badge>
                 )}
                 {isWalkin && (
                   <Badge variant="outline" className="text-[9px] h-4 px-1 border-accent text-accent-foreground">
                     <UserCheck className="h-2.5 w-2.5 mr-0.5" />Walk-in
-                  </Badge>
-                )}
-                {noShowRisk && (
-                  <Badge variant="outline" className="text-[9px] h-4 px-1 border-destructive/50 text-destructive">
-                    <AlertTriangle className="h-2.5 w-2.5 mr-0.5" />{apt.patients.no_show_count}x NS
                   </Badge>
                 )}
               </p>
