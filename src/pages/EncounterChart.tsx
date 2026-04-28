@@ -483,9 +483,8 @@ export default function EncounterChart() {
       }
 
       toast.success("Chart reopened for editing");
-      // Refresh local state
-      setEncounter((prev: any) => prev ? { ...prev, status: "in_progress", signed_at: null, completed_at: null } : prev);
-      if (clinicalNote) setClinicalNote({ ...clinicalNote, status: "draft", signed_at: null });
+      queryClient.invalidateQueries({ queryKey: ["encounter", encounterId] });
+      queryClient.invalidateQueries({ queryKey: ["clinical-note", encounter?.appointment_id] });
     } catch (err: any) {
       toast.error(`Reopen failed: ${err.message}`);
     } finally {
