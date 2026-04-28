@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { cn } from "@/lib/utils";
 import { format, addDays, startOfWeek, isSameDay, parseISO } from "date-fns";
 import { ChevronLeft, ChevronRight, AlertTriangle, Loader2, Brain, Clock } from "lucide-react";
+import { getNoShowRisk } from "@/lib/no-show-risk";
 
 const HOURS = Array.from({ length: 12 }, (_, i) => i + 8);
 
@@ -45,7 +46,7 @@ export default function MultiProviderCalendar() {
     queryFn: async () => {
       const { data } = await supabase
         .from("appointments")
-        .select("id, scheduled_at, duration_minutes, status, provider_id, room_id, patients(first_name, last_name), treatments(name)")
+        .select("id, scheduled_at, duration_minutes, status, provider_id, room_id, patients(first_name, last_name, no_show_count), treatments(name)")
         .gte("scheduled_at", `${rangeStart}T00:00:00`)
         .lt("scheduled_at", `${rangeEnd}T23:59:59`)
         .neq("status", "cancelled")
@@ -223,6 +224,7 @@ export default function MultiProviderCalendar() {
                       >
                         {appts.map((a: any) => {
                           const delay = delays.find(d => d.appointment_id === a.id);
+                          const risk = getNoShowRisk((a.patients as any)?.no_show_count);
                           return (
                             <div
                               key={a.id}
@@ -233,7 +235,18 @@ export default function MultiProviderCalendar() {
                               )}
                               title={`${(a.patients as any)?.first_name} ${(a.patients as any)?.last_name} • ${(a.treatments as any)?.name || ""} • ${format(parseISO(a.scheduled_at), "h:mm a")}`}
                             >
-                              <p className="font-medium truncate">{(a.patients as any)?.first_name} {(a.patients as any)?.last_name?.charAt(0)}.</p>
+                              <p className="font-medium truncate flex items-center gap-1">
+                                <span className="truncate">{(a.patients as any)?.first_name} {(a.patients as any)?.last_name?.charAt(0)}.</span>
+                                {risk && (
+                                  <Badge
+                                    variant={risk.variant}
+                                    className="text-[9px] h-4 px-1 shrink-0"
+                                    title={`${(a.patients as any)?.no_show_count} prior no-show(s)`}
+                                  >
+                                    {risk.label}
+                                  </Badge>
+                                )}
+                              </p>
                               <p className="truncate opacity-70">{(a.treatments as any)?.name || "—"}</p>
                               {delay && <p className="text-warning font-medium">⚠ {delay.delay_minutes}m late</p>}
                             </div>
@@ -264,6 +277,14 @@ export default function MultiProviderCalendar() {
                   {weekDays.map(d => {
                     const dayAppts = appointments.filter((a: any) => a.provider_id === p.id && isSameDay(parseISO(a.scheduled_at), d));
                     const isEmpty = dayAppts.length === 0;
+                    const cellRisk = dayAppts
+                      .map((a: any) => getNoShowRisk((a.patients as any)?.no_show_count))
+                      .reduce<ReturnType<typeof getNoShowRisk>>((acc, r) => {
+                        if (!r) return acc;
+                        if (!acc) return r;
+                        return acc.level === "high" ? acc : r;
+                      }, null);
+                    const riskCount = dayAppts.filter((a: any) => getNoShowRisk((a.patients as any)?.no_show_count)).length;
                     return (
                       <div
                         key={`${p.id}-${d.toISOString()}`}
@@ -276,7 +297,18 @@ export default function MultiProviderCalendar() {
                         title={`${p.first_name} ${p.last_name} — ${format(d, "EEE MMM d")}${isEmpty ? " (available)" : ` • ${dayAppts.length} appt(s)`}`}
                       >
                         {dayAppts.length > 0 && (
-                          <Badge variant="secondary" className="text-[10px]">{dayAppts.length} appt{dayAppts.length > 1 ? "s" : ""}</Badge>
+                          <div className="flex items-center gap-1 flex-wrap">
+                            <Badge variant="secondary" className="text-[10px]">{dayAppts.length} appt{dayAppts.length > 1 ? "s" : ""}</Badge>
+                            {cellRisk && (
+                              <Badge
+                                variant={cellRisk.variant}
+                                className="text-[9px] h-4 px-1"
+                                title={`${riskCount} patient(s) with no-show history`}
+                              >
+                                {cellRisk.label}
+                              </Badge>
+                            )}
+                          </div>
                         )}
                       </div>
                     );
