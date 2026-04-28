@@ -1108,9 +1108,22 @@ export default function EncounterChart() {
             <PhotoConsentGate
               patientId={encounter.patient_id}
               fallback={
-                <p className="text-sm text-muted-foreground p-4">
-                  Photo viewing is gated by patient consent. Please ensure consent is on file.
-                </p>
+                <div className="p-4 space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    Photo viewing is gated by patient consent. Please ensure consent is on file.
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setPhotosOpen(false);
+                      navigate("/front-desk");
+                    }}
+                    className="gap-1"
+                  >
+                    <FileText className="h-4 w-4" /> Capture / record consent
+                  </Button>
+                </div>
               }
             >
               <PhotoGallery patientId={encounter.patient_id} />
