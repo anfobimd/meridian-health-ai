@@ -24,27 +24,27 @@ import { LabReferenceStrip } from "@/components/clinical/LabReferenceChip";
 
 // ── Intake Review Panel (reusable) ──
 export function IntakeReviewPanel({ appointmentId, patientId }: { appointmentId?: string; patientId: string }) {
-  const { data: patient } = useQuery({
+  const { data: patient = null } = useQuery({
     queryKey: ["telehealth-patient", patientId],
     queryFn: async () => {
-      const { data } = await supabase.from("patients").select("*").eq("id", patientId).single();
-      return data;
+      const { data } = await supabase.from("patients").select("*").eq("id", patientId).maybeSingle();
+      return data ?? null;
     },
   });
 
-  const { data: intakeForm } = useQuery({
+  const { data: intakeForm = null } = useQuery({
     queryKey: ["telehealth-intake", appointmentId],
     queryFn: async () => {
       if (!appointmentId) return null;
-      const { data: apt } = await supabase.from("appointments").select("intake_form_id").eq("id", appointmentId).single();
+      const { data: apt } = await supabase.from("appointments").select("intake_form_id").eq("id", appointmentId).maybeSingle();
       if (!apt?.intake_form_id) return null;
-      const { data: form } = await supabase.from("intake_forms").select("*").eq("id", apt.intake_form_id).single();
-      return form;
+      const { data: form } = await supabase.from("intake_forms").select("*").eq("id", apt.intake_form_id).maybeSingle();
+      return form ?? null;
     },
     enabled: !!appointmentId,
   });
 
-  const { data: hormoneVisit } = useQuery({
+  const { data: hormoneVisit = null } = useQuery({
     queryKey: ["telehealth-hormone", patientId],
     queryFn: async () => {
       const { data } = await supabase.from("hormone_visits")
@@ -53,11 +53,11 @@ export function IntakeReviewPanel({ appointmentId, patientId }: { appointmentId?
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
-      return data;
+      return data ?? null;
     },
   });
 
-  const { data: consents } = useQuery({
+  const { data: consents = [] } = useQuery({
     queryKey: ["telehealth-consents", patientId],
     queryFn: async () => {
       const { data } = await supabase.from("e_consents").select("consent_type, signed_at")
@@ -66,14 +66,14 @@ export function IntakeReviewPanel({ appointmentId, patientId }: { appointmentId?
     },
   });
 
-  const { data: aiBrief, isLoading: briefLoading } = useQuery({
+  const { data: aiBrief = null, isLoading: briefLoading } = useQuery({
     queryKey: ["telehealth-ai-brief", patientId],
     queryFn: async () => {
       const { data, error } = await supabase.functions.invoke("ai-patient-brief", {
         body: { patient_id: patientId, appointment_id: appointmentId },
       });
       if (error) return null;
-      return data?.brief;
+      return data?.brief ?? null;
     },
   });
 
@@ -120,20 +120,19 @@ export function IntakeReviewPanel({ appointmentId, patientId }: { appointmentId?
         </Card>
       ) : null}
 
-      {/* Allergies & Meds */}
-      {(patient?.allergies?.length > 0 || patient?.medications?.length > 0) && (
+      {((patient?.allergies?.length ?? 0) > 0 || (patient?.medications?.length ?? 0) > 0) && (
         <Card>
           <CardContent className="p-3 space-y-2">
-            {patient?.allergies?.length > 0 && (
+            {(patient?.allergies?.length ?? 0) > 0 && (
               <div>
                 <p className="text-xs font-semibold text-destructive flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> Allergies</p>
-                <p className="text-xs">{patient.allergies.join(", ")}</p>
+                <p className="text-xs">{patient!.allergies.join(", ")}</p>
               </div>
             )}
-            {patient?.medications?.length > 0 && (
+            {(patient?.medications?.length ?? 0) > 0 && (
               <div>
                 <p className="text-xs font-semibold flex items-center gap-1"><Pill className="h-3 w-3 text-primary" /> Current Meds</p>
-                <p className="text-xs text-muted-foreground">{patient.medications.join(", ")}</p>
+                <p className="text-xs text-muted-foreground">{patient!.medications.join(", ")}</p>
               </div>
             )}
           </CardContent>
@@ -174,7 +173,7 @@ export function IntakeReviewPanel({ appointmentId, patientId }: { appointmentId?
                 { key: "fsh",  value: hormoneVisit.lab_fsh,  shortLabel: "FSH" },
               ]}
             />
-            {hormoneVisit.intake_symptoms?.length > 0 && (
+            {(hormoneVisit.intake_symptoms?.length ?? 0) > 0 && (
               <div>
                 <p className="text-[10px] text-muted-foreground">Symptoms</p>
                 <div className="flex flex-wrap gap-1">{hormoneVisit.intake_symptoms.map((s: string) => <Badge key={s} variant="outline" className="text-[9px]">{s}</Badge>)}</div>
