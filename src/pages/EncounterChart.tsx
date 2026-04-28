@@ -890,9 +890,9 @@ export default function EncounterChart() {
                       </Button>
                     )}
                   </div>
-                  <Textarea
+                  <QuickTextExpander
                     value={soapNotes[section]}
-                    onChange={(e) => setSoapNotes(prev => ({ ...prev, [section]: e.target.value }))}
+                    onChange={(value) => setSoapNotes(prev => ({ ...prev, [section]: value }))}
                     placeholder={`Enter ${section}...`}
                     className="min-h-[80px] text-sm"
                     readOnly={isSigned}
