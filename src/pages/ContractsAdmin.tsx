@@ -99,8 +99,9 @@ export default function ContractsAdmin() {
         start_date: form.start_date || new Date().toISOString().split("T")[0],
         end_date: form.end_date || null,
         notes: form.notes || null,
+        // invitation_email exists in the DB but is missing from generated types — cast to bypass.
         invitation_email: inviteEmail || null,
-      }).select("id").single();
+      } as any).select("id").single();
       if (error) throw error;
 
       // Auto-send invitation if email was provided.
@@ -137,8 +138,9 @@ export default function ContractsAdmin() {
         start_date: form.start_date || new Date().toISOString().split("T")[0],
         end_date: form.end_date || null,
         notes: form.notes || null,
+        // invitation_email exists in the DB but is missing from generated types — cast to bypass.
         invitation_email: inviteEmail || null,
-      }).eq("id", editContractId);
+      } as any).eq("id", editContractId);
       if (error) throw error;
     },
     onSuccess: () => {
