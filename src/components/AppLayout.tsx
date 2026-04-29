@@ -38,10 +38,18 @@ export function AppLayout() {
 
   return (
     <div className="flex min-h-screen">
+      {/* Skip-link: hidden until focused so keyboard users can bypass the
+          50-link sidebar on every page load. Sighted users never see it. */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-foreground focus:shadow-lg"
+      >
+        Skip to main content
+      </a>
       <AppSidebar />
       <div className="flex-1 flex flex-col">
         <MobileNav />
-        <main ref={mainRef} className="flex-1 p-4 md:p-6 lg:p-8 overflow-auto">
+        <main id="main-content" tabIndex={-1} ref={mainRef} className="flex-1 p-4 md:p-6 lg:p-8 overflow-auto">
           <Breadcrumbs />
           {/* Suspense lives INSIDE the layout so the sidebar and header stay
               mounted while the next page's JS chunk downloads. Without this,

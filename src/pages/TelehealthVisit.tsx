@@ -331,13 +331,33 @@ function VideoPanel({ videoUrl, appointmentId, patientId, onCallEnd }: { videoUr
           )}
 
           <div className="flex items-center gap-3">
-            <Button variant={muted ? "destructive" : "outline"} size="icon" className="rounded-full h-12 w-12" onClick={() => setMuted(!muted)}>
+            <Button
+              variant={muted ? "destructive" : "outline"}
+              size="icon"
+              className="rounded-full h-12 w-12"
+              onClick={() => setMuted(!muted)}
+              aria-label={muted ? "Unmute microphone" : "Mute microphone"}
+              aria-pressed={muted}
+            >
               {muted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
             </Button>
-            <Button variant={!videoOn ? "destructive" : "outline"} size="icon" className="rounded-full h-12 w-12" onClick={() => setVideoOn(!videoOn)}>
+            <Button
+              variant={!videoOn ? "destructive" : "outline"}
+              size="icon"
+              className="rounded-full h-12 w-12"
+              onClick={() => setVideoOn(!videoOn)}
+              aria-label={videoOn ? "Turn camera off" : "Turn camera on"}
+              aria-pressed={!videoOn}
+            >
               {videoOn ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
             </Button>
-            <Button variant="destructive" size="icon" className="rounded-full h-14 w-14" onClick={endCall}>
+            <Button
+              variant="destructive"
+              size="icon"
+              className="rounded-full h-14 w-14"
+              onClick={endCall}
+              aria-label="End call"
+            >
               <PhoneOff className="h-6 w-6" />
             </Button>
           </div>

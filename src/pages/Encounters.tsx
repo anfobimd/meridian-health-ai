@@ -146,7 +146,7 @@ export default function Encounters() {
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge variant="secondary" className={statusColors[enc.status] ?? ""}>{enc.status}</Badge>
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); navigate(`/encounters/${enc.id}/chart`); }}>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Open encounter chart" onClick={(e) => { e.stopPropagation(); navigate(`/encounters/${enc.id}/chart`); }}>
                     <Edit className="h-4 w-4" />
                   </Button>
                 </div>

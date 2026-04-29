@@ -901,7 +901,13 @@ export default function ContractsAdmin() {
                             >
                               <Send className="h-3 w-3" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" onClick={() => removeAssignment.mutate(a.id)} title="Remove from clinic">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-5 w-5 shrink-0"
+                              onClick={() => removeAssignment.mutate(a.id)}
+                              aria-label={`Remove ${a.providers?.first_name ?? ""} ${a.providers?.last_name ?? ""} from this clinic`}
+                            >
                               <X className="h-3 w-3" />
                             </Button>
                           </div>

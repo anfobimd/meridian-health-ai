@@ -253,6 +253,7 @@ export default function ChurnRisk() {
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8"
+                            aria-label="Open patient record"
                             onClick={() => navigate(`/patients/${score.patient_id}`)}
                           >
                             <ChevronRight className="h-4 w-4" />

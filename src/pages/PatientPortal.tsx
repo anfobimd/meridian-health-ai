@@ -5,6 +5,7 @@ import { lovable } from "@/integrations/lovable";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -188,7 +189,17 @@ function PortalAuth() {
             <CardDescription>Enter your email to receive a reset link</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Input type="email" placeholder="your@email.com" value={email} onChange={e => setEmail(e.target.value)} />
+            <div className="space-y-1.5 text-left">
+              <Label htmlFor="portal-forgot-email">Email</Label>
+              <Input
+                id="portal-forgot-email"
+                type="email"
+                placeholder="your@email.com"
+                autoComplete="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+              />
+            </div>
             <Button className="w-full" onClick={handleForgotPassword} disabled={loading}>
               {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Mail className="h-4 w-4 mr-2" />} Send Reset Link
             </Button>
@@ -211,24 +222,39 @@ function PortalAuth() {
           <CardDescription>{mode === "login" ? "Sign in to access your health information" : "Create your patient account"}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <Input type="email" placeholder="your@email.com" value={email} onChange={e => setEmail(e.target.value)} />
-          <div className="relative">
+          <div className="space-y-1.5 text-left">
+            <Label htmlFor="portal-email">Email</Label>
             <Input
-              type={showPassword ? "text" : "password"}
-              placeholder="Password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && handleEmailAuth()}
-              className="pr-10"
+              id="portal-email"
+              type="email"
+              placeholder="your@email.com"
+              autoComplete="username"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
             />
-            <button
-              type="button"
-              onClick={() => setShowPassword(v => !v)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              aria-label={showPassword ? "Hide password" : "Show password"}
-            >
-              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </button>
+          </div>
+          <div className="space-y-1.5 text-left">
+            <Label htmlFor="portal-password">Password</Label>
+            <div className="relative">
+              <Input
+                id="portal-password"
+                type={showPassword ? "text" : "password"}
+                placeholder="Password"
+                autoComplete={mode === "signup" ? "new-password" : "current-password"}
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && handleEmailAuth()}
+                className="pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(v => !v)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
           </div>
           <Button className="w-full" onClick={handleEmailAuth} disabled={loading || !email.trim() || !password.trim()}>
             {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : mode === "login" ? <LogIn className="h-4 w-4 mr-2" /> : <KeyRound className="h-4 w-4 mr-2" />}
