@@ -801,11 +801,35 @@ export default function EncounterChart() {
 
         {/* Completeness bar */}
         {!isSigned && completeness.total > 0 && (
-          <div className="flex items-center gap-3 px-1">
-            <Progress value={completeness.percent} className="h-2 flex-1" />
-            <span className={`text-xs font-medium ${completeness.percent === 100 ? "text-green-600" : "text-muted-foreground"}`}>
-              {completeness.percent}% complete ({completeness.filled}/{completeness.total} required)
-            </span>
+          <div className="space-y-2 px-1">
+            <div className="flex items-center gap-3">
+              <Progress value={completeness.percent} className="h-2 flex-1" />
+              <span className={`text-xs font-medium tabular-nums ${completeness.percent === 100 ? "text-success" : "text-muted-foreground"}`}>
+                {completeness.percent}% complete ({completeness.filled}/{completeness.total} required)
+              </span>
+            </div>
+            {/* Surface which required fields are still missing — without this,
+                providers stare at a disabled "Sign & Lock" button and have to
+                hunt through a long form to find what's empty. */}
+            {completeness.missingLabels.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                <span className="text-muted-foreground">Still needed:</span>
+                {completeness.missingLabels.slice(0, 8).map((label) => (
+                  <Badge
+                    key={label}
+                    variant="outline"
+                    className="text-[10px] border-warning/40 text-warning bg-warning/5"
+                  >
+                    {label}
+                  </Badge>
+                ))}
+                {completeness.missingLabels.length > 8 && (
+                  <span className="text-[10px] text-muted-foreground">
+                    +{completeness.missingLabels.length - 8} more
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
