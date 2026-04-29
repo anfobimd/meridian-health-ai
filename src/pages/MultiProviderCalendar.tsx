@@ -5,9 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { format, addDays, startOfWeek, isSameDay, parseISO } from "date-fns";
-import { ChevronLeft, ChevronRight, AlertTriangle, Loader2, Brain, Clock } from "lucide-react";
+import { ChevronLeft, ChevronRight, AlertTriangle, Loader2, Brain, Clock, ExternalLink } from "lucide-react";
 import { getNoShowRisk } from "@/lib/no-show-risk";
 
 const HOURS = Array.from({ length: 12 }, (_, i) => i + 8);
@@ -19,6 +20,7 @@ export default function MultiProviderCalendar() {
   const [delays, setDelays] = useState<any[]>([]);
   const [utilization, setUtilization] = useState<any[]>([]);
   const [loadingDelays, setLoadingDelays] = useState(false);
+  const [openRoomId, setOpenRoomId] = useState<string | null>(null);
 
   const weekDays = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
 
@@ -328,18 +330,82 @@ export default function MultiProviderCalendar() {
             <div className="grid grid-cols-2 gap-3">
               {rooms.map(room => {
                 const roomAppts = appointments.filter((a: any) => a.room_id === room.id);
+                const hasBookings = roomAppts.length > 0;
                 return (
-                  <div key={room.id} className="rounded-lg border p-3">
-                    <p className="text-sm font-medium">{room.name}</p>
+                  <button
+                    key={room.id}
+                    type="button"
+                    onClick={() => hasBookings && setOpenRoomId(room.id)}
+                    disabled={!hasBookings}
+                    className={cn(
+                      "rounded-lg border p-3 text-left transition-all",
+                      hasBookings
+                        ? "hover:bg-muted/50 hover:shadow-sm hover:border-primary/40 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        : "cursor-default opacity-70",
+                    )}
+                    title={hasBookings ? `View ${roomAppts.length} booking${roomAppts.length === 1 ? "" : "s"} in ${room.name}` : "No bookings"}
+                  >
+                    <p className="text-sm font-medium flex items-center gap-1.5">
+                      {room.name}
+                      {hasBookings && <ExternalLink className="h-3 w-3 text-muted-foreground" />}
+                    </p>
                     <p className="text-2xl font-bold">{roomAppts.length}</p>
-                    <p className="text-[10px] text-muted-foreground">bookings</p>
-                  </div>
+                    <p className="text-[10px] text-muted-foreground">{roomAppts.length === 1 ? "booking" : "bookings"}{hasBookings ? " — click to view" : ""}</p>
+                  </button>
                 );
               })}
               {rooms.length === 0 && <p className="text-sm text-muted-foreground col-span-2">No rooms configured</p>}
             </div>
           </CardContent>
         </Card>
+
+        {/* QA #36 — Room booking details dialog */}
+        <Dialog open={!!openRoomId} onOpenChange={(o) => { if (!o) setOpenRoomId(null); }}>
+          <DialogContent className="max-w-md">
+            {(() => {
+              const room = rooms.find(r => r.id === openRoomId);
+              const roomAppts = appointments
+                .filter((a: any) => a.room_id === openRoomId)
+                .sort((a: any, b: any) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime());
+              const providerName = (id: string | null) => {
+                const p = providers.find((pp: any) => pp.id === id);
+                return p ? `${p.first_name} ${p.last_name}` : "Unassigned";
+              };
+              return (
+                <>
+                  <DialogHeader>
+                    <DialogTitle>{room?.name ?? "Room"} bookings</DialogTitle>
+                    <DialogDescription>
+                      {viewMode === "day"
+                        ? format(selectedDay, "EEEE, MMMM d")
+                        : `Week of ${format(weekStart, "MMM d")}`}
+                      {" — "}
+                      {roomAppts.length} {roomAppts.length === 1 ? "booking" : "bookings"}
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+                    {roomAppts.map((a: any) => (
+                      <div key={a.id} className="rounded-md border p-3 text-sm space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium">
+                            {a.patients?.first_name} {a.patients?.last_name}
+                          </span>
+                          <Badge variant="outline" className="text-[10px] capitalize">{a.status?.replace(/_/g, " ")}</Badge>
+                        </div>
+                        <div className="text-xs text-muted-foreground flex items-center gap-2 flex-wrap">
+                          <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{format(parseISO(a.scheduled_at), "h:mm a")}</span>
+                          {a.duration_minutes && <span>· {a.duration_minutes} min</span>}
+                          {a.treatments?.name && <span>· {a.treatments.name}</span>}
+                        </div>
+                        <div className="text-xs text-muted-foreground">Provider: {providerName(a.provider_id)}</div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              );
+            })()}
+          </DialogContent>
+        </Dialog>
 
         {viewMode === "day" && utilization.length > 0 && (
           <Card>

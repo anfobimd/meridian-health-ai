@@ -55,8 +55,12 @@ export default function ContractsAdmin() {
     },
   });
 
+  // Distinct cache key from ClinicSwitcher / MdCoverage (which both use ["clinics"]
+  // with .select("id, name").eq("is_active", true)). Sharing the key was causing
+  // QA #35: those summary fetches overwrote the full row data, leaving c.is_active
+  // undefined and rendering every clinic as "Inactive" after a refresh.
   const { data: clinics = [] } = useQuery({
-    queryKey: ["clinics"],
+    queryKey: ["clinics", "admin-full"],
     queryFn: async () => {
       const { data, error } = await supabase.from("clinics").select("*, contracts(name)").order("name");
       if (error) throw error;
