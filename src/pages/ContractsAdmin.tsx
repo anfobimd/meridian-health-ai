@@ -161,7 +161,7 @@ export default function ContractsAdmin() {
     },
     onSuccess: (next) => {
       qc.invalidateQueries({ queryKey: ["clinics"] });
-      toast.success(next ? "Clinic activated" : "Clinic deactivated");
+      toast.success(next ? "Clinic marked Active" : "Clinic marked Inactive");
     },
     onError: (e: Error) => toast.error(e.message || "Failed to update status"),
   });
