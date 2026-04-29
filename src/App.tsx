@@ -176,6 +176,7 @@ const App = () => (
                   <Route path="/reports" element={<Reports />} />
                   <Route path="/clinical-photos" element={<ClinicalPhotos />} />
                   <Route path="/performance-goals" element={<PerformanceGoals />} />
+                  <Route path="/intake-clearance" element={<IntakeClearanceQueue />} />
 
                   {/* Admin-only routes */}
                   <Route element={<ProtectedRoute minRole="admin" />}>
@@ -185,7 +186,6 @@ const App = () => (
                     <Route path="/benchmarks" element={<Benchmarks />} />
                     <Route path="/automation-rules" element={<AutomationRules />} />
                     <Route path="/audit-log" element={<AuditLog />} />
-                    <Route path="/intake-clearance" element={<IntakeClearanceQueue />} />
                     <Route path="/users" element={<UserManagement />} />
                   </Route>
 

@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/RBACContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -8,16 +9,39 @@ import { FileText, Clock, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { format, parseISO, differenceInHours } from "date-fns";
 
 export default function OutstandingCharts() {
+  const { user, hasRole } = useAuth();
+  // Admins / super_admins see clinic-wide; everyone else sees only their own charts.
+  const isGlobalView = hasRole("admin", "super_admin");
+
+  // Resolve the current user's provider_id (only needed for scoped view).
+  const { data: providerId, isLoading: providerIdLoading } = useQuery({
+    queryKey: ["my-provider-id", user?.id],
+    enabled: !!user?.id && !isGlobalView,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("providers")
+        .select("id")
+        .eq("user_id", user!.id)
+        .maybeSingle();
+      return data?.id ?? null;
+    },
+  });
+
+  const scopedReady = isGlobalView || (!providerIdLoading && !!providerId);
+
   // Unsigned encounters (signed_at IS NULL, status not draft)
   const { data: unsignedEncounters, isLoading } = useQuery({
-    queryKey: ["outstanding-charts"],
+    queryKey: ["outstanding-charts", isGlobalView ? "global" : providerId],
+    enabled: scopedReady,
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
         .from("encounters")
         .select("id, status, encounter_type, created_at, started_at, completed_at, patients(first_name, last_name), providers(first_name, last_name, credentials)")
         .is("signed_at", null)
         .in("status", ["in_progress", "completed"])
         .order("created_at", { ascending: true });
+      if (!isGlobalView) q = q.eq("provider_id", providerId!);
+      const { data, error } = await q;
       if (error) throw error;
       return data ?? [];
     },
@@ -25,27 +49,33 @@ export default function OutstandingCharts() {
 
   // Unsigned clinical notes
   const { data: unsignedNotes } = useQuery({
-    queryKey: ["outstanding-notes"],
+    queryKey: ["outstanding-notes", isGlobalView ? "global" : providerId],
+    enabled: scopedReady,
     queryFn: async () => {
-      const { data } = await supabase
+      let q = supabase
         .from("clinical_notes")
         .select("id, status, created_at, patients(first_name, last_name), providers(first_name, last_name)")
         .eq("status", "draft")
         .order("created_at", { ascending: true });
+      if (!isGlobalView) q = q.eq("provider_id", providerId!);
+      const { data } = await q;
       return data ?? [];
     },
   });
 
   // Provider charting lag — avg hours from encounter creation to signing
   const { data: chartingLag } = useQuery({
-    queryKey: ["charting-lag"],
+    queryKey: ["charting-lag", isGlobalView ? "global" : providerId],
+    enabled: scopedReady,
     queryFn: async () => {
-      const { data } = await supabase
+      let q = supabase
         .from("encounters")
         .select("provider_id, created_at, signed_at, providers(first_name, last_name, credentials)")
         .not("signed_at", "is", null)
         .order("signed_at", { ascending: false })
         .limit(500);
+      if (!isGlobalView) q = q.eq("provider_id", providerId!);
+      const { data } = await q;
       if (!data || data.length === 0) return [];
 
       const byProvider: Record<string, { name: string; totalHours: number; count: number }> = {};
