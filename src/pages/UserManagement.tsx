@@ -10,6 +10,10 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Loader2, UserPlus, Trash2, Shield, Mail, Users } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -44,6 +48,7 @@ export default function UserManagement() {
   const [inviteRole, setInviteRole] = useState<Role>("front_desk");
   const [allowEmail, setAllowEmail] = useState("");
   const [allowNotes, setAllowNotes] = useState("");
+  const [removeAllowEmail, setRemoveAllowEmail] = useState<string | null>(null);
 
   // ── Users ──
   const { data: users, isLoading: loadingUsers } = useQuery({
@@ -266,7 +271,8 @@ export default function UserManagement() {
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={() => { if (confirm(`Remove ${a.email} from allowlist?`)) removeAllowMut.mutate(a.email); }}
+                          aria-label={`Remove ${a.email} from allowlist`}
+                          onClick={() => setRemoveAllowEmail(a.email)}
                         >
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
@@ -313,6 +319,38 @@ export default function UserManagement() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Remove-from-allowlist confirmation. Replaces native confirm() so it
+          inherits theme, dark mode, focus trap, and Escape handling. */}
+      <AlertDialog
+        open={removeAllowEmail !== null}
+        onOpenChange={(open) => { if (!open) setRemoveAllowEmail(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove from allowlist?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {removeAllowEmail ? (
+                <>
+                  <span className="font-medium text-foreground">{removeAllowEmail}</span>{" "}
+                  will no longer be able to sign up or be invited unless re-added.
+                </>
+              ) : null}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (removeAllowEmail) removeAllowMut.mutate(removeAllowEmail);
+                setRemoveAllowEmail(null);
+              }}
+            >
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

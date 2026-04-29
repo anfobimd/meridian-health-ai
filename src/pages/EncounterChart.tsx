@@ -17,6 +17,10 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import {
   ChevronDown, ChevronRight, Sparkles, FileText, Save, CheckCircle2,
@@ -251,6 +255,7 @@ export default function EncounterChart() {
   const [showAftercareModal, setShowAftercareModal] = useState(false);
   const [safetyWarnings, setSafetyWarnings] = useState<string[]>([]);
   const [photosOpen, setPhotosOpen] = useState(false);
+  const [reopenDialogOpen, setReopenDialogOpen] = useState(false);
 
   // Auto-reopen the photos modal if we returned from the consent workflow
   // with ?reopenPhotos=1 in the URL.
@@ -479,9 +484,9 @@ export default function EncounterChart() {
   };
 
   // Reopen a signed encounter for editing (status toggle back to in_progress)
+  // The AlertDialog handles confirmation; this function does the actual work.
   const reopenEncounter = async () => {
     if (!encounterId) return;
-    if (!confirm("Reopen this signed chart for editing? The chart will be returned to in-progress status.")) return;
     try {
       setSaving(true);
       const { error: encErr } = await supabase
@@ -952,7 +957,7 @@ export default function EncounterChart() {
                     variant="outline"
                     size="sm"
                     className="h-7 text-xs shrink-0"
-                    onClick={reopenEncounter}
+                    onClick={() => setReopenDialogOpen(true)}
                     disabled={saving}
                   >
                     <Unlock className="h-3 w-3 mr-1" />
@@ -1152,6 +1157,34 @@ export default function EncounterChart() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Reopen-signed-chart confirmation. Replaces native confirm() so it's
+          themed, focus-trapped, dark-mode aware, and can't be permanently
+          dismissed by browser settings. */}
+      <AlertDialog open={reopenDialogOpen} onOpenChange={setReopenDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Unlock className="h-4 w-4" />
+              Reopen signed chart?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This chart will be returned to in-progress status. The signature and
+              lock will be cleared, and the linked clinical note will revert to draft.
+              You can sign it again once edits are complete.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => { setReopenDialogOpen(false); reopenEncounter(); }}
+              disabled={saving}
+            >
+              Reopen chart
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 
