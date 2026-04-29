@@ -40,6 +40,39 @@ function KpiCard({ label, value, sub, icon: Icon, color = "primary", alert }: {
   );
 }
 
+// Map AI-returned category enum to actual app routes. The AI sometimes
+// hallucinates routes (e.g. "/charts" or "/reviews") that don't exist —
+// causing 404s. Always derive the route from category here. (QA #38)
+const CATEGORY_ROUTES: Record<string, string> = {
+  chart_review: "/md-oversight",
+  waitlist: "/waitlist",
+  unsigned_note: "/clinical-notes",
+  approval: "/physician-approval",
+  compliance: "/md-oversight",
+  financial: "/billing",
+};
+
+const KNOWN_ROUTES = new Set([
+  "/", "/front-desk", "/provider-day", "/patients", "/appointments",
+  "/encounters", "/clinical-notes", "/hormone-visits", "/hormone-intake",
+  "/physician-approval", "/protocols", "/rooms-devices", "/treatments",
+  "/medications", "/providers", "/billing", "/md-oversight",
+  "/md-oversight/dashboard", "/marketplace", "/packages",
+  "/membership-billing", "/earnings", "/proforma", "/churn-risk",
+  "/my-marketplace", "/provider-schedule", "/clinic-hours", "/waitlist",
+  "/settings",
+]);
+
+function resolveActionRoute(item: { category?: string; route?: string }): string {
+  // Prefer category-based mapping (deterministic).
+  const fromCategory = item.category ? CATEGORY_ROUTES[item.category] : undefined;
+  if (fromCategory) return fromCategory;
+  // Otherwise fall back to AI-provided route only if it matches a known top-level route.
+  const aiRoute = (item.route || "").split("?")[0].split("#")[0];
+  if (aiRoute && KNOWN_ROUTES.has(aiRoute)) return aiRoute;
+  return "/md-oversight";
+}
+
 function ActionItemRow({ item, onNav }: { item: any; onNav: (route: string) => void }) {
   const urgencyStyles: Record<string, string> = {
     critical: "border-destructive/40 bg-destructive/5",
@@ -60,7 +93,7 @@ function ActionItemRow({ item, onNav }: { item: any; onNav: (route: string) => v
           <p className="text-xs text-muted-foreground truncate">{item.detail}</p>
         </div>
       </div>
-      <Button size="sm" variant={item.urgency === "critical" ? "destructive" : "outline"} className="ml-2 shrink-0 text-xs h-7" onClick={() => onNav(item.route)}>
+      <Button size="sm" variant={item.urgency === "critical" ? "destructive" : "outline"} className="ml-2 shrink-0 text-xs h-7" onClick={() => onNav(resolveActionRoute(item))}>
         {item.action_label} <ChevronRight className="h-3 w-3 ml-0.5" />
       </Button>
     </div>
