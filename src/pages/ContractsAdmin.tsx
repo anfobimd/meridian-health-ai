@@ -12,9 +12,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { toast } from "sonner";
-import { Plus, Building2, FileText, Users, UserPlus, X, MapPin, Phone as PhoneIcon, Pencil, Trash2, Power } from "lucide-react";
+import { Plus, Building2, FileText, Users, UserPlus, X, MapPin, Phone as PhoneIcon, Pencil, Trash2, Power, Calendar as CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 import { US_STATES, validateClinicForm, normalizeState, type FieldError } from "@/lib/clinic-validation";
 
 export default function ContractsAdmin() {
@@ -256,8 +259,58 @@ export default function ContractsAdmin() {
               <div className="space-y-3">
                 <div><Label>Name</Label><Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} /></div>
                 <div className="grid grid-cols-2 gap-3">
-                  <div><Label>Start</Label><Input type="date" value={form.start_date} onChange={e => setForm(p => ({ ...p, start_date: e.target.value }))} /></div>
-                  <div><Label>End</Label><Input type="date" value={form.end_date} onChange={e => setForm(p => ({ ...p, end_date: e.target.value }))} /></div>
+                  <div className="space-y-1.5">
+                    <Label>Start</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className={cn("w-full justify-start text-left font-normal", !form.start_date && "text-muted-foreground")}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
+                          {form.start_date ? format(new Date(form.start_date), "PPP") : "Pick a date"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={form.start_date ? new Date(form.start_date) : undefined}
+                          onSelect={(d) => setForm(p => ({ ...p, start_date: d ? format(d, "yyyy-MM-dd") : "" }))}
+                          disabled={(d) => d < new Date(new Date().setHours(0, 0, 0, 0))}
+                          className={cn("p-3 pointer-events-auto")}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>End</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className={cn("w-full justify-start text-left font-normal", !form.end_date && "text-muted-foreground")}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
+                          {form.end_date ? format(new Date(form.end_date), "PPP") : "Pick a date"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={form.end_date ? new Date(form.end_date) : undefined}
+                          onSelect={(d) => setForm(p => ({ ...p, end_date: d ? format(d, "yyyy-MM-dd") : "" }))}
+                          disabled={(d) => {
+                            const today = new Date(new Date().setHours(0, 0, 0, 0));
+                            const minDate = form.start_date ? new Date(form.start_date) : today;
+                            return d < minDate;
+                          }}
+                          className={cn("p-3 pointer-events-auto")}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
                 </div>
                 <div><Label>Notes</Label><Textarea value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} /></div>
                 <Button onClick={() => addContract.mutate()} disabled={!form.name}>Create</Button>
