@@ -1,17 +1,20 @@
 ---
-name: hci-review-skill
-description: Audit a React/Tailwind/shadcn UI for HCI quality — heuristics, accessibility (WCAG 2.2 AA), information architecture, visual hierarchy, motion, and healthcare-specific UX concerns. Use when the user asks for a "design audit", "HCI review", "UX review", "a11y review", or `/hci-review-skill`.
+name: hci-review-meridian
+description: Audit a React/Tailwind/shadcn UI in the Meridian Health AI codebase for HCI quality — heuristics, accessibility (WCAG 2.2 AA), information architecture, visual hierarchy, motion, and healthcare-specific UX concerns (PHI handling, clinical safety, AI provenance). Use when the user asks for a Meridian-specific "design audit", "HCI review", "UX review", "a11y review", or `/hci-review-meridian`. For a generic HCI pass not tuned to this codebase, prefer the upstream `hci-review-skill` if installed.
 ---
 
-# HCI Review Skill
+# HCI Review — Meridian Health AI
+
+Project-local companion to the upstream `hci-review-skill`. This one is tuned to the Meridian Health AI repo: its healthcare domain, its stack (Vite + React + Tailwind + shadcn/ui + Supabase + Sentry), and its patient/clinician-facing surfaces. Use the upstream skill for generic HCI passes; use this one when you want the audit to know about PHI, clinical safety, and our component conventions.
 
 Run a structured human-computer-interaction audit against changed or specified UI surfaces in this Vite + React + Tailwind + shadcn/ui codebase. Produce a prioritized, actionable report — not a generic checklist dump.
 
 ## When to use
 
-- The user asks for a design / UX / HCI / accessibility audit on a route, page, component, or PR.
-- The user invokes `/hci-review-skill` (with or without an argument naming the target).
+- The user asks for a design / UX / HCI / accessibility audit on a route, page, component, or PR in this repo.
+- The user invokes `/hci-review-meridian` (with or without an argument naming the target).
 - After a substantial UI change in `src/pages/**` or `src/components/**`, when reviewing.
+- Prefer this over the upstream `hci-review-skill` when the surface touches PHI, clinical decisions, or AI-generated content.
 
 ## Scope resolution
 
