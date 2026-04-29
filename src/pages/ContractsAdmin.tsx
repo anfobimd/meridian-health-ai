@@ -15,7 +15,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { toast } from "sonner";
-import { Plus, Building2, FileText, Users, UserPlus, X, MapPin, Phone as PhoneIcon, Pencil, Trash2, Power, Calendar as CalendarIcon } from "lucide-react";
+import { Plus, Building2, FileText, Users, UserPlus, X, MapPin, Phone as PhoneIcon, Pencil, Trash2, Power, Calendar as CalendarIcon, Ban, CheckCircle2 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { US_STATES, validateClinicForm, normalizeState, type FieldError } from "@/lib/clinic-validation";
@@ -36,6 +36,7 @@ export default function ContractsAdmin() {
   const [editClinicId, setEditClinicId] = useState<string | null>(null);
   const [deleteClinicId, setDeleteClinicId] = useState<string | null>(null);
   const [clinicErrors, setClinicErrors] = useState<Record<string, string>>({});
+  const [contractStatusFilter, setContractStatusFilter] = useState<"all" | "active" | "suspended" | "expired">("all");
 
   const errorFor = (field: string): string | undefined => clinicErrors[field];
   const fieldErrorMap = (errors: FieldError[]): Record<string, string> =>
@@ -242,6 +243,17 @@ export default function ContractsAdmin() {
   });
 
   const statusColor = (s: string) => s === "active" ? "default" : s === "suspended" ? "destructive" : "secondary";
+  // QA #28 — display status reflects end_date even when DB still says "active".
+  const effectiveStatus = (c: { status: string; end_date: string | null }): "active" | "suspended" | "expired" => {
+    if (c.status === "suspended") return "suspended";
+    if (c.end_date) {
+      const today = new Date(new Date().setHours(0, 0, 0, 0));
+      if (new Date(c.end_date) < today) return "expired";
+    }
+    return "active";
+  };
+  const effectiveStatusBadgeVariant = (s: "active" | "suspended" | "expired") =>
+    s === "active" ? "default" : s === "suspended" ? "destructive" : "secondary";
   const clinicAssignments = (clinicId: string) => assignments.filter((a: any) => a.clinic_id === clinicId);
 
   return (
@@ -467,7 +479,7 @@ export default function ContractsAdmin() {
         <Card><CardContent className="pt-6 flex items-center gap-3"><FileText className="h-8 w-8 text-primary" /><div><p className="text-2xl font-bold">{contracts.length}</p><p className="text-xs text-muted-foreground">Contracts</p></div></CardContent></Card>
         <Card><CardContent className="pt-6 flex items-center gap-3"><Building2 className="h-8 w-8 text-primary" /><div><p className="text-2xl font-bold">{clinics.length}</p><p className="text-xs text-muted-foreground">Clinics</p></div></CardContent></Card>
         <Card><CardContent className="pt-6 flex items-center gap-3"><Users className="h-8 w-8 text-primary" /><div><p className="text-2xl font-bold">{assignments.length}</p><p className="text-xs text-muted-foreground">Assignments</p></div></CardContent></Card>
-        <Card><CardContent className="pt-6 flex items-center gap-3"><FileText className="h-8 w-8 text-primary" /><div><p className="text-2xl font-bold">{contracts.filter(c => c.status === "active").length}</p><p className="text-xs text-muted-foreground">Active Contracts</p></div></CardContent></Card>
+        <Card><CardContent className="pt-6 flex items-center gap-3"><FileText className="h-8 w-8 text-primary" /><div><p className="text-2xl font-bold">{contracts.filter(c => effectiveStatus(c) === "active").length}</p><p className="text-xs text-muted-foreground">Active Contracts</p></div></CardContent></Card>
       </div>
 
       <Tabs defaultValue="contracts">
@@ -486,24 +498,77 @@ export default function ContractsAdmin() {
               </Button>
             </CardHeader>
             <CardContent>
+              {/* QA #30 — status filter so suspended / expired contracts are reachable */}
+              <div className="flex items-center gap-1 mb-4 flex-wrap">
+                {(["all", "active", "suspended", "expired"] as const).map((f) => {
+                  const count = f === "all"
+                    ? contracts.length
+                    : contracts.filter(c => effectiveStatus(c) === f).length;
+                  return (
+                    <Button
+                      key={f}
+                      size="sm"
+                      variant={contractStatusFilter === f ? "default" : "outline"}
+                      onClick={() => setContractStatusFilter(f)}
+                      className="h-7 text-xs capitalize"
+                    >
+                      {f} <span className="ml-1.5 opacity-70">({count})</span>
+                    </Button>
+                  );
+                })}
+              </div>
               <Table>
-                <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Start</TableHead><TableHead>End</TableHead><TableHead>Status</TableHead><TableHead>Clinics</TableHead><TableHead></TableHead></TableRow></TableHeader>
+                <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Start</TableHead><TableHead>End</TableHead><TableHead>Status</TableHead><TableHead>Clinics</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
                 <TableBody>
-                  {contracts.map(c => (
-                    <TableRow key={c.id}>
-                      <TableCell className="font-medium">{c.name}</TableCell>
-                      <TableCell>{format(new Date(c.start_date), "MMM d, yyyy")}</TableCell>
-                      <TableCell>{c.end_date ? format(new Date(c.end_date), "MMM d, yyyy") : "—"}</TableCell>
-                      <TableCell><Badge variant={statusColor(c.status)}>{c.status}</Badge></TableCell>
-                      <TableCell>{clinics.filter(cl => cl.contract_id === c.id).length}</TableCell>
-                      <TableCell><Button size="sm" variant="ghost" onClick={() => toggleContract.mutate({ id: c.id, status: c.status })}>{c.status === "active" ? "Suspend" : "Activate"}</Button></TableCell>
-                    </TableRow>
-                  ))}
-                  {contracts.length === 0 && (
+                  {contracts
+                    .filter(c => contractStatusFilter === "all" || effectiveStatus(c) === contractStatusFilter)
+                    .map(c => {
+                      const eff = effectiveStatus(c);
+                      const isExpired = eff === "expired";
+                      return (
+                        <TableRow key={c.id}>
+                          <TableCell className="font-medium">{c.name}</TableCell>
+                          <TableCell>{format(new Date(c.start_date), "MMM d, yyyy")}</TableCell>
+                          <TableCell>{c.end_date ? format(new Date(c.end_date), "MMM d, yyyy") : "—"}</TableCell>
+                          <TableCell>
+                            <Badge variant={effectiveStatusBadgeVariant(eff)} className="capitalize">{eff}</Badge>
+                          </TableCell>
+                          <TableCell>{clinics.filter(cl => cl.contract_id === c.id).length}</TableCell>
+                          <TableCell className="text-right">
+                            {isExpired ? (
+                              <span className="text-xs text-muted-foreground italic">Past end date</span>
+                            ) : c.status === "active" ? (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => toggleContract.mutate({ id: c.id, status: c.status })}
+                                title="Pause this contract — clinics under it stop being treated as active"
+                              >
+                                <Ban className="h-3.5 w-3.5 mr-1.5" />Suspend
+                              </Button>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="default"
+                                onClick={() => toggleContract.mutate({ id: c.id, status: c.status })}
+                                title="Reactivate this contract"
+                              >
+                                <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />Activate
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  {contracts.filter(c => contractStatusFilter === "all" || effectiveStatus(c) === contractStatusFilter).length === 0 && (
                     <TableRow>
                       <TableCell colSpan={6} className="text-center py-8">
                         <div className="flex flex-col items-center gap-3">
-                          <p className="text-sm text-muted-foreground">No contracts yet</p>
+                          <p className="text-sm text-muted-foreground">
+                            {contracts.length === 0
+                              ? "No contracts yet"
+                              : `No ${contractStatusFilter} contracts`}
+                          </p>
                           <Button size="sm" onClick={() => setContractOpen(true)}>
                             <Plus className="h-4 w-4 mr-1" />Add Contract
                           </Button>
