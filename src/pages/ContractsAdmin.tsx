@@ -37,6 +37,8 @@ export default function ContractsAdmin() {
   const [deleteClinicId, setDeleteClinicId] = useState<string | null>(null);
   const [clinicErrors, setClinicErrors] = useState<Record<string, string>>({});
   const [contractStatusFilter, setContractStatusFilter] = useState<"all" | "active" | "suspended" | "expired">("all");
+  const [editContractOpen, setEditContractOpen] = useState(false);
+  const [editContractId, setEditContractId] = useState<string | null>(null);
 
   const errorFor = (field: string): string | undefined => clinicErrors[field];
   const fieldErrorMap = (errors: FieldError[]): Record<string, string> =>
@@ -115,6 +117,45 @@ export default function ContractsAdmin() {
     },
     onError: (e: Error) => toast.error(e.message || "Failed to create contract"),
   });
+
+  const updateContract = useMutation({
+    mutationFn: async () => {
+      if (!editContractId) throw new Error("No contract selected");
+      if (!form.name.trim()) throw new Error("Name is required");
+      const inviteEmail = form.invitation_email.trim();
+      if (inviteEmail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(inviteEmail)) {
+        throw new Error("Invitation email looks invalid");
+      }
+      const { error } = await supabase.from("contracts").update({
+        name: form.name.trim(),
+        start_date: form.start_date || new Date().toISOString().split("T")[0],
+        end_date: form.end_date || null,
+        notes: form.notes || null,
+        invitation_email: inviteEmail || null,
+      }).eq("id", editContractId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["contracts"] });
+      setEditContractOpen(false);
+      setEditContractId(null);
+      setForm({ name: "", start_date: "", end_date: "", notes: "", invitation_email: "" });
+      toast.success("Contract updated");
+    },
+    onError: (e: Error) => toast.error(e.message || "Failed to update contract"),
+  });
+
+  const openEditContract = (c: any) => {
+    setEditContractId(c.id);
+    setForm({
+      name: c.name ?? "",
+      start_date: c.start_date ?? "",
+      end_date: c.end_date ?? "",
+      notes: c.notes ?? "",
+      invitation_email: c.invitation_email ?? "",
+    });
+    setEditContractOpen(true);
+  };
 
   const sendContractInvitation = useMutation({
     mutationFn: async ({ contract_id, email }: { contract_id: string; email?: string }) => {
@@ -626,27 +667,38 @@ export default function ContractsAdmin() {
                           </TableCell>
                           <TableCell>{clinics.filter(cl => cl.contract_id === c.id).length}</TableCell>
                           <TableCell className="text-right">
-                            {isExpired ? (
-                              <span className="text-xs text-muted-foreground italic">Past end date</span>
-                            ) : c.status === "active" ? (
+                            <div className="flex items-center justify-end gap-1.5">
                               <Button
                                 size="sm"
-                                variant="outline"
-                                onClick={() => toggleContract.mutate({ id: c.id, status: c.status })}
-                                title="Pause this contract — clinics under it stop being treated as active"
+                                variant="ghost"
+                                onClick={() => openEditContract(c)}
+                                title="Edit contract"
+                                aria-label="Edit contract"
                               >
-                                <Ban className="h-3.5 w-3.5 mr-1.5" />Suspend
+                                <Pencil className="h-3.5 w-3.5" />
                               </Button>
-                            ) : (
-                              <Button
-                                size="sm"
-                                variant="default"
-                                onClick={() => toggleContract.mutate({ id: c.id, status: c.status })}
-                                title="Reactivate this contract"
-                              >
-                                <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />Activate
-                              </Button>
-                            )}
+                              {isExpired ? (
+                                <span className="text-xs text-muted-foreground italic">Past end date</span>
+                              ) : c.status === "active" ? (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => toggleContract.mutate({ id: c.id, status: c.status })}
+                                  title="Pause this contract — clinics under it stop being treated as active"
+                                >
+                                  <Ban className="h-3.5 w-3.5 mr-1.5" />Suspend
+                                </Button>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  variant="default"
+                                  onClick={() => toggleContract.mutate({ id: c.id, status: c.status })}
+                                  title="Reactivate this contract"
+                                >
+                                  <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />Activate
+                                </Button>
+                              )}
+                            </div>
                           </TableCell>
                         </TableRow>
                       );
@@ -790,6 +842,89 @@ export default function ContractsAdmin() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Edit Contract Dialog (QA #33) */}
+      <Dialog open={editContractOpen} onOpenChange={(o) => { setEditContractOpen(o); if (!o) { setEditContractId(null); setForm({ name: "", start_date: "", end_date: "", notes: "", invitation_email: "" }); } }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Edit Contract</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label>Name <span className="text-destructive">*</span></Label>
+              <Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} required />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Start</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className={cn("w-full justify-start text-left font-normal", !form.start_date && "text-muted-foreground")}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
+                      {form.start_date ? format(new Date(form.start_date), "PPP") : "Pick a date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={form.start_date ? new Date(form.start_date) : undefined}
+                      onSelect={(d) => setForm(p => ({ ...p, start_date: d ? format(d, "yyyy-MM-dd") : "" }))}
+                      className={cn("p-3 pointer-events-auto")}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div className="space-y-1.5">
+                <Label>End</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className={cn("w-full justify-start text-left font-normal", !form.end_date && "text-muted-foreground")}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
+                      {form.end_date ? format(new Date(form.end_date), "PPP") : "Pick a date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={form.end_date ? new Date(form.end_date) : undefined}
+                      onSelect={(d) => setForm(p => ({ ...p, end_date: d ? format(d, "yyyy-MM-dd") : "" }))}
+                      disabled={(d) => {
+                        const minDate = form.start_date ? new Date(form.start_date) : null;
+                        return !!minDate && d < minDate;
+                      }}
+                      className={cn("p-3 pointer-events-auto")}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
+            <div><Label>Notes</Label><Textarea value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} /></div>
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-1.5">
+                <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                Invitation email <span className="text-xs text-muted-foreground font-normal">(optional)</span>
+              </Label>
+              <Input
+                type="email"
+                value={form.invitation_email}
+                onChange={e => setForm(p => ({ ...p, invitation_email: e.target.value }))}
+                placeholder="counterparty@example.com"
+                inputMode="email"
+              />
+              <p className="text-[11px] text-muted-foreground">Saved with the contract; use the Resend button on the row to actually send.</p>
+            </div>
+            <Button onClick={() => updateContract.mutate()} disabled={!form.name.trim() || updateContract.isPending}>
+              {updateContract.isPending ? "Saving…" : "Save Changes"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Clinic Dialog */}
       <Dialog open={editClinicOpen} onOpenChange={(o) => { setEditClinicOpen(o); if (!o) { setEditClinicId(null); setClinicForm({ name: "", address: "", contract_id: "", phone: "", city: "", state: "", timezone: "America/New_York" }); setClinicErrors({}); } }}>
