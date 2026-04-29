@@ -261,7 +261,7 @@ export default function Proforma() {
             <CardContent className="pt-4 space-y-2">
               <div className="flex gap-2">
                 <Input placeholder="Scenario name" value={scenarioName} onChange={e => setScenarioName(e.target.value)} />
-                <Button variant="outline" size="icon" onClick={saveScenario}><Save className="h-4 w-4" /></Button>
+                <Button variant="outline" size="icon" aria-label="Save scenario" onClick={saveScenario}><Save className="h-4 w-4" /></Button>
               </div>
             </CardContent>
           </Card>

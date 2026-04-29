@@ -248,7 +248,7 @@ export function AppSidebar() {
     "User";
 
   return (
-    <aside className="hidden md:flex w-56 flex-col bg-sidebar text-sidebar-foreground min-h-screen flex-shrink-0">
+    <nav aria-label="Primary" className="hidden md:flex w-56 flex-col bg-sidebar text-sidebar-foreground min-h-screen flex-shrink-0">
       <div className="px-5 py-4 border-b border-sidebar-border">
         <div className="flex items-center gap-2">
           <Activity className="h-5 w-5 text-sidebar-primary" />
@@ -272,7 +272,7 @@ export function AppSidebar() {
         <kbd className="text-[9px] bg-sidebar-muted px-1 py-0.5 rounded font-mono">⌘K</kbd>
       </button>
 
-      <nav className="flex-1 overflow-y-auto px-2 py-3">
+      <div className="flex-1 overflow-y-auto px-2 py-3">
         {visibleSections.map((section) => (
           <div key={section.label}>
             <p className="px-3 pt-4 pb-1 text-[9px] font-bold tracking-[0.14em] uppercase text-sidebar-foreground/25">{section.label}</p>
@@ -304,7 +304,7 @@ export function AppSidebar() {
             })}
           </div>
         ))}
-      </nav>
+      </div>
 
       <div className="px-3 py-3 border-t border-sidebar-border space-y-2">
         <div className="flex items-center gap-2.5">
@@ -324,6 +324,6 @@ export function AppSidebar() {
           <span>Sign Out</span>
         </button>
       </div>
-    </aside>
+    </nav>
   );
 }

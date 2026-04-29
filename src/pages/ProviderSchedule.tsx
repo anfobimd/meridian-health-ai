@@ -182,7 +182,7 @@ export default function ProviderSchedule() {
                   <CardHeader className="pb-2 px-3 pt-3">
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-xs font-semibold">{SHORT_DAYS[i]}</CardTitle>
-                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEditSlot(i)}>
+                      <Button variant="ghost" size="icon" className="h-6 w-6" aria-label={`Add slot to ${day}`} onClick={() => openEditSlot(i)}>
                         <Plus className="h-3 w-3" />
                       </Button>
                     </div>

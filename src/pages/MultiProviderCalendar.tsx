@@ -113,13 +113,13 @@ export default function MultiProviderCalendar() {
               <SelectItem value="week">Week</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="outline" size="icon" onClick={() => viewMode === "day" ? setSelectedDay(d => addDays(d, -1)) : setWeekStart(d => addDays(d, -7))}>
+          <Button variant="outline" size="icon" aria-label={viewMode === "day" ? "Previous day" : "Previous week"} onClick={() => viewMode === "day" ? setSelectedDay(d => addDays(d, -1)) : setWeekStart(d => addDays(d, -7))}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <span className="text-sm font-medium min-w-[120px] text-center">
             {viewMode === "day" ? format(selectedDay, "EEE, MMM d") : `${format(weekStart, "MMM d")} – ${format(addDays(weekStart, 6), "MMM d")}`}
           </span>
-          <Button variant="outline" size="icon" onClick={() => viewMode === "day" ? setSelectedDay(d => addDays(d, 1)) : setWeekStart(d => addDays(d, 7))}>
+          <Button variant="outline" size="icon" aria-label={viewMode === "day" ? "Next day" : "Next week"} onClick={() => viewMode === "day" ? setSelectedDay(d => addDays(d, 1)) : setWeekStart(d => addDays(d, 7))}>
             <ChevronRight className="h-4 w-4" />
           </Button>
           <Button variant="outline" size="sm" onClick={() => { setSelectedDay(new Date()); setWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 })); }}>Today</Button>

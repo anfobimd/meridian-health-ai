@@ -128,7 +128,7 @@ function DrugInteractionBanner({
               <p key={i} className="text-xs text-destructive/80">{a}</p>
             ))}
           </div>
-          <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={onDismiss}>
+          <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" aria-label="Dismiss drug interaction alert" onClick={onDismiss}>
             <X className="h-3 w-3" />
           </Button>
         </div>

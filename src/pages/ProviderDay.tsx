@@ -440,7 +440,7 @@ export default function ProviderDay() {
                         <Badge variant="secondary" className={`text-[10px] ${statusColor[apt.status] || ""}`}>
                           {statusLabel[apt.status] || apt.status}
                         </Badge>
-                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => loadAiBrief(apt)} disabled={briefLoading[apt.id]} title="AI Brief">
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => loadAiBrief(apt)} disabled={briefLoading[apt.id]} aria-label="Generate AI brief for this patient">
                           {briefLoading[apt.id] ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
                         </Button>
                         {apt.visit_type === "telehealth" && (
@@ -448,7 +448,7 @@ export default function ProviderDay() {
                             <Video className="h-3 w-3 mr-0.5" /> Join
                           </Button>
                         )}
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => apt.visit_type === "telehealth" ? navigate(`/telehealth/${apt.id}`) : openChart(apt)} title="Open Chart">
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => apt.visit_type === "telehealth" ? navigate(`/telehealth/${apt.id}`) : openChart(apt)} aria-label="Open chart">
                           <ChevronRight className="h-4 w-4" />
                         </Button>
                       </div>
