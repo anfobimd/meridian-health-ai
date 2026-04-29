@@ -377,32 +377,50 @@ export default function RemoteIntake() {
             {step === 1 && (
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2"><Label>First Name *</Label><Input value={firstName} onChange={e => setFirstName(e.target.value)} placeholder="Jane" /></div>
-                  <div className="space-y-2"><Label>Last Name *</Label><Input value={lastName} onChange={e => setLastName(e.target.value)} placeholder="Doe" /></div>
+                  <div className="space-y-2">
+                    <Label htmlFor="intake-first-name">First Name *</Label>
+                    <Input id="intake-first-name" value={firstName} onChange={e => setFirstName(e.target.value)} placeholder="Jane" autoComplete="given-name" required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="intake-last-name">Last Name *</Label>
+                    <Input id="intake-last-name" value={lastName} onChange={e => setLastName(e.target.value)} placeholder="Doe" autoComplete="family-name" required />
+                  </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2"><Label>Email *</Label><Input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@email.com" /></div>
-                  <div className="space-y-2"><Label>Phone</Label><Input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="(555) 123-4567" /></div>
+                  <div className="space-y-2">
+                    <Label htmlFor="intake-email">Email *</Label>
+                    <Input id="intake-email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@email.com" autoComplete="email" required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="intake-phone">Phone</Label>
+                    <Input id="intake-phone" type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="(555) 123-4567" autoComplete="tel" />
+                  </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="space-y-2"><Label>Date of Birth</Label><Input type="date" value={dob} onChange={e => setDob(e.target.value)} /></div>
                   <div className="space-y-2">
-                    <Label>Biological Sex *</Label>
+                    <Label htmlFor="intake-dob">Date of Birth</Label>
+                    <Input id="intake-dob" type="date" value={dob} onChange={e => setDob(e.target.value)} autoComplete="bday" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="intake-sex">Biological Sex *</Label>
                     <Select value={sex} onValueChange={setSex}>
-                      <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                      <SelectTrigger id="intake-sex"><SelectValue placeholder="Select" /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="male">Male</SelectItem>
                         <SelectItem value="female">Female</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-2"><Label>Weight (lbs)</Label><Input type="number" value={weightLbs} onChange={e => setWeightLbs(e.target.value)} placeholder="185" /></div>
+                  <div className="space-y-2">
+                    <Label htmlFor="intake-weight">Weight (lbs)</Label>
+                    <Input id="intake-weight" type="number" value={weightLbs} onChange={e => setWeightLbs(e.target.value)} placeholder="185" />
+                  </div>
                 </div>
                 {sex === "female" && (
                   <div className="p-4 bg-primary/5 rounded-lg">
-                    <Label>Menopausal Status</Label>
+                    <Label htmlFor="intake-meno">Menopausal Status</Label>
                     <Select value={menoStatus} onValueChange={setMenoStatus}>
-                      <SelectTrigger className="mt-2"><SelectValue placeholder="Select" /></SelectTrigger>
+                      <SelectTrigger id="intake-meno" className="mt-2"><SelectValue placeholder="Select" /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="pre">Pre-menopausal</SelectItem>
                         <SelectItem value="peri">Peri-menopausal</SelectItem>
@@ -463,8 +481,8 @@ export default function RemoteIntake() {
                   {CORE_LAB_FIELDS.map(f => (
                     <div key={f.key} className="flex items-end gap-1.5">
                       <div className="flex-1 space-y-1">
-                        <Label className="text-xs text-muted-foreground">{f.label}</Label>
-                        <Input type="number" step="any" placeholder="—" value={labValues[f.key] ?? ""} onChange={e => setLabValues(p => ({ ...p, [f.key]: e.target.value }))} className="h-8 text-sm" />
+                        <Label htmlFor={`intake-${f.key}`} className="text-xs text-muted-foreground">{f.label}</Label>
+                        <Input id={`intake-${f.key}`} type="number" step="any" placeholder="—" value={labValues[f.key] ?? ""} onChange={e => setLabValues(p => ({ ...p, [f.key]: e.target.value }))} className="h-8 text-sm" />
                       </div>
                       <span className="text-[10px] text-muted-foreground pb-2">{f.unit}</span>
                     </div>
@@ -478,16 +496,16 @@ export default function RemoteIntake() {
             {step === 4 && (
               <>
                 <div className="space-y-2">
-                  <Label>Current Medications</Label>
-                  <Textarea placeholder="List any medications you're currently taking" value={medications} onChange={e => setMedications(e.target.value)} rows={2} />
+                  <Label htmlFor="intake-medications">Current Medications</Label>
+                  <Textarea id="intake-medications" placeholder="List any medications you're currently taking" value={medications} onChange={e => setMedications(e.target.value)} rows={2} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Known Allergies</Label>
-                  <Input placeholder="e.g. Penicillin, Sulfa" value={allergies} onChange={e => setAllergies(e.target.value)} />
+                  <Label htmlFor="intake-allergies">Known Allergies</Label>
+                  <Input id="intake-allergies" placeholder="e.g. Penicillin, Sulfa" value={allergies} onChange={e => setAllergies(e.target.value)} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Prior Hormone or Peptide Therapy</Label>
-                  <Textarea placeholder="Describe any prior therapy, including compounds and response" value={priorTherapy} onChange={e => setPriorTherapy(e.target.value)} rows={3} />
+                  <Label htmlFor="intake-prior-therapy">Prior Hormone or Peptide Therapy</Label>
+                  <Textarea id="intake-prior-therapy" placeholder="Describe any prior therapy, including compounds and response" value={priorTherapy} onChange={e => setPriorTherapy(e.target.value)} rows={3} />
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
