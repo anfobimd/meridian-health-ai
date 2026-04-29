@@ -6,6 +6,7 @@ import {
   CreditCard, TrendingUp, Calculator, MonitorCheck, Briefcase, Search, LogOut, CalendarClock, TrendingDown,
   Settings, UserCircle, CalendarOff, MessageSquare, ClipboardCheck, Mail, Clock, ListChecks,
   Building2, BarChart3, Zap, BookOpen, Bell, CalendarDays, Inbox, Video, ScrollText, Target, Camera,
+  FileWarning,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/RBACContext";
@@ -33,6 +34,7 @@ const navSections: NavSection[] = [
     items: [
       { to: "/", icon: LayoutDashboard, label: "Dashboard", roles: ["admin", "front_desk"] },
       { to: "/provider-day", icon: Briefcase, label: "My Day", roles: ["provider"] },
+      { to: "/outstanding-charts", icon: FileWarning, label: "Outstanding Charts", roles: ["admin", "provider"] },
       { to: "/front-desk", icon: MonitorCheck, label: "Front Desk", roles: ["admin", "front_desk"] },
       { to: "/check-in", icon: ClipboardCheck, label: "Check-In", roles: ["admin", "front_desk"] },
     ],
@@ -64,6 +66,7 @@ const navSections: NavSection[] = [
       { to: "/hormone-visits", icon: FlaskConical, label: "Hormone Labs", roles: ["admin", "provider"] },
       { to: "/hormone-intake", icon: ClipboardPlus, label: "Hormone Intake", roles: ["admin", "provider"] },
       { to: "/physician-approval", icon: ShieldCheck, label: "Approvals", roles: ["admin", "provider"] },
+      { to: "/intake-clearance", icon: Inbox, label: "Intake Clearance", roles: ["admin", "provider"] },
       { to: "/protocols", icon: Pill, label: "Protocols", roles: ["admin", "provider"] },
       { to: "/md-feedback", icon: MessageSquare, label: "MD Feedback", roles: ["provider"], badgeKey: "md_corrections" },
       { to: "/clinical-photos", icon: Camera, label: "Clinical Photos" },
