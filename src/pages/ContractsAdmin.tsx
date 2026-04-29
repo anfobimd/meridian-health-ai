@@ -15,7 +15,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { toast } from "sonner";
-import { Plus, Building2, FileText, Users, UserPlus, X, MapPin, Phone as PhoneIcon, Pencil, Trash2, Power, Calendar as CalendarIcon, Ban, CheckCircle2 } from "lucide-react";
+import { Plus, Building2, FileText, Users, UserPlus, X, MapPin, Phone as PhoneIcon, Pencil, Trash2, Power, Calendar as CalendarIcon, Ban, CheckCircle2, Mail, Send } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { US_STATES, validateClinicForm, normalizeState, type FieldError } from "@/lib/clinic-validation";
@@ -29,7 +29,7 @@ export default function ContractsAdmin() {
   const [assignProviderId, setAssignProviderId] = useState("");
   const [assignRole, setAssignRole] = useState("provider");
   const [assignPrimary, setAssignPrimary] = useState(false);
-  const [form, setForm] = useState({ name: "", start_date: "", end_date: "", notes: "" });
+  const [form, setForm] = useState({ name: "", start_date: "", end_date: "", notes: "", invitation_email: "" });
   const [clinicForm, setClinicForm] = useState({ name: "", address: "", contract_id: "", phone: "", city: "", state: "", timezone: "America/New_York" });
   const [selectedClinicId, setSelectedClinicId] = useState<string | null>(null);
   const [editClinicOpen, setEditClinicOpen] = useState(false);
@@ -82,15 +82,49 @@ export default function ContractsAdmin() {
 
   const addContract = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("contracts").insert({
+      const inviteEmail = form.invitation_email.trim();
+      if (inviteEmail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(inviteEmail)) {
+        throw new Error("Invitation email looks invalid");
+      }
+      const { data: inserted, error } = await supabase.from("contracts").insert({
         name: form.name,
         start_date: form.start_date || new Date().toISOString().split("T")[0],
         end_date: form.end_date || null,
         notes: form.notes || null,
+        invitation_email: inviteEmail || null,
+      }).select("id").single();
+      if (error) throw error;
+
+      // Auto-send invitation if email was provided.
+      if (inviteEmail && inserted?.id) {
+        const { error: invErr } = await supabase.functions.invoke("send-contract-invitation", {
+          body: { contract_id: inserted.id, email: inviteEmail },
+        });
+        if (invErr) {
+          // Contract was created — surface but don't undo.
+          throw new Error(`Contract created, but invitation send failed: ${invErr.message}`);
+        }
+      }
+      return { sent: !!inviteEmail };
+    },
+    onSuccess: ({ sent }) => {
+      qc.invalidateQueries({ queryKey: ["contracts"] });
+      setContractOpen(false);
+      setForm({ name: "", start_date: "", end_date: "", notes: "", invitation_email: "" });
+      toast.success(sent ? "Contract created and invitation sent" : "Contract created");
+    },
+    onError: (e: Error) => toast.error(e.message || "Failed to create contract"),
+  });
+
+  const sendContractInvitation = useMutation({
+    mutationFn: async ({ contract_id, email }: { contract_id: string; email?: string }) => {
+      const { error } = await supabase.functions.invoke("send-contract-invitation", {
+        body: { contract_id, ...(email ? { email } : {}) },
       });
       if (error) throw error;
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["contracts"] }); setContractOpen(false); setForm({ name: "", start_date: "", end_date: "", notes: "" }); toast.success("Contract created"); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["contracts"] }); toast.success("Invitation sent"); },
+    onError: (e: Error) => toast.error(e.message || "Failed to send invitation"),
   });
 
   const addClinic = useMutation({
@@ -325,7 +359,23 @@ export default function ContractsAdmin() {
                   </div>
                 </div>
                 <div><Label>Notes</Label><Textarea value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} /></div>
-                <Button onClick={() => addContract.mutate()} disabled={!form.name}>Create</Button>
+                <div className="space-y-1.5">
+                  <Label className="flex items-center gap-1.5">
+                    <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                    Invitation email <span className="text-xs text-muted-foreground font-normal">(optional)</span>
+                  </Label>
+                  <Input
+                    type="email"
+                    value={form.invitation_email}
+                    onChange={e => setForm(p => ({ ...p, invitation_email: e.target.value }))}
+                    placeholder="counterparty@example.com"
+                    inputMode="email"
+                  />
+                  <p className="text-[11px] text-muted-foreground">If filled, an invitation email with the contract details is sent automatically when you create the contract. You can resend later from the Contracts table.</p>
+                </div>
+                <Button onClick={() => addContract.mutate()} disabled={!form.name || addContract.isPending}>
+                  {addContract.isPending ? "Creating…" : "Create"}
+                </Button>
               </div>
             </DialogContent>
           </Dialog>
@@ -518,13 +568,16 @@ export default function ContractsAdmin() {
                 })}
               </div>
               <Table>
-                <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Start</TableHead><TableHead>End</TableHead><TableHead>Status</TableHead><TableHead>Clinics</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
+                <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Start</TableHead><TableHead>End</TableHead><TableHead>Status</TableHead><TableHead>Invitation</TableHead><TableHead>Clinics</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
                 <TableBody>
                   {contracts
                     .filter(c => contractStatusFilter === "all" || effectiveStatus(c) === contractStatusFilter)
                     .map(c => {
                       const eff = effectiveStatus(c);
                       const isExpired = eff === "expired";
+                      const inviteCount = (c as any).invitation_count ?? 0;
+                      const inviteEmail = (c as any).invitation_email as string | null;
+                      const inviteSentAt = (c as any).invitation_sent_at as string | null;
                       return (
                         <TableRow key={c.id}>
                           <TableCell className="font-medium">{c.name}</TableCell>
@@ -532,6 +585,44 @@ export default function ContractsAdmin() {
                           <TableCell>{c.end_date ? format(new Date(c.end_date), "MMM d, yyyy") : "—"}</TableCell>
                           <TableCell>
                             <Badge variant={effectiveStatusBadgeVariant(eff)} className="capitalize">{eff}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            {inviteCount === 0 ? (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  const email = inviteEmail || prompt("Send invitation to which email?")?.trim();
+                                  if (!email) return;
+                                  sendContractInvitation.mutate({ contract_id: c.id, email });
+                                }}
+                                disabled={sendContractInvitation.isPending}
+                                title="Send the invitation email for this contract"
+                              >
+                                <Send className="h-3.5 w-3.5 mr-1.5" />Send Invitation
+                              </Button>
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                <Badge variant="secondary" className="gap-1" title={inviteSentAt ? `Last sent ${format(new Date(inviteSentAt), "PPp")}` : ""}>
+                                  <Mail className="h-3 w-3" />
+                                  Sent {inviteCount > 1 ? `${inviteCount}×` : ""}
+                                </Badge>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 px-2 text-xs"
+                                  onClick={() => {
+                                    const email = inviteEmail || prompt("Resend invitation to which email?")?.trim();
+                                    if (!email) return;
+                                    sendContractInvitation.mutate({ contract_id: c.id, email });
+                                  }}
+                                  disabled={sendContractInvitation.isPending}
+                                  title={inviteEmail ? `Resend to ${inviteEmail}` : "Resend invitation"}
+                                >
+                                  Resend
+                                </Button>
+                              </div>
+                            )}
                           </TableCell>
                           <TableCell>{clinics.filter(cl => cl.contract_id === c.id).length}</TableCell>
                           <TableCell className="text-right">
@@ -562,7 +653,7 @@ export default function ContractsAdmin() {
                     })}
                   {contracts.filter(c => contractStatusFilter === "all" || effectiveStatus(c) === contractStatusFilter).length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8">
+                      <TableCell colSpan={7} className="text-center py-8">
                         <div className="flex flex-col items-center gap-3">
                           <p className="text-sm text-muted-foreground">
                             {contracts.length === 0
