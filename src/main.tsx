@@ -1,3 +1,4 @@
+import { forwardRef } from "react";
 import { createRoot } from "react-dom/client";
 import * as Sentry from "@sentry/react";
 import App from "./App.tsx";
@@ -40,8 +41,14 @@ const FallbackComponent = ({ resetError }: { resetError: () => void }) => (
   </div>
 );
 
+// Sentry.ErrorBoundary may attach a ref to its child. Keep App behind a
+// forwardRef boundary so React does not pass that ref to the plain function
+// component and trigger hook-context issues in the preview iframe.
+const SentryBoundaryApp = forwardRef((_props, _ref) => <App />);
+SentryBoundaryApp.displayName = "SentryBoundaryApp";
+
 createRoot(document.getElementById("root")!).render(
   <Sentry.ErrorBoundary fallback={FallbackComponent}>
-    <App />
+    <SentryBoundaryApp />
   </Sentry.ErrorBoundary>
 );
