@@ -419,14 +419,28 @@ export default function HormoneIntake() {
                   <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Patient *</Label>
                   <Select value={selectedPatient} onValueChange={setSelectedPatient}>
                     <SelectTrigger><SelectValue placeholder="Select patient" /></SelectTrigger>
-                    <SelectContent>{patients?.map(p => <SelectItem key={p.id} value={p.id}>{p.last_name}, {p.first_name}</SelectItem>)}</SelectContent>
+                    <SelectContent
+                      position="popper"
+                      side="bottom"
+                      sideOffset={4}
+                      className="max-h-60 w-[var(--radix-select-trigger-width)]"
+                    >
+                      {patients?.map(p => <SelectItem key={p.id} value={p.id}>{p.last_name}, {p.first_name}</SelectItem>)}
+                    </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
                   <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Provider</Label>
                   <Select value={selectedProvider} onValueChange={setSelectedProvider}>
                     <SelectTrigger><SelectValue placeholder="Select provider" /></SelectTrigger>
-                    <SelectContent>{providers?.map(p => <SelectItem key={p.id} value={p.id}>{p.last_name}, {p.first_name} {p.credentials && `(${p.credentials})`}</SelectItem>)}</SelectContent>
+                    <SelectContent
+                      position="popper"
+                      side="bottom"
+                      sideOffset={4}
+                      className="max-h-60 w-[var(--radix-select-trigger-width)]"
+                    >
+                      {providers?.map(p => <SelectItem key={p.id} value={p.id}>{p.last_name}, {p.first_name} {p.credentials && `(${p.credentials})`}</SelectItem>)}
+                    </SelectContent>
                   </Select>
                 </div>
               </div>
