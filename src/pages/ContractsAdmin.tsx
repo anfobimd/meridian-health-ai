@@ -15,6 +15,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { toast } from "sonner";
 import { Plus, Building2, FileText, Users, UserPlus, X, MapPin, Phone as PhoneIcon, Pencil, Trash2, Power } from "lucide-react";
 import { format } from "date-fns";
+import { US_STATES, validateClinicForm, normalizeState, type FieldError } from "@/lib/clinic-validation";
 
 export default function ContractsAdmin() {
   const qc = useQueryClient();
@@ -31,6 +32,11 @@ export default function ContractsAdmin() {
   const [editClinicOpen, setEditClinicOpen] = useState(false);
   const [editClinicId, setEditClinicId] = useState<string | null>(null);
   const [deleteClinicId, setDeleteClinicId] = useState<string | null>(null);
+  const [clinicErrors, setClinicErrors] = useState<Record<string, string>>({});
+
+  const errorFor = (field: string): string | undefined => clinicErrors[field];
+  const fieldErrorMap = (errors: FieldError[]): Record<string, string> =>
+    Object.fromEntries(errors.map(e => [e.field, e.message]));
 
   const { data: contracts = [] } = useQuery({
     queryKey: ["contracts"],
@@ -85,47 +91,49 @@ export default function ContractsAdmin() {
 
   const addClinic = useMutation({
     mutationFn: async () => {
-      const name = clinicForm.name.trim();
-      const address = clinicForm.address.trim();
-      const city = clinicForm.city.trim();
-      const state = clinicForm.state.trim();
-      if (!name) throw new Error("Clinic name is required");
-      if (!address) throw new Error("Address is required");
-      if (!city) throw new Error("City is required");
-      if (!state) throw new Error("State is required");
+      const errors = validateClinicForm(clinicForm);
+      if (errors.length > 0) {
+        setClinicErrors(fieldErrorMap(errors));
+        throw new Error(errors[0].message);
+      }
+      setClinicErrors({});
       const { error } = await supabase.from("clinics").insert({
-        name,
-        address,
-        city,
-        state,
+        name: clinicForm.name.trim(),
+        address: clinicForm.address.trim(),
+        city: clinicForm.city.trim(),
+        state: normalizeState(clinicForm.state),
         contract_id: clinicForm.contract_id || null,
-        phone: clinicForm.phone || null,
+        phone: clinicForm.phone.trim() || null,
         timezone: clinicForm.timezone || "America/New_York",
       });
       if (error) throw error;
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["clinics"] }); setClinicOpen(false); setClinicForm({ name: "", address: "", contract_id: "", phone: "", city: "", state: "", timezone: "America/New_York" }); toast.success("Clinic created"); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["clinics"] });
+      setClinicOpen(false);
+      setClinicForm({ name: "", address: "", contract_id: "", phone: "", city: "", state: "", timezone: "America/New_York" });
+      setClinicErrors({});
+      toast.success("Clinic created");
+    },
     onError: (e: Error) => toast.error(e.message || "Failed to create clinic"),
   });
 
   const updateClinic = useMutation({
     mutationFn: async () => {
       if (!editClinicId) throw new Error("No clinic selected");
-      const name = clinicForm.name.trim();
-      const address = clinicForm.address.trim();
-      const city = clinicForm.city.trim();
-      const state = clinicForm.state.trim();
-      if (!name) throw new Error("Clinic name is required");
-      if (!address) throw new Error("Address is required");
-      if (!city) throw new Error("City is required");
-      if (!state) throw new Error("State is required");
+      const errors = validateClinicForm(clinicForm);
+      if (errors.length > 0) {
+        setClinicErrors(fieldErrorMap(errors));
+        throw new Error(errors[0].message);
+      }
+      setClinicErrors({});
       const { error } = await supabase.from("clinics").update({
-        name,
-        address,
-        city,
-        state,
+        name: clinicForm.name.trim(),
+        address: clinicForm.address.trim(),
+        city: clinicForm.city.trim(),
+        state: normalizeState(clinicForm.state),
         contract_id: clinicForm.contract_id || null,
-        phone: clinicForm.phone || null,
+        phone: clinicForm.phone.trim() || null,
         timezone: clinicForm.timezone || "America/New_York",
       }).eq("id", editClinicId);
       if (error) throw error;
@@ -135,6 +143,7 @@ export default function ContractsAdmin() {
       setEditClinicOpen(false);
       setEditClinicId(null);
       setClinicForm({ name: "", address: "", contract_id: "", phone: "", city: "", state: "", timezone: "America/New_York" });
+      setClinicErrors({});
       toast.success("Clinic updated");
     },
     onError: (e: Error) => toast.error(e.message || "Failed to update clinic"),
@@ -255,18 +264,73 @@ export default function ContractsAdmin() {
               </div>
             </DialogContent>
           </Dialog>
-          <Dialog open={clinicOpen} onOpenChange={setClinicOpen}>
+          <Dialog open={clinicOpen} onOpenChange={(o) => { setClinicOpen(o); if (!o) setClinicErrors({}); }}>
             <DialogTrigger asChild><Button size="sm" variant="outline"><Plus className="h-4 w-4 mr-1" />Clinic</Button></DialogTrigger>
             <DialogContent>
               <DialogHeader><DialogTitle>New Clinic</DialogTitle></DialogHeader>
               <div className="space-y-3">
-                <div><Label>Name <span className="text-destructive">*</span></Label><Input value={clinicForm.name} onChange={e => setClinicForm(p => ({ ...p, name: e.target.value }))} required /></div>
-                <div><Label>Address <span className="text-destructive">*</span></Label><Input value={clinicForm.address} onChange={e => setClinicForm(p => ({ ...p, address: e.target.value }))} placeholder="Street address" required /></div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div><Label>City <span className="text-destructive">*</span></Label><Input value={clinicForm.city} onChange={e => setClinicForm(p => ({ ...p, city: e.target.value }))} required /></div>
-                  <div><Label>State <span className="text-destructive">*</span></Label><Input value={clinicForm.state} onChange={e => setClinicForm(p => ({ ...p, state: e.target.value }))} placeholder="e.g. FL" required /></div>
+                <div>
+                  <Label>Name <span className="text-destructive">*</span></Label>
+                  <Input
+                    value={clinicForm.name}
+                    onChange={e => { setClinicForm(p => ({ ...p, name: e.target.value })); if (clinicErrors.name) setClinicErrors(p => ({ ...p, name: "" })); }}
+                    aria-invalid={!!errorFor("name")}
+                    className={errorFor("name") ? "border-destructive focus-visible:ring-destructive" : ""}
+                    required
+                  />
+                  {errorFor("name") && <p className="mt-1 text-xs text-destructive">{errorFor("name")}</p>}
                 </div>
-                <div><Label>Phone</Label><Input value={clinicForm.phone} onChange={e => setClinicForm(p => ({ ...p, phone: e.target.value }))} placeholder="(555) 123-4567" /></div>
+                <div>
+                  <Label>Address <span className="text-destructive">*</span></Label>
+                  <Input
+                    value={clinicForm.address}
+                    onChange={e => { setClinicForm(p => ({ ...p, address: e.target.value })); if (clinicErrors.address) setClinicErrors(p => ({ ...p, address: "" })); }}
+                    placeholder="123 Main St"
+                    aria-invalid={!!errorFor("address")}
+                    className={errorFor("address") ? "border-destructive focus-visible:ring-destructive" : ""}
+                    required
+                  />
+                  {errorFor("address") && <p className="mt-1 text-xs text-destructive">{errorFor("address")}</p>}
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>City <span className="text-destructive">*</span></Label>
+                    <Input
+                      value={clinicForm.city}
+                      onChange={e => { setClinicForm(p => ({ ...p, city: e.target.value })); if (clinicErrors.city) setClinicErrors(p => ({ ...p, city: "" })); }}
+                      aria-invalid={!!errorFor("city")}
+                      className={errorFor("city") ? "border-destructive focus-visible:ring-destructive" : ""}
+                      required
+                    />
+                    {errorFor("city") && <p className="mt-1 text-xs text-destructive">{errorFor("city")}</p>}
+                  </div>
+                  <div>
+                    <Label>State <span className="text-destructive">*</span></Label>
+                    <Input
+                      list="us-states-list"
+                      value={clinicForm.state}
+                      onChange={e => { setClinicForm(p => ({ ...p, state: e.target.value })); if (clinicErrors.state) setClinicErrors(p => ({ ...p, state: "" })); }}
+                      placeholder="e.g. FL or Florida"
+                      maxLength={32}
+                      aria-invalid={!!errorFor("state")}
+                      className={errorFor("state") ? "border-destructive focus-visible:ring-destructive" : ""}
+                      required
+                    />
+                    {errorFor("state") && <p className="mt-1 text-xs text-destructive">{errorFor("state")}</p>}
+                  </div>
+                </div>
+                <div>
+                  <Label>Phone</Label>
+                  <Input
+                    value={clinicForm.phone}
+                    onChange={e => { setClinicForm(p => ({ ...p, phone: e.target.value })); if (clinicErrors.phone) setClinicErrors(p => ({ ...p, phone: "" })); }}
+                    placeholder="(555) 123-4567"
+                    inputMode="tel"
+                    aria-invalid={!!errorFor("phone")}
+                    className={errorFor("phone") ? "border-destructive focus-visible:ring-destructive" : ""}
+                  />
+                  {errorFor("phone") && <p className="mt-1 text-xs text-destructive">{errorFor("phone")}</p>}
+                </div>
                 <div><Label>Timezone</Label>
                   <Select value={clinicForm.timezone} onValueChange={v => setClinicForm(p => ({ ...p, timezone: v }))}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
@@ -362,7 +426,12 @@ export default function ContractsAdmin() {
 
         <TabsContent value="contracts">
           <Card>
-            <CardHeader><CardTitle>Contracts</CardTitle></CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0">
+              <CardTitle>Contracts</CardTitle>
+              <Button size="sm" onClick={() => setContractOpen(true)}>
+                <Plus className="h-4 w-4 mr-1" />Add Contract
+              </Button>
+            </CardHeader>
             <CardContent>
               <Table>
                 <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Start</TableHead><TableHead>End</TableHead><TableHead>Status</TableHead><TableHead>Clinics</TableHead><TableHead></TableHead></TableRow></TableHeader>
@@ -377,7 +446,18 @@ export default function ContractsAdmin() {
                       <TableCell><Button size="sm" variant="ghost" onClick={() => toggleContract.mutate({ id: c.id, status: c.status })}>{c.status === "active" ? "Suspend" : "Activate"}</Button></TableCell>
                     </TableRow>
                   ))}
-                  {contracts.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No contracts yet</TableCell></TableRow>}
+                  {contracts.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8">
+                        <div className="flex flex-col items-center gap-3">
+                          <p className="text-sm text-muted-foreground">No contracts yet</p>
+                          <Button size="sm" onClick={() => setContractOpen(true)}>
+                            <Plus className="h-4 w-4 mr-1" />Add Contract
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </CardContent>
@@ -503,17 +583,72 @@ export default function ContractsAdmin() {
       </Tabs>
 
       {/* Edit Clinic Dialog */}
-      <Dialog open={editClinicOpen} onOpenChange={(o) => { setEditClinicOpen(o); if (!o) { setEditClinicId(null); setClinicForm({ name: "", address: "", contract_id: "", phone: "", city: "", state: "", timezone: "America/New_York" }); } }}>
+      <Dialog open={editClinicOpen} onOpenChange={(o) => { setEditClinicOpen(o); if (!o) { setEditClinicId(null); setClinicForm({ name: "", address: "", contract_id: "", phone: "", city: "", state: "", timezone: "America/New_York" }); setClinicErrors({}); } }}>
         <DialogContent>
           <DialogHeader><DialogTitle>Edit Clinic</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <div><Label>Name <span className="text-destructive">*</span></Label><Input value={clinicForm.name} onChange={e => setClinicForm(p => ({ ...p, name: e.target.value }))} required /></div>
-            <div><Label>Address <span className="text-destructive">*</span></Label><Input value={clinicForm.address} onChange={e => setClinicForm(p => ({ ...p, address: e.target.value }))} placeholder="Street address" required /></div>
-            <div className="grid grid-cols-2 gap-3">
-              <div><Label>City <span className="text-destructive">*</span></Label><Input value={clinicForm.city} onChange={e => setClinicForm(p => ({ ...p, city: e.target.value }))} required /></div>
-              <div><Label>State <span className="text-destructive">*</span></Label><Input value={clinicForm.state} onChange={e => setClinicForm(p => ({ ...p, state: e.target.value }))} placeholder="e.g. FL" required /></div>
+            <div>
+              <Label>Name <span className="text-destructive">*</span></Label>
+              <Input
+                value={clinicForm.name}
+                onChange={e => { setClinicForm(p => ({ ...p, name: e.target.value })); if (clinicErrors.name) setClinicErrors(p => ({ ...p, name: "" })); }}
+                aria-invalid={!!errorFor("name")}
+                className={errorFor("name") ? "border-destructive focus-visible:ring-destructive" : ""}
+                required
+              />
+              {errorFor("name") && <p className="mt-1 text-xs text-destructive">{errorFor("name")}</p>}
             </div>
-            <div><Label>Phone</Label><Input value={clinicForm.phone} onChange={e => setClinicForm(p => ({ ...p, phone: e.target.value }))} placeholder="(555) 123-4567" /></div>
+            <div>
+              <Label>Address <span className="text-destructive">*</span></Label>
+              <Input
+                value={clinicForm.address}
+                onChange={e => { setClinicForm(p => ({ ...p, address: e.target.value })); if (clinicErrors.address) setClinicErrors(p => ({ ...p, address: "" })); }}
+                placeholder="123 Main St"
+                aria-invalid={!!errorFor("address")}
+                className={errorFor("address") ? "border-destructive focus-visible:ring-destructive" : ""}
+                required
+              />
+              {errorFor("address") && <p className="mt-1 text-xs text-destructive">{errorFor("address")}</p>}
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>City <span className="text-destructive">*</span></Label>
+                <Input
+                  value={clinicForm.city}
+                  onChange={e => { setClinicForm(p => ({ ...p, city: e.target.value })); if (clinicErrors.city) setClinicErrors(p => ({ ...p, city: "" })); }}
+                  aria-invalid={!!errorFor("city")}
+                  className={errorFor("city") ? "border-destructive focus-visible:ring-destructive" : ""}
+                  required
+                />
+                {errorFor("city") && <p className="mt-1 text-xs text-destructive">{errorFor("city")}</p>}
+              </div>
+              <div>
+                <Label>State <span className="text-destructive">*</span></Label>
+                <Input
+                  list="us-states-list"
+                  value={clinicForm.state}
+                  onChange={e => { setClinicForm(p => ({ ...p, state: e.target.value })); if (clinicErrors.state) setClinicErrors(p => ({ ...p, state: "" })); }}
+                  placeholder="e.g. FL or Florida"
+                  maxLength={32}
+                  aria-invalid={!!errorFor("state")}
+                  className={errorFor("state") ? "border-destructive focus-visible:ring-destructive" : ""}
+                  required
+                />
+                {errorFor("state") && <p className="mt-1 text-xs text-destructive">{errorFor("state")}</p>}
+              </div>
+            </div>
+            <div>
+              <Label>Phone</Label>
+              <Input
+                value={clinicForm.phone}
+                onChange={e => { setClinicForm(p => ({ ...p, phone: e.target.value })); if (clinicErrors.phone) setClinicErrors(p => ({ ...p, phone: "" })); }}
+                placeholder="(555) 123-4567"
+                inputMode="tel"
+                aria-invalid={!!errorFor("phone")}
+                className={errorFor("phone") ? "border-destructive focus-visible:ring-destructive" : ""}
+              />
+              {errorFor("phone") && <p className="mt-1 text-xs text-destructive">{errorFor("phone")}</p>}
+            </div>
             <div>
               <Label>Timezone</Label>
               <Select value={clinicForm.timezone} onValueChange={v => setClinicForm(p => ({ ...p, timezone: v }))}>
@@ -569,6 +704,16 @@ export default function ContractsAdmin() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Shared US-states datalist used by both New / Edit Clinic State inputs */}
+      <datalist id="us-states-list">
+        {US_STATES.map(s => (
+          <option key={s.code} value={s.code}>{s.name}</option>
+        ))}
+        {US_STATES.map(s => (
+          <option key={`${s.code}-name`} value={s.name} />
+        ))}
+      </datalist>
     </div>
   );
 }
