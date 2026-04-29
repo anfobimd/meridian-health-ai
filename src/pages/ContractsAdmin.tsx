@@ -29,6 +29,8 @@ export default function ContractsAdmin() {
   const [assignProviderId, setAssignProviderId] = useState("");
   const [assignRole, setAssignRole] = useState("provider");
   const [assignPrimary, setAssignPrimary] = useState(false);
+  const [assignNotify, setAssignNotify] = useState(true);
+  const [assignNotifyEmailOverride, setAssignNotifyEmailOverride] = useState("");
   const [form, setForm] = useState({ name: "", start_date: "", end_date: "", notes: "", invitation_email: "" });
   const [clinicForm, setClinicForm] = useState({ name: "", address: "", contract_id: "", phone: "", city: "", state: "", timezone: "America/New_York" });
   const [selectedClinicId, setSelectedClinicId] = useState<string | null>(null);
@@ -65,7 +67,7 @@ export default function ContractsAdmin() {
   const { data: providers = [] } = useQuery({
     queryKey: ["all-providers-for-assign"],
     queryFn: async () => {
-      const { data } = await supabase.from("providers").select("id, first_name, last_name, credentials, specialty").eq("is_active", true).order("last_name");
+      const { data } = await supabase.from("providers").select("id, first_name, last_name, credentials, specialty, email").eq("is_active", true).order("last_name");
       return data ?? [];
     },
   });
@@ -75,7 +77,7 @@ export default function ContractsAdmin() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("provider_clinic_assignments")
-        .select("*, providers(first_name, last_name, credentials, specialty), clinics(name)")
+        .select("*, providers(first_name, last_name, credentials, specialty, email), clinics(name)")
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
@@ -280,21 +282,53 @@ export default function ContractsAdmin() {
 
   const addAssignment = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("provider_clinic_assignments").insert({
-        provider_id: assignProviderId,
-        clinic_id: assignClinicId,
-        role_at_clinic: assignRole,
-        is_primary: assignPrimary,
-      });
+      const overrideEmail = assignNotifyEmailOverride.trim();
+      if (assignNotify && overrideEmail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(overrideEmail)) {
+        throw new Error("Notification email looks invalid");
+      }
+      const { data: inserted, error } = await supabase
+        .from("provider_clinic_assignments")
+        .insert({
+          provider_id: assignProviderId,
+          clinic_id: assignClinicId,
+          role_at_clinic: assignRole,
+          is_primary: assignPrimary,
+        })
+        .select("id")
+        .single();
       if (error) throw error;
+
+      // Optional notification (QA #34).
+      if (assignNotify && inserted?.id) {
+        const { error: notifyErr } = await supabase.functions.invoke("send-staff-assignment-invitation", {
+          body: { assignment_id: inserted.id, ...(overrideEmail ? { email: overrideEmail } : {}) },
+        });
+        if (notifyErr) {
+          // Assignment was created — surface but don't roll back.
+          throw new Error(`Provider assigned, but notification failed: ${notifyErr.message}`);
+        }
+      }
+      return { notified: assignNotify };
     },
-    onSuccess: () => {
+    onSuccess: ({ notified }) => {
       qc.invalidateQueries({ queryKey: ["provider-clinic-assignments"] });
       setAssignOpen(false);
       setAssignProviderId(""); setAssignClinicId(""); setAssignRole("provider"); setAssignPrimary(false);
-      toast.success("Provider assigned to clinic");
+      setAssignNotify(true); setAssignNotifyEmailOverride("");
+      toast.success(notified ? "Provider assigned and notified" : "Provider assigned to clinic");
     },
     onError: (e: any) => toast.error(e.message?.includes("duplicate") ? "Provider already assigned to this clinic" : e.message),
+  });
+
+  const sendAssignmentInvitation = useMutation({
+    mutationFn: async ({ assignment_id, email }: { assignment_id: string; email?: string }) => {
+      const { error } = await supabase.functions.invoke("send-staff-assignment-invitation", {
+        body: { assignment_id, ...(email ? { email } : {}) },
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["provider-clinic-assignments"] }); toast.success("Notification sent"); },
+    onError: (e: Error) => toast.error(e.message || "Failed to send notification"),
   });
 
   const removeAssignment = useMutation({
@@ -519,7 +553,7 @@ export default function ContractsAdmin() {
               </div>
             </DialogContent>
           </Dialog>
-          <Dialog open={assignOpen} onOpenChange={setAssignOpen}>
+          <Dialog open={assignOpen} onOpenChange={(o) => { setAssignOpen(o); if (!o) { setAssignNotify(true); setAssignNotifyEmailOverride(""); } }}>
             <DialogTrigger asChild><Button size="sm" variant="outline"><UserPlus className="h-4 w-4 mr-1" />Assign Provider</Button></DialogTrigger>
             <DialogContent>
               <DialogHeader><DialogTitle>Assign Provider to Clinic</DialogTitle></DialogHeader>
@@ -557,8 +591,57 @@ export default function ContractsAdmin() {
                   <input type="checkbox" checked={assignPrimary} onChange={e => setAssignPrimary(e.target.checked)} className="rounded" />
                   Primary clinic for this provider
                 </label>
-                <Button onClick={() => addAssignment.mutate()} disabled={!assignProviderId || !assignClinicId}>
-                  Assign
+                {/* QA #34 — optional staff notification email */}
+                {(() => {
+                  const selectedProvider = providers.find(p => p.id === assignProviderId);
+                  const providerEmail = selectedProvider?.email ?? null;
+                  const willSendTo = assignNotifyEmailOverride.trim() || providerEmail || "";
+                  return (
+                    <div className="rounded-md border bg-muted/30 p-3 space-y-2">
+                      <label className="flex items-center gap-2 text-sm font-medium">
+                        <input
+                          type="checkbox"
+                          checked={assignNotify}
+                          onChange={e => setAssignNotify(e.target.checked)}
+                          className="rounded"
+                        />
+                        <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                        Send email notification to provider
+                      </label>
+                      {assignNotify && (
+                        <div className="pl-6 space-y-1.5">
+                          <Input
+                            type="email"
+                            value={assignNotifyEmailOverride}
+                            onChange={e => setAssignNotifyEmailOverride(e.target.value)}
+                            placeholder={providerEmail || "provider@example.com"}
+                            inputMode="email"
+                            className="h-8 text-xs"
+                          />
+                          <p className="text-[11px] text-muted-foreground">
+                            {assignNotifyEmailOverride.trim()
+                              ? `Will send to ${willSendTo} (overrides provider's email on file)`
+                              : providerEmail
+                                ? `Will send to ${providerEmail} (provider's email on file)`
+                                : "Provider has no email on file — enter one above or uncheck to skip notification"}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+                <Button
+                  onClick={() => addAssignment.mutate()}
+                  disabled={
+                    !assignProviderId ||
+                    !assignClinicId ||
+                    addAssignment.isPending ||
+                    (assignNotify
+                      && !assignNotifyEmailOverride.trim()
+                      && !providers.find(p => p.id === assignProviderId)?.email)
+                  }
+                >
+                  {addAssignment.isPending ? "Assigning…" : (assignNotify ? "Assign & Notify" : "Assign")}
                 </Button>
               </div>
             </DialogContent>
@@ -782,17 +865,42 @@ export default function ContractsAdmin() {
                     <p className="text-xs text-muted-foreground py-3 text-center">No providers assigned</p>
                   ) : (
                     <div className="flex flex-wrap gap-2">
-                      {ca.map((a: any) => (
-                        <div key={a.id} className="flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs">
-                          <span className="font-medium">{a.providers?.first_name} {a.providers?.last_name}</span>
-                          {a.providers?.credentials && <span className="text-muted-foreground">{a.providers.credentials}</span>}
-                          <Badge variant="outline" className="text-[9px] px-1">{a.role_at_clinic?.replace(/_/g, " ")}</Badge>
-                          {a.is_primary && <Badge className="text-[9px] px-1">Primary</Badge>}
-                          <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" onClick={() => removeAssignment.mutate(a.id)}>
-                            <X className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      ))}
+                      {ca.map((a: any) => {
+                        const notifyCount = a.notification_count ?? 0;
+                        const providerEmail = a.providers?.email as string | null;
+                        return (
+                          <div key={a.id} className="flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs">
+                            <span className="font-medium">{a.providers?.first_name} {a.providers?.last_name}</span>
+                            {a.providers?.credentials && <span className="text-muted-foreground">{a.providers.credentials}</span>}
+                            <Badge variant="outline" className="text-[9px] px-1">{a.role_at_clinic?.replace(/_/g, " ")}</Badge>
+                            {a.is_primary && <Badge className="text-[9px] px-1">Primary</Badge>}
+                            {notifyCount > 0 && (
+                              <Badge variant="secondary" className="text-[9px] px-1 gap-0.5" title={a.notification_sent_at ? `Last sent ${format(new Date(a.notification_sent_at), "PPp")}` : ""}>
+                                <Mail className="h-2.5 w-2.5" />
+                                Sent {notifyCount > 1 ? `${notifyCount}×` : ""}
+                              </Badge>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-5 w-5 shrink-0"
+                              onClick={() => {
+                                const email = providerEmail || prompt("Send notification to which email?")?.trim();
+                                if (!email) return;
+                                sendAssignmentInvitation.mutate({ assignment_id: a.id, email });
+                              }}
+                              disabled={sendAssignmentInvitation.isPending}
+                              title={notifyCount > 0 ? "Resend assignment notification" : "Send assignment notification"}
+                              aria-label={notifyCount > 0 ? "Resend notification" : "Send notification"}
+                            >
+                              <Send className="h-3 w-3" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" onClick={() => removeAssignment.mutate(a.id)} title="Remove from clinic">
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </CardContent>
