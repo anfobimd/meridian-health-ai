@@ -63,6 +63,51 @@ export function PatientRegistrationDialog({ open, onOpenChange }: Props) {
 
   const saveMutation = useMutation({
     mutationFn: async () => {
+      // QA #42 — block duplicate patient registration. Match on email, on
+      // normalized phone, or on (first_name + last_name + dob) — those are
+      // the standard keys that identify the same person across re-entries.
+      const email = form.email.trim().toLowerCase();
+      const phoneDigits = form.phone.trim().replace(/\D/g, "");
+      const first = form.first_name.trim();
+      const last = form.last_name.trim();
+      const dob = form.date_of_birth || "";
+
+      const orFilters: string[] = [];
+      if (email) orFilters.push(`email.ilike.${email}`);
+      if (phoneDigits.length >= 10) orFilters.push(`phone.ilike.%${phoneDigits.slice(-10)}%`);
+
+      let dupes: any[] = [];
+      if (orFilters.length > 0) {
+        const { data } = await supabase
+          .from("patients")
+          .select("id, first_name, last_name, email, phone, date_of_birth")
+          .or(orFilters.join(","))
+          .limit(5);
+        dupes = data ?? [];
+      }
+      // Name+DOB exact match needs a separate query (no OR support across two AND'd fields).
+      if (first && last && dob) {
+        const { data } = await supabase
+          .from("patients")
+          .select("id, first_name, last_name, email, phone, date_of_birth")
+          .ilike("first_name", first)
+          .ilike("last_name", last)
+          .eq("date_of_birth", dob)
+          .limit(5);
+        for (const p of data ?? []) {
+          if (!dupes.find(d => d.id === p.id)) dupes.push(p);
+        }
+      }
+
+      if (dupes.length > 0) {
+        const d = dupes[0];
+        const reason =
+          d.email && email && d.email.toLowerCase() === email ? `email ${email}` :
+          d.phone && phoneDigits && d.phone.replace(/\D/g, "").endsWith(phoneDigits.slice(-10)) ? `phone ${form.phone}` :
+          `name ${d.first_name} ${d.last_name} + DOB ${d.date_of_birth}`;
+        throw new Error(`A patient with the same ${reason} already exists. Open the existing record instead of creating a duplicate.`);
+      }
+
       const { error } = await supabase.from("patients").insert({
         first_name: form.first_name.trim(),
         last_name: form.last_name.trim(),

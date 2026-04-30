@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
-import { Plus, Zap, Pause, Play, Sparkles, Loader2, Brain, AlertTriangle, Lightbulb } from "lucide-react";
+import { Plus, Zap, Pause, Play, Sparkles, Loader2, Brain, AlertTriangle, Lightbulb, Pencil } from "lucide-react";
 
 const TRIGGERS = [
   { value: "appointment_created", label: "Appointment Created" },
@@ -48,6 +48,8 @@ export default function AutomationRules() {
   const [loadingFatigue, setLoadingFatigue] = useState(false);
   const [aiSuggestions, setAiSuggestions] = useState<any>(null);
   const [loadingSuggest, setLoadingSuggest] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
 
   const { data: rules = [] } = useQuery({
     queryKey: ["automation-rules"],
@@ -79,9 +81,54 @@ export default function AutomationRules() {
     mutationFn: async ({ id, is_active }: { id: string; is_active: boolean }) => {
       const { error } = await supabase.from("automation_rules").update({ is_active: !is_active }).eq("id", id);
       if (error) throw error;
+      return !is_active;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["automation-rules"] }),
+    onSuccess: (next) => {
+      qc.invalidateQueries({ queryKey: ["automation-rules"] });
+      // QA #40 — confirmation toast on pause/resume.
+      toast.success(next ? "Rule resumed" : "Rule paused");
+    },
+    onError: (e: Error) => toast.error(e.message || "Failed to update rule status"),
   });
+
+  const updateRule = useMutation({
+    mutationFn: async () => {
+      if (!editId) throw new Error("No rule selected");
+      if (!form.name.trim() || !form.trigger_event || !form.action_type) {
+        throw new Error("Name, trigger, and action are required");
+      }
+      const { error } = await supabase.from("automation_rules").update({
+        name: form.name.trim(),
+        trigger_event: form.trigger_event,
+        action_type: form.action_type,
+        recipient_type: form.recipient_type,
+        delay_minutes: parseInt(form.delay_minutes) || 0,
+        is_platform_rule: form.is_platform_rule,
+      }).eq("id", editId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["automation-rules"] });
+      setEditOpen(false);
+      setEditId(null);
+      setForm({ name: "", trigger_event: "", action_type: "", recipient_type: "patient", delay_minutes: "0", is_platform_rule: false });
+      toast.success("Rule updated");
+    },
+    onError: (e: Error) => toast.error(e.message || "Failed to update rule"),
+  });
+
+  const openEdit = (r: any) => {
+    setEditId(r.id);
+    setForm({
+      name: r.name ?? "",
+      trigger_event: r.trigger_event ?? "",
+      action_type: r.action_type ?? "",
+      recipient_type: r.recipient_type ?? "patient",
+      delay_minutes: String(r.delay_minutes ?? 0),
+      is_platform_rule: !!r.is_platform_rule,
+    });
+    setEditOpen(true);
+  };
 
   const deleteRule = useMutation({
     mutationFn: async (id: string) => {
@@ -243,7 +290,14 @@ export default function AutomationRules() {
                       {r.is_active ? <><Pause className="h-3.5 w-3.5 mr-1" />Pause</> : <><Play className="h-3.5 w-3.5 mr-1" />Resume</>}
                     </Button>
                   </TableCell>
-                  <TableCell><Button size="sm" variant="ghost" className="text-destructive" onClick={() => deleteRule.mutate(r.id)}>Delete</Button></TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1">
+                      <Button size="sm" variant="ghost" onClick={() => openEdit(r)} title="Edit rule" aria-label="Edit rule">
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button size="sm" variant="ghost" className="text-destructive" onClick={() => deleteRule.mutate(r.id)}>Delete</Button>
+                    </div>
+                  </TableCell>
                 </TableRow>
               ))}
               {rules.length === 0 && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">No automation rules yet</TableCell></TableRow>}
@@ -251,6 +305,24 @@ export default function AutomationRules() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Edit Rule Dialog (QA #41) */}
+      <Dialog open={editOpen} onOpenChange={(o) => { setEditOpen(o); if (!o) { setEditId(null); setForm({ name: "", trigger_event: "", action_type: "", recipient_type: "patient", delay_minutes: "0", is_platform_rule: false }); } }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Edit Automation Rule</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div><Label>Name</Label><Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="e.g. 48h Appointment Reminder" /></div>
+            <div><Label>Trigger</Label><Select value={form.trigger_event} onValueChange={v => setForm(p => ({ ...p, trigger_event: v }))}><SelectTrigger><SelectValue placeholder="Select trigger" /></SelectTrigger><SelectContent>{TRIGGERS.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent></Select></div>
+            <div><Label>Action</Label><Select value={form.action_type} onValueChange={v => setForm(p => ({ ...p, action_type: v }))}><SelectTrigger><SelectValue placeholder="Select action" /></SelectTrigger><SelectContent>{ACTIONS.map(a => <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>)}</SelectContent></Select></div>
+            <div><Label>Recipient</Label><Select value={form.recipient_type} onValueChange={v => setForm(p => ({ ...p, recipient_type: v }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{RECIPIENTS.map(r => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}</SelectContent></Select></div>
+            <div><Label>Delay (minutes)</Label><Input type="number" min={0} value={form.delay_minutes} onChange={e => setForm(p => ({ ...p, delay_minutes: e.target.value }))} /></div>
+            <div className="flex items-center gap-2"><Switch checked={form.is_platform_rule} onCheckedChange={v => setForm(p => ({ ...p, is_platform_rule: v }))} /><Label>Platform-wide rule</Label></div>
+            <Button onClick={() => updateRule.mutate()} disabled={!form.name || !form.trigger_event || !form.action_type || updateRule.isPending}>
+              {updateRule.isPending ? "Saving…" : "Save Changes"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
