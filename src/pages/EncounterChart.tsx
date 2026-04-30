@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { VitalsPanel } from "@/components/encounter/VitalsPanel";
 import { AddendumSection } from "@/components/clinical/AddendumSection";
+import { AftercareModal } from "@/components/clinical/AftercareModal";
 import { AdminNotesPanel } from "@/components/front-desk/AdminNotesPanel";
 import { PhotoConsentGate } from "@/components/clinical/PhotoConsentGate";
 import { PhotoGallery } from "@/components/clinical-photos/PhotoGallery";
@@ -138,99 +139,6 @@ function DrugInteractionBanner({
         </div>
       </CardContent>
     </Card>
-  );
-}
-
-/* ── Aftercare Modal ── */
-function AftercareModal({
-  open,
-  onClose,
-  patientName,
-  procedureType,
-  encounterId,
-}: {
-  open: boolean;
-  onClose: () => void;
-  patientName: string;
-  procedureType: string;
-  encounterId: string;
-}) {
-  const [channel, setChannel] = useState("sms");
-  const [sending, setSending] = useState(false);
-  const [message, setMessage] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    setLoading(true);
-    supabase.functions
-      .invoke("ai-aftercare-message", {
-        body: { encounter_id: encounterId, procedure_type: procedureType, patient_name: patientName },
-      })
-      .then(({ data }) => {
-        setMessage(data?.message || `Thank you for your ${procedureType} treatment today, ${patientName}. Please follow your aftercare instructions and contact us with any concerns.`);
-      })
-      .catch(() => {
-        setMessage(`Thank you for your ${procedureType} treatment today, ${patientName}. Please follow your aftercare instructions.`);
-      })
-      .finally(() => setLoading(false));
-  }, [open, encounterId, procedureType, patientName]);
-
-  const send = async () => {
-    setSending(true);
-    try {
-      // In production this would call send-sms or email function
-      toast.success(`Aftercare sent via ${channel}`);
-      onClose();
-    } catch {
-      toast.error("Failed to send aftercare");
-    } finally {
-      setSending(false);
-    }
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Send className="h-4 w-4" /> Send Aftercare Instructions
-          </DialogTitle>
-          <DialogDescription>
-            Chart signed. Send personalized aftercare to {patientName}?
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-3">
-          <div className="space-y-1">
-            <Label className="text-xs">Channel</Label>
-            <Select value={channel} onValueChange={setChannel}>
-              <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="sms">SMS</SelectItem>
-                <SelectItem value="email">Email</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Message</Label>
-            {loading ? (
-              <div className="flex items-center gap-2 p-3 bg-muted rounded text-xs text-muted-foreground">
-                <Loader2 className="h-3 w-3 animate-spin" /> AI generating aftercare message...
-              </div>
-            ) : (
-              <Textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={5} className="text-sm" />
-            )}
-          </div>
-        </div>
-        <DialogFooter className="gap-2">
-          <Button variant="ghost" size="sm" onClick={onClose}>Skip</Button>
-          <Button size="sm" onClick={send} disabled={sending || loading}>
-            {sending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Send className="h-3.5 w-3.5 mr-1" />}
-            Send
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 }
 
@@ -893,6 +801,8 @@ export default function EncounterChart() {
         patientName={`${encounter?.patients?.first_name || ""} ${encounter?.patients?.last_name || ""}`}
         procedureType={procedureType}
         encounterId={encounterId!}
+        patientId={encounter?.patients?.id ?? null}
+        appointmentId={encounter?.appointment_id ?? null}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

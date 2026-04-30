@@ -12,7 +12,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { patient_id, procedure_type, custom_instructions, encounter_id, patient_name, auto_send } = await req.json();
+    const { patient_id, procedure_type, custom_instructions, encounter_id, patient_name } = await req.json();
 
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -92,21 +92,18 @@ ${custom_instructions ? `Additional instructions: ${custom_instructions}` : ""}`
       result = JSON.parse(clean);
     } catch { result = { error: "Failed to parse AI response" }; }
 
-    // Auto-send: log to patient communication
-    if (auto_send && resolvedPatientId && result.body) {
-      try {
-        await supabaseAdmin.from("patient_communication_log").insert({
-          patient_id: resolvedPatientId,
-          direction: "outbound",
-          channel: "sms",
-          subject: `Aftercare: ${treatmentName}`,
-          body: result.body,
-          is_read: false,
-        });
-      } catch (e) { console.error("Failed to log aftercare communication:", e); }
-    }
+    // NOTE: This function used to accept an `auto_send` flag that immediately
+    // wrote the AI-drafted message to patient_communication_log without any
+    // provider review. That was both a safety issue (unreviewed AI content
+    // reaching the patient record) and was silently broken anyway (the insert
+    // referenced columns that don't exist in the table schema, so nothing
+    // ever actually landed). The flag is no longer honored. The front-end
+    // now opens an AftercareModal that lets the provider review/edit the
+    // draft before explicitly clicking Send, which performs the actual
+    // patient_communication_log insert from the client. This function is now
+    // pure: input → AI draft, no side effects.
 
-    return new Response(JSON.stringify({ ...result, auto_sent: !!auto_send }), {
+    return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {

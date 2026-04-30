@@ -17,6 +17,7 @@ import {
   RefreshCw, TrendingUp, Video, Phone,
 } from "lucide-react";
 import { StatCard } from "@/components/StatCard";
+import { AftercareModal } from "@/components/clinical/AftercareModal";
 
 const statusColor: Record<string, string> = {
   booked: "bg-primary/10 text-primary border-primary/20",
@@ -44,6 +45,16 @@ export default function ProviderDay() {
   const [dayBrief, setDayBrief] = useState<string | null>(null);
   const [dayBriefLoading, setDayBriefLoading] = useState(false);
   const [completedOpen, setCompletedOpen] = useState(false);
+  // Phase 3 #2: Aftercare goes through a review modal now, not auto-send.
+  // Holds the appointment whose aftercare we're currently composing, plus
+  // the resolved encounter_id so the modal can call the AI generator.
+  const [aftercareApt, setAftercareApt] = useState<{
+    appointmentId: string;
+    encounterId: string;
+    patientId: string;
+    patientName: string;
+    procedureType: string;
+  } | null>(null);
 
   // Resolve provider ID from auth user
   useEffect(() => {
@@ -493,11 +504,21 @@ export default function ProviderDay() {
                     <Button variant="ghost" size="sm" className="text-xs h-7 text-primary" onClick={async () => {
                       try {
                         const { data: enc } = await supabase.from("encounters").select("id").eq("appointment_id", apt.id).limit(1);
-                        await supabase.functions.invoke("ai-aftercare-message", {
-                          body: { encounter_id: enc?.[0]?.id, procedure_type: apt.treatments?.name || "Visit", patient_name: `${apt.patients?.first_name} ${apt.patients?.last_name}`, auto_send: true },
+                        const encounterId = enc?.[0]?.id;
+                        if (!encounterId) {
+                          toast.error("No encounter found for this appointment");
+                          return;
+                        }
+                        setAftercareApt({
+                          appointmentId: apt.id,
+                          encounterId,
+                          patientId: apt.patient_id,
+                          patientName: `${apt.patients?.first_name ?? ""} ${apt.patients?.last_name ?? ""}`.trim(),
+                          procedureType: apt.treatments?.name || "Visit",
                         });
-                        toast.success("Aftercare sent");
-                      } catch { toast.error("Failed to send aftercare"); }
+                      } catch {
+                        toast.error("Failed to open aftercare");
+                      }
                     }}>
                       <Send className="h-3 w-3 mr-1" /> Aftercare
                     </Button>
@@ -522,6 +543,22 @@ export default function ProviderDay() {
           <Stethoscope className="h-12 w-12 mx-auto text-muted-foreground/30" />
           <p className="text-muted-foreground mt-3">No patients scheduled for today</p>
         </div>
+      )}
+
+      {/* Aftercare review modal — opened by the per-row "Aftercare" button.
+          Replaces the old auto-send flow, which was both unsafe and silently
+          broken. The modal lets the provider review/edit the AI draft before
+          a single click writes the row to patient_communication_log. */}
+      {aftercareApt && (
+        <AftercareModal
+          open
+          onClose={() => setAftercareApt(null)}
+          patientName={aftercareApt.patientName}
+          procedureType={aftercareApt.procedureType}
+          encounterId={aftercareApt.encounterId}
+          patientId={aftercareApt.patientId}
+          appointmentId={aftercareApt.appointmentId}
+        />
       )}
     </div>
   );

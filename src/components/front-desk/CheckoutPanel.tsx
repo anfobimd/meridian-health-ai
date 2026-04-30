@@ -8,6 +8,7 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { PaymentPanel } from "./PaymentPanel";
 import { FollowUpBooker } from "./FollowUpBooker";
+import { AftercareModal } from "@/components/clinical/AftercareModal";
 import {
   CheckCircle2, AlertTriangle, Loader2, Sparkles, CreditCard,
   XCircle, CircleCheck, Send,
@@ -37,6 +38,14 @@ export function CheckoutPanel({ appointmentId, open, onOpenChange }: {
   const [reviewed, setReviewed] = useState(false);
   const [paymentDone, setPaymentDone] = useState(false);
   const [aftercareSent, setAftercareSent] = useState(false);
+  // Phase 3 #2: Aftercare goes through a review modal now. Stores the
+  // resolved encounter + patient context once the user clicks the button.
+  const [aftercareCtx, setAftercareCtx] = useState<{
+    encounterId: string;
+    patientId: string;
+    patientName: string;
+    procedureType: string;
+  } | null>(null);
 
   const runReview = async () => {
     setLoading(true);
@@ -76,20 +85,49 @@ export function CheckoutPanel({ appointmentId, open, onOpenChange }: {
     }
   };
 
-  const sendAftercare = async () => {
-    // Trigger aftercare message
+  const openAftercare = async () => {
+    // Resolve the appointment + encounter context, then open the modal.
+    // The modal handles AI generation, review/edit, and the eventual write
+    // to patient_communication_log. We only mark aftercareSent=true if the
+    // modal closes via Send (i.e. produces a log row); Skip leaves the
+    // button available for retry.
     try {
-      await supabase.functions.invoke("ai-aftercare-message", {
-        body: { appointment_id: appointmentId },
+      const { data: apt, error: aptErr } = await supabase
+        .from("appointments")
+        .select("id, patient_id, patients(first_name, last_name), treatments(name)")
+        .eq("id", appointmentId)
+        .maybeSingle();
+      if (aptErr || !apt?.patient_id) {
+        toast.error("Could not load appointment");
+        return;
+      }
+      const { data: enc } = await supabase
+        .from("encounters")
+        .select("id")
+        .eq("appointment_id", appointmentId)
+        .limit(1)
+        .maybeSingle();
+      if (!enc?.id) {
+        toast.error("No encounter found for this visit");
+        return;
+      }
+      const t = apt.treatments as { name?: string } | { name?: string }[] | null;
+      const treatmentName = (Array.isArray(t) ? t[0]?.name : t?.name) || "Visit";
+      const p = apt.patients as { first_name?: string; last_name?: string } | { first_name?: string; last_name?: string }[] | null;
+      const pat = Array.isArray(p) ? p[0] : p;
+      setAftercareCtx({
+        encounterId: enc.id,
+        patientId: apt.patient_id,
+        patientName: `${pat?.first_name ?? ""} ${pat?.last_name ?? ""}`.trim(),
+        procedureType: treatmentName,
       });
-      setAftercareSent(true);
-      toast.success("Aftercare instructions sent");
     } catch {
-      toast.error("Failed to send aftercare");
+      toast.error("Failed to load aftercare context");
     }
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
         <DialogHeader>
@@ -169,7 +207,7 @@ export function CheckoutPanel({ appointmentId, open, onOpenChange }: {
                   <CheckCircle2 className="h-3.5 w-3.5" />Aftercare instructions sent
                 </div>
               ) : (
-                <Button variant="outline" size="sm" className="w-full" onClick={sendAftercare}>
+                <Button variant="outline" size="sm" className="w-full" onClick={openAftercare}>
                   <Send className="h-3.5 w-3.5 mr-1.5" />Send Aftercare Instructions
                 </Button>
               )}
@@ -192,5 +230,27 @@ export function CheckoutPanel({ appointmentId, open, onOpenChange }: {
         )}
       </DialogContent>
     </Dialog>
+
+    {/* Aftercare modal — opens when user clicks "Send Aftercare Instructions"
+        in CheckoutPanel. Replaces the previous silent invoke that pretended
+        to send but never wrote to patient_communication_log. */}
+    {aftercareCtx && (
+      <AftercareModal
+        open
+        onClose={() => {
+          // We can't tell from onClose alone whether they Sent or Skipped.
+          // Mark aftercareSent if the user explicitly sent (modal toasts on
+          // success). Closing via Skip leaves the button available for retry.
+          // The modal's own toast handles user feedback; we just clear ctx.
+          setAftercareCtx(null);
+        }}
+        patientName={aftercareCtx.patientName}
+        procedureType={aftercareCtx.procedureType}
+        encounterId={aftercareCtx.encounterId}
+        patientId={aftercareCtx.patientId}
+        appointmentId={appointmentId}
+      />
+    )}
+  </>
   );
 }

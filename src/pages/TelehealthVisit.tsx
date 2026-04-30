@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { format, parseISO, differenceInYears, differenceInSeconds } from "date-fns";
 import { TelehealthRx } from "@/pages/Prescriptions";
 import { LabReferenceStrip } from "@/components/clinical/LabReferenceChip";
+import { AftercareModal } from "@/components/clinical/AftercareModal";
 
 // ── Intake Review Panel (reusable) ──
 export function IntakeReviewPanel({ appointmentId, patientId }: { appointmentId?: string; patientId: string }) {
@@ -502,7 +503,9 @@ export default function TelehealthVisit() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [callEnded, setCallEnded] = useState(false);
-  const [aftercareSending, setAftercareSending] = useState(false);
+  // Phase 3 #2: Aftercare goes through a review modal now (AftercareModal),
+  // not auto-send. State just tracks whether to show the modal after sign.
+  const [showAftercare, setShowAftercare] = useState(false);
 
   const { data: appointment, isLoading } = useQuery({
     queryKey: ["telehealth-apt", appointmentId],
@@ -546,46 +549,26 @@ export default function TelehealthVisit() {
     toast.success("Call ended. Complete your documentation below.");
   };
 
-  // Auto-send aftercare on chart sign
-  const sendAutoAftercare = async () => {
-    if (!appointment || aftercareSending) return;
-    setAftercareSending(true);
-    try {
-      await supabase.functions.invoke("ai-aftercare-message", {
-        body: {
-          encounter_id: encounter?.id,
-          procedure_type: appointment.treatments?.name || "Telehealth Visit",
-          patient_name: `${appointment.patients?.first_name} ${appointment.patients?.last_name}`,
-          auto_send: true,
-        },
-      });
-      toast.success("Aftercare instructions sent to patient");
-    } catch {
-      toast.error("Could not auto-send aftercare");
-    }
-    setAftercareSending(false);
-  };
-
   const signAndClose = async () => {
     if (!encounter?.id) return;
     await supabase.from("encounters").update({ status: "signed" as any, signed_at: new Date().toISOString() }).eq("id", encounter.id);
     await supabase.from("appointments").update({ status: "completed" as any, completed_at: new Date().toISOString() }).eq("id", appointmentId!);
 
-    // Run aftercare + telehealth summary in parallel
-    await Promise.allSettled([
-      sendAutoAftercare(),
-      supabase.functions.invoke("ai-checkout-review", {
-        body: { appointment_id: appointmentId, mode: "telehealth_summary" },
-      }).then(({ data }) => {
-        if (data?.visit_summary) {
-          toast.info(`Follow-up in ${data.follow_up_days || 14} days`, { description: data.follow_up_recommendation });
-        }
-      }),
-    ]);
+    // Run the telehealth summary in the background; aftercare now goes through
+    // a review modal (opened below), not auto-send.
+    void supabase.functions.invoke("ai-checkout-review", {
+      body: { appointment_id: appointmentId, mode: "telehealth_summary" },
+    }).then(({ data }) => {
+      if (data?.visit_summary) {
+        toast.info(`Follow-up in ${data.follow_up_days || 14} days`, { description: data.follow_up_recommendation });
+      }
+    });
 
     queryClient.invalidateQueries({ queryKey: ["telehealth-apt"] });
     toast.success("Encounter signed & closed");
-    navigate("/provider-day");
+    // Open the aftercare review modal. When the provider clicks Send or Skip,
+    // its onClose handler navigates back to /provider-day.
+    setShowAftercare(true);
   };
 
   if (isLoading) {
@@ -655,6 +638,27 @@ export default function TelehealthVisit() {
           </Tabs>
         </ResizablePanel>
       </ResizablePanelGroup>
+
+      {/* Aftercare review modal — opens after Sign & Close. Replaces the
+          previous auto-send flow which was both an audit issue (unreviewed
+          AI content reaching the patient record) and silently broken at the
+          DB layer. The provider reviews/edits, then explicit Send writes
+          patient_communication_log; Skip closes without logging. Either way,
+          we then navigate back to /provider-day. */}
+      {encounter?.id && appointment && (
+        <AftercareModal
+          open={showAftercare}
+          onClose={() => {
+            setShowAftercare(false);
+            navigate("/provider-day");
+          }}
+          patientName={`${appointment.patients?.first_name ?? ""} ${appointment.patients?.last_name ?? ""}`.trim()}
+          procedureType={appointment.treatments?.name || "Telehealth Visit"}
+          encounterId={encounter.id}
+          patientId={appointment.patient_id}
+          appointmentId={appointmentId ?? null}
+        />
+      )}
     </div>
   );
 }
