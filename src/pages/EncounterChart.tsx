@@ -135,6 +135,16 @@ export default function EncounterChart() {
   const [safetyWarnings, setSafetyWarnings] = useState<string[]>([]);
   const [photosOpen, setPhotosOpen] = useState(false);
   const [reopenDialogOpen, setReopenDialogOpen] = useState(false);
+  // Phase 3 #4: pending AI SOAP overwrite confirmation. Holds the section
+  // key (subjective/objective/assessment/plan) that the user just clicked
+  // "AI Draft" on while existing content was present. Confirmation dialog
+  // then either replaces the section content or cancels.
+  const [aiSoapOverwriteSection, setAiSoapOverwriteSection] = useState<keyof typeof soapNotes | null>(null);
+  // Phase 3 #6: tightening of the Sign Anyway bypass. Provider must enter
+  // a reason and check the acknowledgment box before the destructive action
+  // is enabled. Reason + warnings are persisted to audit_logs.
+  const [bypassReason, setBypassReason] = useState("");
+  const [bypassAcknowledged, setBypassAcknowledged] = useState(false);
 
   // Auto-reopen the photos modal if we returned from the consent workflow
   // with ?reopenPhotos=1 in the URL.
@@ -331,8 +341,13 @@ export default function EncounterChart() {
     });
   }, []);
 
-  // AI SOAP generation
-  const generateAiSoap = async (section: keyof typeof soapNotes) => {
+  // Phase 3 #4: AI SOAP generation, with overwrite confirmation.
+  // The public entry point (`generateAiSoap`) is what the button calls.
+  // If the target section already has user-entered text, it opens a
+  // confirmation dialog and stops. The actual generation work is in
+  // `runAiSoap`, called either directly (empty section) or via the
+  // dialog's confirm handler.
+  const runAiSoap = async (section: keyof typeof soapNotes) => {
     setAiLoading(prev => ({ ...prev, [section]: true }));
     try {
       const template = templates?.find((t: any) => t.id === templateId);
@@ -360,6 +375,18 @@ export default function EncounterChart() {
     } finally {
       setAiLoading(prev => ({ ...prev, [section]: false }));
     }
+  };
+
+  const generateAiSoap = (section: keyof typeof soapNotes) => {
+    // If the section already has provider-entered content, route through the
+    // confirmation dialog instead of overwriting silently. Audit fix: the
+    // previous behavior could destroy a half-written assessment when the
+    // provider clicked AI Draft a second time or by accident.
+    if (soapNotes[section]?.trim()) {
+      setAiSoapOverwriteSection(section);
+      return;
+    }
+    void runAiSoap(section);
   };
 
   // Reopen a signed encounter for editing (status toggle back to in_progress)
@@ -759,7 +786,16 @@ export default function EncounterChart() {
       )}
 
       {/* Safety warnings dialog */}
-      <Dialog open={safetyWarnings.length > 0} onOpenChange={() => setSafetyWarnings([])}>
+      <Dialog
+        open={safetyWarnings.length > 0}
+        onOpenChange={(o) => {
+          if (!o) {
+            setSafetyWarnings([]);
+            setBypassReason("");
+            setBypassAcknowledged(false);
+          }
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-warning">
@@ -769,7 +805,7 @@ export default function EncounterChart() {
               The following safety-related fields are incomplete. Please review before signing.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-2 max-h-60 overflow-y-auto">
+          <div className="space-y-2 max-h-48 overflow-y-auto">
             {safetyWarnings.map((w, i) => (
               <div key={i} className="flex items-start gap-2 text-sm p-2 bg-warning/10 dark:bg-warning/20 rounded">
                 <AlertTriangle className="h-3.5 w-3.5 text-warning mt-0.5 shrink-0" />
@@ -777,16 +813,77 @@ export default function EncounterChart() {
               </div>
             ))}
           </div>
+          {/* Phase 3 #6: bypass requires an explicit reason and acknowledgment.
+              Audit fix — the previous one-click "Sign Anyway" was too low
+              friction for a destructive clinical action. The reason is
+              persisted to audit_logs alongside the warning list. */}
+          <div className="space-y-2 border-t pt-3 mt-1">
+            <Label htmlFor="bypass-reason" className="text-xs font-semibold">
+              Reason for signing with these gaps <span className="text-destructive">*</span>
+            </Label>
+            <Textarea
+              id="bypass-reason"
+              placeholder="e.g., Patient declined to provide medical history; documented refusal in chart."
+              value={bypassReason}
+              onChange={(e) => setBypassReason(e.target.value)}
+              rows={2}
+              className="text-sm"
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Required (minimum 10 characters). Logged for compliance review.
+            </p>
+            <div className="flex items-start gap-2 pt-1">
+              <Checkbox
+                id="bypass-ack"
+                checked={bypassAcknowledged}
+                onCheckedChange={(c) => setBypassAcknowledged(!!c)}
+                className="mt-0.5"
+              />
+              <Label htmlFor="bypass-ack" className="text-xs leading-snug cursor-pointer">
+                I acknowledge that signing with these gaps may impact patient safety and accept
+                clinical responsibility for this decision.
+              </Label>
+            </div>
+          </div>
           <DialogFooter className="gap-2">
-            <Button variant="ghost" size="sm" onClick={() => setSafetyWarnings([])}>
+            <Button variant="ghost" size="sm" onClick={() => {
+              setSafetyWarnings([]);
+              setBypassReason("");
+              setBypassAcknowledged(false);
+            }}>
               Go Back & Fix
             </Button>
             <Button
               variant="destructive"
               size="sm"
-              onClick={() => {
+              disabled={bypassReason.trim().length < 10 || !bypassAcknowledged}
+              onClick={async () => {
+                // Capture the audit row BEFORE clearing dialog state, so we
+                // record exactly what was bypassed. Insert is best-effort —
+                // a failed audit shouldn't block a sign that the provider
+                // has consciously chosen to make. Failures are logged to the
+                // console for ops review.
+                try {
+                  const { data: { user } } = await supabase.auth.getUser();
+                  if (user?.id && encounterId) {
+                    await supabase.from("audit_logs").insert({
+                      user_id: user.id,
+                      action: "encounter_sign_bypass",
+                      table_name: "encounters",
+                      record_id: encounterId,
+                      new_values: {
+                        warnings: safetyWarnings,
+                        reason: bypassReason.trim(),
+                        bypassed_at: new Date().toISOString(),
+                      },
+                    });
+                  }
+                } catch (e) {
+                  console.error("Failed to write Sign Anyway audit log:", e);
+                }
                 setSafetyWarnings([]);
-                // Force sign bypassing safety check
+                setBypassReason("");
+                setBypassAcknowledged(false);
                 setSaving(true);
                 saveEncounterForce();
               }}
@@ -1097,6 +1194,41 @@ export default function EncounterChart() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Phase 3 #4: AI SOAP overwrite confirmation. Shown when the provider
+          clicks "AI Draft" on a section that already contains text. Audit fix
+          — without this, an accidental click silently destroyed in-progress
+          assessment work with no undo. */}
+      <AlertDialog
+        open={aiSoapOverwriteSection !== null}
+        onOpenChange={(o) => { if (!o) setAiSoapOverwriteSection(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4" />
+              Replace existing {aiSoapOverwriteSection ?? ""}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This {aiSoapOverwriteSection ?? "section"} already has content. Generating an AI
+              draft will replace what you've written. Your existing text cannot be recovered
+              once replaced.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep my draft</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                const section = aiSoapOverwriteSection;
+                setAiSoapOverwriteSection(null);
+                if (section) void runAiSoap(section);
+              }}
+            >
+              Replace with AI draft
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Reopen-signed-chart confirmation. Replaces native confirm() so it's
           themed, focus-trapped, dark-mode aware, and can't be permanently
