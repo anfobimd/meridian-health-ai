@@ -77,49 +77,17 @@ type OrderSet = {
   is_auto_added: boolean;
 };
 
-/* ── Drug Interaction Alert Component ── */
+/* ── Drug Interaction Alert Component ──
+   Presentational only. Parent computes the alerts and signature so it can
+   detect when the alert set changes (e.g. a new med is added) and re-fire
+   even if a previous version of the alerts was dismissed. */
 function DrugInteractionBanner({
-  patientMeds,
-  allergies,
-  procedureType,
+  alerts,
   onDismiss,
 }: {
-  patientMeds: string[];
-  allergies: string[];
-  procedureType: string;
+  alerts: string[];
   onDismiss: () => void;
 }) {
-  const alerts = useMemo(() => {
-    const warnings: string[] = [];
-    const medsLower = patientMeds.map(m => m.toLowerCase());
-    const allergyLower = allergies.map(a => a.toLowerCase());
-    const procLower = procedureType.toLowerCase();
-
-    const isInjectableOrFiller = ["filler", "botox", "injection", "prp", "kybella"].some(k => procLower.includes(k));
-    const isLaser = ["laser", "ipl", "bbl", "resurfacing"].some(k => procLower.includes(k));
-
-    // Blood thinner warnings for injectables
-    if (isInjectableOrFiller) {
-      const thinners = ["aspirin", "warfarin", "coumadin", "plavix", "clopidogrel", "eliquis", "apixaban", "xarelto", "rivaroxaban", "ibuprofen", "advil", "motrin", "fish oil", "vitamin e"];
-      const found = medsLower.filter(m => thinners.some(t => m.includes(t)));
-      if (found.length) warnings.push(`Blood thinner risk: Patient takes ${found.join(", ")}. Increased bruising/bleeding risk with injectables.`);
-    }
-
-    // Accutane + laser
-    if (isLaser) {
-      const accutane = ["accutane", "isotretinoin", "claravis", "absorica"];
-      const found = medsLower.filter(m => accutane.some(a => m.includes(a)));
-      if (found.length) warnings.push(`Accutane/isotretinoin detected. Laser/IPL contraindicated for 6+ months post-treatment.`);
-    }
-
-    // Lidocaine allergy for injectables
-    if (isInjectableOrFiller && allergyLower.some(a => a.includes("lidocaine") || a.includes("novocaine"))) {
-      warnings.push(`Lidocaine/anesthetic allergy noted. Confirm numbing protocol before procedure.`);
-    }
-
-    return warnings;
-  }, [patientMeds, allergies, procedureType]);
-
   if (!alerts.length) return null;
 
   return (
@@ -159,7 +127,10 @@ export default function EncounterChart() {
   const [openSections, setOpenSections] = useState<Set<string>>(new Set());
   const [aiLoading, setAiLoading] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
-  const [drugAlertDismissed, setDrugAlertDismissed] = useState(false);
+  // Phase 3 #3: track which alert set was dismissed by content-hash, not a
+  // boolean, so the banner re-fires when meds change and the alert set
+  // expands. null means "never dismissed".
+  const [dismissedDrugAlertsSig, setDismissedDrugAlertsSig] = useState<string | null>(null);
   const [showAftercareModal, setShowAftercareModal] = useState(false);
   const [safetyWarnings, setSafetyWarnings] = useState<string[]>([]);
   const [photosOpen, setPhotosOpen] = useState(false);
@@ -585,6 +556,42 @@ export default function EncounterChart() {
   const patientAllergies = encounter?.patients?.allergies || [];
   const procedureType = activeTemplate?.name || encounter?.chief_complaint || "";
 
+  // Phase 3 #3: drug-interaction alerts computed in the parent so we can
+  // detect when the alert set changes (a med added mid-encounter) and
+  // re-fire even after a previous dismissal.
+  const drugAlerts = useMemo(() => {
+    const warnings: string[] = [];
+    const medsLower = (patientMeds as string[]).map(m => m.toLowerCase());
+    const allergyLower = (patientAllergies as string[]).map(a => a.toLowerCase());
+    const procLower = procedureType.toLowerCase();
+
+    const isInjectableOrFiller = ["filler", "botox", "injection", "prp", "kybella"].some(k => procLower.includes(k));
+    const isLaser = ["laser", "ipl", "bbl", "resurfacing"].some(k => procLower.includes(k));
+
+    if (isInjectableOrFiller) {
+      const thinners = ["aspirin", "warfarin", "coumadin", "plavix", "clopidogrel", "eliquis", "apixaban", "xarelto", "rivaroxaban", "ibuprofen", "advil", "motrin", "fish oil", "vitamin e"];
+      const found = medsLower.filter(m => thinners.some(t => m.includes(t)));
+      if (found.length) warnings.push(`Blood thinner risk: Patient takes ${found.join(", ")}. Increased bruising/bleeding risk with injectables.`);
+    }
+    if (isLaser) {
+      const accutane = ["accutane", "isotretinoin", "claravis", "absorica"];
+      const found = medsLower.filter(m => accutane.some(a => m.includes(a)));
+      if (found.length) warnings.push(`Accutane/isotretinoin detected. Laser/IPL contraindicated for 6+ months post-treatment.`);
+    }
+    if (isInjectableOrFiller && allergyLower.some(a => a.includes("lidocaine") || a.includes("novocaine"))) {
+      warnings.push(`Lidocaine/anesthetic allergy noted. Confirm numbing protocol before procedure.`);
+    }
+    return warnings;
+  }, [patientMeds, patientAllergies, procedureType]);
+
+  // Stable content-hash of the current alerts. Sorted so order doesn't matter.
+  // Used to compare against the user's last-dismissed signature; when these
+  // diverge, the banner re-fires.
+  const drugAlertsSignature = useMemo(
+    () => drugAlerts.slice().sort().join("||"),
+    [drugAlerts]
+  );
+
   // Template selection screen
   if (!templateId) {
     return (
@@ -742,13 +749,12 @@ export default function EncounterChart() {
         )}
       </div>
 
-      {/* Drug interaction alert */}
-      {!drugAlertDismissed && !isSigned && (patientMeds.length > 0 || patientAllergies.length > 0) && (
+      {/* Drug interaction alert. Re-fires if the alert set changes after a
+          previous dismissal (e.g. provider adds warfarin mid-encounter). */}
+      {!isSigned && drugAlerts.length > 0 && drugAlertsSignature !== dismissedDrugAlertsSig && (
         <DrugInteractionBanner
-          patientMeds={patientMeds}
-          allergies={patientAllergies}
-          procedureType={procedureType}
-          onDismiss={() => setDrugAlertDismissed(true)}
+          alerts={drugAlerts}
+          onDismiss={() => setDismissedDrugAlertsSig(drugAlertsSignature)}
         />
       )}
 
