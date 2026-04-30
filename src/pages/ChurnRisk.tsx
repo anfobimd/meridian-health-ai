@@ -137,30 +137,37 @@ export default function ChurnRisk() {
         })}
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search patients..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-          />
-        </div>
-        <Select value={tierFilter} onValueChange={setTierFilter}>
-          <SelectTrigger className="w-full sm:w-40">
-            <SelectValue placeholder="All tiers" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Tiers</SelectItem>
-            <SelectItem value="critical">Critical</SelectItem>
-            <SelectItem value="high">High</SelectItem>
-            <SelectItem value="medium">Medium</SelectItem>
-            <SelectItem value="low">Low</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      {/* Filters — disabled until we have scored patients to filter (QA #48) */}
+      {(() => {
+        const hasScores = (scores?.length ?? 0) > 0;
+        return (
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder={hasScores ? "Search patients..." : "Run AI Scoring first to enable search"}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9"
+                disabled={!hasScores}
+                title={hasScores ? "" : "No scored patients yet — click Run AI Scoring to populate the list"}
+              />
+            </div>
+            <Select value={tierFilter} onValueChange={setTierFilter} disabled={!hasScores}>
+              <SelectTrigger className="w-full sm:w-40">
+                <SelectValue placeholder="All tiers" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Tiers</SelectItem>
+                <SelectItem value="critical">Critical</SelectItem>
+                <SelectItem value="high">High</SelectItem>
+                <SelectItem value="medium">Medium</SelectItem>
+                <SelectItem value="low">Low</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        );
+      })()}
 
       {/* Table */}
       <Card>
@@ -262,6 +269,22 @@ export default function ChurnRisk() {
                       </TableRow>
                     );
                   })}
+                  {filtered.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center py-10 text-sm text-muted-foreground">
+                        No patients match {search ? `"${search}"` : "this filter"}.
+                        {(search || tierFilter !== "all") && (
+                          <button
+                            type="button"
+                            onClick={() => { setSearch(""); setTierFilter("all"); }}
+                            className="ml-2 text-primary hover:underline"
+                          >
+                            Clear filters
+                          </button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </div>

@@ -163,8 +163,13 @@ export default function Dashboard() {
     },
   });
 
+  // QA #46 — Action-count queries opt out of the global 60s staleTime so the
+  // KPI updates the moment the user returns from completing the action.
+  const COUNTERS_OPTS = { staleTime: 0, refetchOnMount: "always" as const };
+
   const { data: unsignedNotes } = useQuery({
     queryKey: ["dash-unsigned-notes"],
+    ...COUNTERS_OPTS,
     queryFn: async () => {
       const { data } = await supabase.from("clinical_notes").select("id, patients(first_name, last_name), created_at").eq("status", "draft").order("created_at", { ascending: false }).limit(10);
       return data ?? [];
@@ -173,6 +178,7 @@ export default function Dashboard() {
 
   const { data: pendingReviews } = useQuery({
     queryKey: ["dash-pending-reviews"],
+    ...COUNTERS_OPTS,
     queryFn: async () => {
       const { data } = await supabase.from("chart_review_records").select("id, ai_risk_tier, patients(first_name, last_name), created_at").in("status", ["pending_ai", "pending_md"]).order("ai_priority_score", { ascending: false }).limit(10);
       return data ?? [];
@@ -181,6 +187,7 @@ export default function Dashboard() {
 
   const { data: pendingApprovals } = useQuery({
     queryKey: ["dash-pending-approvals"],
+    ...COUNTERS_OPTS,
     queryFn: async () => {
       const { data } = await supabase.from("hormone_visits").select("id, patients(first_name, last_name), visit_date").eq("approval_status", "pending").order("visit_date", { ascending: false }).limit(10);
       return data ?? [];
@@ -189,6 +196,7 @@ export default function Dashboard() {
 
   const { data: atRiskPackages } = useQuery({
     queryKey: ["dash-at-risk-packages"],
+    ...COUNTERS_OPTS,
     queryFn: async () => {
       const { data } = await supabase.from("patient_package_purchases").select("id, sessions_used, sessions_total, expires_at, patients(first_name, last_name), service_packages(name)").eq("status", "active").not("expires_at", "is", null).order("expires_at", { ascending: true }).limit(10);
       const now = new Date();
@@ -202,6 +210,7 @@ export default function Dashboard() {
 
   const { data: overdueInvoices } = useQuery({
     queryKey: ["dash-overdue-invoices"],
+    ...COUNTERS_OPTS,
     queryFn: async () => {
       const { data } = await supabase.from("invoices").select("id, total, balance_due, due_date, patients(first_name, last_name)").in("status", ["sent", "overdue"]).lt("due_date", new Date().toISOString()).order("due_date", { ascending: true }).limit(10);
       return data ?? [];

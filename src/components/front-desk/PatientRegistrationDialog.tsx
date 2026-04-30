@@ -47,13 +47,24 @@ export function PatientRegistrationDialog({ open, onOpenChange }: Props) {
     return null;
   };
 
+  // QA #47 — email is optional, but if provided must be a valid format.
+  const validateEmail = (raw: string): string | null => {
+    const v = raw.trim();
+    if (!v) return null;
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)) return "Invalid email format (e.g. you@example.com)";
+    if (v.length > 255) return "Email too long";
+    return null;
+  };
+
   const firstNameError = form.first_name.length > 0 ? validateName(form.first_name) : null;
   const lastNameError = form.last_name.length > 0 ? validateName(form.last_name) : null;
+  const emailError = validateEmail(form.email);
   const basicInfoValid =
     form.first_name.trim().length > 0 &&
     form.last_name.trim().length > 0 &&
     !validateName(form.first_name) &&
-    !validateName(form.last_name);
+    !validateName(form.last_name) &&
+    !emailError;
 
   const runAiValidation = async () => {
     setValidating(true);
@@ -235,7 +246,17 @@ export function PatientRegistrationDialog({ open, onOpenChange }: Props) {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs">Email</Label>
-                <Input type="email" value={form.email} onChange={e => set("email", e.target.value)} />
+                <Input
+                  type="email"
+                  value={form.email}
+                  onChange={e => set("email", e.target.value)}
+                  aria-invalid={!!emailError}
+                  className={emailError ? "border-destructive focus-visible:ring-destructive" : ""}
+                  placeholder="patient@example.com"
+                  inputMode="email"
+                  maxLength={255}
+                />
+                {emailError && <p className="text-[11px] text-destructive">{emailError}</p>}
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs">Phone</Label>
@@ -249,7 +270,7 @@ export function PatientRegistrationDialog({ open, onOpenChange }: Props) {
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs">Sex at Birth</Label>
-                <select value={form.sex_at_birth} onChange={e => set("sex_at_birth", e.target.value)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                <select aria-label="Sex at birth" value={form.sex_at_birth} onChange={e => set("sex_at_birth", e.target.value)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
                   <option value="">—</option>
                   <option value="male">Male</option>
                   <option value="female">Female</option>
@@ -263,7 +284,7 @@ export function PatientRegistrationDialog({ open, onOpenChange }: Props) {
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Referral Source</Label>
-              <select value={form.referral_source} onChange={e => set("referral_source", e.target.value)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+              <select aria-label="Referral source" value={form.referral_source} onChange={e => set("referral_source", e.target.value)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
                 <option value="">—</option>
                 <option value="google">Google Search</option>
                 <option value="instagram">Instagram</option>
@@ -315,7 +336,7 @@ export function PatientRegistrationDialog({ open, onOpenChange }: Props) {
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Relationship</Label>
-              <select value={form.emergency_contact_relationship} onChange={e => set("emergency_contact_relationship", e.target.value)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+              <select aria-label="Emergency contact relationship" value={form.emergency_contact_relationship} onChange={e => set("emergency_contact_relationship", e.target.value)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
                 <option value="">—</option>
                 <option value="spouse">Spouse</option>
                 <option value="parent">Parent</option>
@@ -330,7 +351,7 @@ export function PatientRegistrationDialog({ open, onOpenChange }: Props) {
 
             <div className="space-y-1.5">
               <Label className="text-xs flex items-center gap-1"><Phone className="h-3 w-3" />Preferred Contact Channel</Label>
-              <select value={form.preferred_contact_channel} onChange={e => set("preferred_contact_channel", e.target.value)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+              <select aria-label="Preferred contact channel" value={form.preferred_contact_channel} onChange={e => set("preferred_contact_channel", e.target.value)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
                 <option value="sms">SMS</option>
                 <option value="email">Email</option>
                 <option value="phone">Phone Call</option>
