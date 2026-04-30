@@ -14,9 +14,19 @@ const CardHeader = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDiv
 );
 CardHeader.displayName = "CardHeader";
 
-const CardTitle = React.forwardRef<HTMLParagraphElement, React.HTMLAttributes<HTMLHeadingElement>>(
-  ({ className, ...props }, ref) => (
-    <h3 ref={ref} className={cn("text-2xl font-semibold leading-none tracking-tight", className)} {...props} />
+// Phase 3 #8: CardTitle is now polymorphic — accepts an `as` prop so the
+// caller can pick the appropriate heading level for the page's heading
+// hierarchy. Defaults to h3 to preserve the existing behavior at every
+// existing call site (no-op for current code; opt-in for new fixes).
+type HeadingTag = "h1" | "h2" | "h3" | "h4" | "h5" | "h6";
+
+interface CardTitleProps extends React.HTMLAttributes<HTMLHeadingElement> {
+  as?: HeadingTag;
+}
+
+const CardTitle = React.forwardRef<HTMLHeadingElement, CardTitleProps>(
+  ({ className, as: Tag = "h3", ...props }, ref) => (
+    <Tag ref={ref} className={cn("text-2xl font-semibold leading-none tracking-tight", className)} {...props} />
   ),
 );
 CardTitle.displayName = "CardTitle";

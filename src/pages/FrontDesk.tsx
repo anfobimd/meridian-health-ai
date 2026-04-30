@@ -229,9 +229,18 @@ export default function FrontDesk() {
       const existingId = formData.get("existing_patient_id") as string;
       let patientId = existingId;
       if (!existingId) {
+        // Phase 3 #5: guard against creating ghost patient records. Without
+        // an existing patient AND without first/last name, the previous
+        // form would silently insert {first_name: "", last_name: ""} into
+        // patients, producing rows that can't be searched or contacted.
+        const firstName = (formData.get("first_name") as string ?? "").trim();
+        const lastName = (formData.get("last_name") as string ?? "").trim();
+        if (!firstName || !lastName) {
+          throw new Error("First name and last name are required for new walk-ins");
+        }
         const { data: newPatient, error: patErr } = await supabase.from("patients").insert({
-          first_name: formData.get("first_name") as string,
-          last_name: formData.get("last_name") as string,
+          first_name: firstName,
+          last_name: lastName,
           date_of_birth: formData.get("dob") as string || null,
           phone: formData.get("phone") as string || null,
         }).select("id").single();
@@ -428,10 +437,16 @@ export default function FrontDesk() {
               </select>
             </div>
             <Separator />
-            <p className="text-xs text-muted-foreground">Or create a new patient:</p>
+            <p className="text-xs text-muted-foreground">Or create a new patient (first &amp; last name required):</p>
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1"><Label className="text-xs">First Name</Label><Input name="first_name" /></div>
-              <div className="space-y-1"><Label className="text-xs">Last Name</Label><Input name="last_name" /></div>
+              <div className="space-y-1">
+                <Label htmlFor="walkin-first" className="text-xs">First Name</Label>
+                <Input id="walkin-first" name="first_name" autoComplete="given-name" />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="walkin-last" className="text-xs">Last Name</Label>
+                <Input id="walkin-last" name="last_name" autoComplete="family-name" />
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1"><Label className="text-xs">DOB</Label><Input name="dob" type="date" /></div>
