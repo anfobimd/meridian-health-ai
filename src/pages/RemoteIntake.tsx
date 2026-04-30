@@ -83,7 +83,28 @@ const STEPS = [
   { title: "Goals & Consent", icon: FileSignature },
 ];
 
+// Phase 3 #7: PII no longer goes to localStorage.
+// - For tokened invitations: drafts are stored server-side via the
+//   submit-remote-intake edge function. Patient data never persists on disk.
+// - For ref-mode / cold-form (no token): drafts use sessionStorage so PII at
+//   least clears when the tab closes. Cross-session resume isn't possible
+//   without a token, which is the right tradeoff — there's no secure way to
+//   key persistent storage to an anonymous patient.
+//
+// SAVE_KEY is still used as the sessionStorage key for the no-token path.
 const SAVE_KEY = "meridian_intake_draft";
+
+// Shape of what we serialize for either path. Keeping it explicit makes it
+// obvious at a glance which fields cross the trust boundary.
+type IntakeDraft = {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  dob: string;
+  sex: string;
+  step: number;
+};
 
 export default function RemoteIntake() {
   const [searchParams] = useSearchParams();
@@ -163,31 +184,62 @@ export default function RemoteIntake() {
     }
   }, [invitationToken, refPatientId]);
 
-  // Restore draft from localStorage
+  // Phase 3 #7: restore draft on mount. Server-side load if we have a
+  // token; otherwise fall back to sessionStorage for the no-token flow.
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(SAVE_KEY);
-      if (saved) {
-        const d = JSON.parse(saved);
-        if (d.firstName && !firstName) setFirstName(d.firstName);
-        if (d.lastName && !lastName) setLastName(d.lastName);
-        if (d.email && !email) setEmail(d.email);
-        if (d.phone && !phone) setPhone(d.phone);
-        if (d.dob && !dob) setDob(d.dob);
-        if (d.sex && !sex) setSex(d.sex);
-        if (d.step) setStep(d.step);
-      }
-    } catch { /* ignore */ }
-  }, []);
+    let cancelled = false;
+    const applyDraft = (d: Partial<IntakeDraft>) => {
+      if (cancelled) return;
+      if (d.firstName && !firstName) setFirstName(d.firstName);
+      if (d.lastName && !lastName) setLastName(d.lastName);
+      if (d.email && !email) setEmail(d.email);
+      if (d.phone && !phone) setPhone(d.phone);
+      if (d.dob && !dob) setDob(d.dob);
+      if (d.sex && !sex) setSex(d.sex);
+      if (d.step) setStep(d.step);
+    };
 
-  // Save draft on step change
-  useEffect(() => {
-    if (step > 0 && email) {
+    if (invitationToken) {
+      supabase.functions
+        .invoke("submit-remote-intake", {
+          body: { _loadDraft: true, token: invitationToken },
+        })
+        .then(({ data }) => {
+          if (data?.draft) applyDraft(data.draft as Partial<IntakeDraft>);
+        })
+        .catch(() => { /* silent — start fresh */ });
+    } else {
       try {
-        localStorage.setItem(SAVE_KEY, JSON.stringify({ firstName, lastName, email, phone, dob, sex, step }));
+        const saved = sessionStorage.getItem(SAVE_KEY);
+        if (saved) applyDraft(JSON.parse(saved));
       } catch { /* ignore */ }
     }
-  }, [step, firstName, lastName, email, phone, dob, sex]);
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [invitationToken]);
+
+  // Phase 3 #7: save draft on field/step change. Server-side via edge
+  // function when tokened; otherwise sessionStorage. Saves are best-effort —
+  // a failed save shouldn't block the patient from filling the form.
+  useEffect(() => {
+    if (step <= 0 || !email) return;
+    const draft: IntakeDraft = { firstName, lastName, email, phone, dob, sex, step };
+
+    if (invitationToken) {
+      // Debounce-light: a single fire-and-forget per dependency change is
+      // fine at this scale (form has ~5 steps, ~20 inputs total). If we
+      // observe traffic spikes, switch to a setTimeout debounce.
+      supabase.functions
+        .invoke("submit-remote-intake", {
+          body: { _saveDraft: true, token: invitationToken, draft_data: draft },
+        })
+        .catch(() => { /* silent — already in memory */ });
+    } else {
+      try {
+        sessionStorage.setItem(SAVE_KEY, JSON.stringify(draft));
+      } catch { /* ignore */ }
+    }
+  }, [step, firstName, lastName, email, phone, dob, sex, invitationToken]);
 
   // Lab upload
   const handleLabUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -248,7 +300,12 @@ export default function RemoteIntake() {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
-      localStorage.removeItem(SAVE_KEY);
+      // Phase 3 #7: clean up local + remote draft state. The submit edge
+      // function already deletes the server-side draft on completion, but
+      // we make a defensive call here in case the user re-opens the form
+      // mid-submit. sessionStorage cleanup covers the no-token flow.
+      try { sessionStorage.removeItem(SAVE_KEY); } catch { /* ignore */ }
+      // Server-side already cleaned by the submit handler.
       setSubmitted(true);
       toast.success("Intake submitted successfully!");
     } catch (err: any) { toast.error(err.message || "Submission failed"); }

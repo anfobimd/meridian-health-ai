@@ -6,6 +6,11 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Phase 3 #7: cap on draft payload size (50KB). The intake form has
+// ~25 string fields — well under this — so anything larger is a misuse
+// or an attempt to fill the table.
+const MAX_DRAFT_BYTES = 50_000;
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -49,6 +54,98 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ success: true, invitation: inv }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    // ─── Phase 3 #7: server-side draft persistence ─────────────────────────
+    // Replaces localStorage as the storage location for in-progress patient
+    // PII (name, email, phone, DOB). Tokened-invitation patients only;
+    // cold-form / ref-mode users keep working but their drafts live only in
+    // the browser session (sessionStorage, cleared on tab close — handled
+    // client-side).
+    //
+    // All three actions verify that the invitation exists and isn't already
+    // completed before touching the drafts table. The FK constraint on
+    // remote_intake_drafts.token also prevents writing fabricated tokens.
+
+    if ((body._loadDraft || body._saveDraft || body._deleteDraft) && body.token) {
+      const supabaseAdmin = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      );
+
+      // Verify the invitation exists. Don't reveal whether the token is
+      // wrong vs. expired — same 404 either way.
+      const { data: inv } = await supabaseAdmin
+        .from("intake_invitations")
+        .select("status, expires_at")
+        .eq("token", body.token)
+        .maybeSingle();
+      if (!inv) {
+        return new Response(JSON.stringify({ error: "Invalid token" }), {
+          status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (inv.status === "completed") {
+        return new Response(JSON.stringify({ error: "Intake already submitted" }), {
+          status: 410, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (inv.expires_at && new Date(inv.expires_at) < new Date()) {
+        return new Response(JSON.stringify({ error: "Invitation expired" }), {
+          status: 410, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      if (body._loadDraft) {
+        const { data: draft } = await supabaseAdmin
+          .from("remote_intake_drafts")
+          .select("draft_data, updated_at")
+          .eq("token", body.token)
+          .maybeSingle();
+        return new Response(JSON.stringify({
+          success: true,
+          draft: draft?.draft_data ?? null,
+          updated_at: draft?.updated_at ?? null,
+        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      if (body._saveDraft) {
+        const data = body.draft_data;
+        if (typeof data !== "object" || data === null || Array.isArray(data)) {
+          return new Response(JSON.stringify({ error: "draft_data must be an object" }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const serialized = JSON.stringify(data);
+        if (serialized.length > MAX_DRAFT_BYTES) {
+          return new Response(JSON.stringify({ error: "Draft too large" }), {
+            status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const { error: upsertErr } = await supabaseAdmin
+          .from("remote_intake_drafts")
+          .upsert({
+            token: body.token,
+            draft_data: data,
+            expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          }, { onConflict: "token" });
+        if (upsertErr) {
+          console.error("Draft save error:", upsertErr);
+          return new Response(JSON.stringify({ error: "Save failed" }), {
+            status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        return new Response(JSON.stringify({ success: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      if (body._deleteDraft) {
+        await supabaseAdmin.from("remote_intake_drafts").delete().eq("token", body.token);
+        return new Response(JSON.stringify({ success: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
     const {
@@ -213,6 +310,11 @@ Deno.serve(async (req) => {
           completed_at: new Date().toISOString(),
           intake_form_id: intakeForm?.id || null,
         }).eq("token", invitation_token);
+        // Phase 3 #7: also clean up the server-side draft once submission
+        // succeeds. CASCADE on the FK would do this for us if the invitation
+        // were deleted, but we mark them completed instead, so the draft
+        // needs an explicit clear here. Best-effort.
+        await supabaseAdmin.from("remote_intake_drafts").delete().eq("token", invitation_token);
       } catch (e) {
         console.error("Invitation update error:", e);
       }
