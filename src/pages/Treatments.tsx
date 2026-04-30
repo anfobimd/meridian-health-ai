@@ -62,7 +62,7 @@ export default function Treatments() {
         requires_md_review: formData.get("requires_md_review") === "on",
         bookable_via_self_serve: formData.get("bookable_via_self_serve") === "on",
       };
-      const { error } = await supabase.from("treatments").insert(treatment);
+      const { error } = await supabase.from("treatments").insert(treatment as any);
       if (error) throw error;
       await supabase.from("audit_logs").insert({ user_id: user?.id, action: "create", table_name: "treatments", new_values: treatment });
     },
@@ -86,7 +86,7 @@ export default function Treatments() {
 
   const toggleFlag = useMutation({
     mutationFn: async ({ id, field, value }: { id: string; field: "requires_gfe" | "requires_md_review" | "bookable_via_self_serve"; value: boolean }) => {
-      const { error } = await supabase.from("treatments").update({ [field]: value }).eq("id", id);
+      const { error } = await supabase.from("treatments").update({ [field]: value } as any).eq("id", id);
       if (error) throw error;
       await supabase.from("audit_logs").insert({ user_id: user?.id, action: "update", table_name: "treatments", record_id: id, new_values: { [field]: value } });
     },
