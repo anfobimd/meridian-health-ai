@@ -22,17 +22,17 @@ import { format, parseISO } from "date-fns";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 const approvalBadge: Record<string, { label: string; class: string; icon: any }> = {
-  pending: { label: "Pending Review", class: "bg-amber-100 text-amber-800 border-amber-200", icon: Clock },
+  pending: { label: "Pending Review", class: "bg-warning/10 text-warning border-warning/30", icon: Clock },
   approved: { label: "Approved", class: "bg-emerald-100 text-emerald-800 border-emerald-200", icon: CheckCircle },
-  modified: { label: "Modified & Approved", class: "bg-blue-100 text-blue-800 border-blue-200", icon: Edit3 },
-  rejected: { label: "Rejected", class: "bg-red-100 text-red-800 border-red-200", icon: XCircle },
+  modified: { label: "Modified & Approved", class: "bg-info/10 text-info border-info/30", icon: Edit3 },
+  rejected: { label: "Rejected", class: "bg-destructive/10 text-destructive border-destructive/30", icon: XCircle },
 };
 
 const riskLevelColors: Record<string, string> = {
   low: "bg-emerald-50 border-emerald-200 text-emerald-900",
-  medium: "bg-amber-50 border-amber-200 text-amber-900",
-  high: "bg-orange-50 border-orange-200 text-orange-900",
-  critical: "bg-red-50 border-red-200 text-red-900",
+  medium: "bg-warning/10 border-warning/30 text-warning",
+  high: "bg-warning/10 border-warning/30 text-warning",
+  critical: "bg-destructive/10 border-destructive/30 text-destructive",
 };
 
 export default function PhysicianApproval() {
@@ -216,7 +216,7 @@ export default function PhysicianApproval() {
                     {/* Focus Tags */}
                     <div className="flex flex-wrap gap-1 flex-1">
                       {(visit.intake_focus || []).slice(0, 3).map((f: string) => (
-                        <Badge key={f} variant="outline" className="text-[10px] px-1.5 py-0">
+                        <Badge key={f} variant="outline" className="text-[11px] px-1.5 py-0">
                           {f.replace("hormone_", "").replace("peptide_", "").replace(/_/g, " ")}
                         </Badge>
                       ))}
@@ -227,7 +227,7 @@ export default function PhysicianApproval() {
                       <span className="text-xs text-muted-foreground">
                         {format(parseISO(visit.visit_date), "MMM d, yyyy")}
                       </span>
-                      <Badge className={`${badge.class} border text-[10px] gap-1`}>
+                      <Badge className={`${badge.class} border text-[11px] gap-1`}>
                         <BadgeIcon className="h-3 w-3" />
                         {badge.label}
                       </Badge>
@@ -273,7 +273,7 @@ export default function PhysicianApproval() {
                     </div>
                     <div className="flex flex-wrap gap-1">
                       {(currentVisit.peptide_contraindications as string[]).map((c: string) => (
-                        <Badge key={c} variant="destructive" className="text-[10px]">{c}</Badge>
+                        <Badge key={c} variant="destructive" className="text-[11px]">{c}</Badge>
                       ))}
                     </div>
                   </div>
@@ -281,7 +281,7 @@ export default function PhysicianApproval() {
 
                 {/* Clinical Summary - read-only */}
                 <div className="p-3 bg-primary/5 rounded-lg">
-                  <p className="text-[10px] font-bold text-primary uppercase tracking-wider mb-1">Clinical Summary</p>
+                  <p className="text-[11px] font-bold text-primary uppercase tracking-wider mb-1">Clinical Summary</p>
                   <p className="text-sm">{aiSections.summary}</p>
                 </div>
 
@@ -350,7 +350,7 @@ export default function PhysicianApproval() {
                     <div className="flex items-center gap-2">
                       <FileText className="h-4 w-4 text-primary" />
                       <span className="text-sm font-medium">Treatment Plan</span>
-                      <Badge variant="outline" className="text-[9px] ml-1">editable</Badge>
+                      <Badge variant="outline" className="text-[11px] ml-1">editable</Badge>
                     </div>
                     {expandedSections.treatment ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                   </button>
@@ -364,12 +364,12 @@ export default function PhysicianApproval() {
                       />
                       {editedTreatment !== (aiSections.treatment_recommendation || "") && (
                         <div className="flex items-center gap-2 mt-2">
-                          <Edit3 className="h-3 w-3 text-amber-600" />
-                          <span className="text-[10px] text-amber-600 font-medium">Modified from AI original</span>
+                          <Edit3 className="h-3 w-3 text-warning" />
+                          <span className="text-[11px] text-warning font-medium">Modified from AI original</span>
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="text-[10px] h-6 ml-auto"
+                            className="text-[11px] h-6 ml-auto"
                             onClick={() => setEditedTreatment(aiSections.treatment_recommendation || "")}
                           >
                             Reset to AI version
@@ -389,7 +389,7 @@ export default function PhysicianApproval() {
                     <div className="flex items-center gap-2">
                       <FlaskConical className="h-4 w-4 text-primary" />
                       <span className="text-sm font-medium">Monitoring Plan</span>
-                      <Badge variant="outline" className="text-[9px] ml-1">editable</Badge>
+                      <Badge variant="outline" className="text-[11px] ml-1">editable</Badge>
                     </div>
                     {expandedSections.monitoring ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                   </button>
@@ -403,12 +403,12 @@ export default function PhysicianApproval() {
                       />
                       {editedMonitoring !== (aiSections.monitoring_plan || "") && (
                         <div className="flex items-center gap-2 mt-2">
-                          <Edit3 className="h-3 w-3 text-amber-600" />
-                          <span className="text-[10px] text-amber-600 font-medium">Modified from AI original</span>
+                          <Edit3 className="h-3 w-3 text-warning" />
+                          <span className="text-[11px] text-warning font-medium">Modified from AI original</span>
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="text-[10px] h-6 ml-auto"
+                            className="text-[11px] h-6 ml-auto"
                             onClick={() => setEditedMonitoring(aiSections.monitoring_plan || "")}
                           >
                             Reset to AI version
@@ -494,7 +494,7 @@ export default function PhysicianApproval() {
                       const val = (currentVisit as any)[k];
                       return val != null ? (
                         <div key={k} className="bg-muted/50 rounded px-2 py-1">
-                          <p className="text-[10px] text-muted-foreground">{l}</p>
+                          <p className="text-[11px] text-muted-foreground">{l}</p>
                           <p className="text-sm font-medium">{val}</p>
                         </div>
                       ) : null;

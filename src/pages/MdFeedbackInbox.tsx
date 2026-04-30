@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
 const statusColors: Record<string, string> = {
   approved: "bg-primary/10 text-primary",
   corrected: "bg-destructive/10 text-destructive",
-  pending_review: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200",
+  pending_review: "bg-warning/10 text-warning dark:bg-warning dark:text-warning",
   pending_ai: "bg-muted text-muted-foreground",
   acknowledged: "bg-muted text-muted-foreground",
 };
@@ -149,7 +149,7 @@ export default function MdFeedbackInbox() {
             className="text-xs"
             onClick={() => setFilter(key)}
           >
-            {label} {(count ?? 0) > 0 && <Badge variant="secondary" className="ml-1.5 text-[10px] h-4 px-1.5">{count}</Badge>}
+            {label} {(count ?? 0) > 0 && <Badge variant="secondary" className="ml-1.5 text-[11px] h-4 px-1.5">{count}</Badge>}
           </Button>
         ))}
       </div>
@@ -200,7 +200,7 @@ export default function MdFeedbackInbox() {
                       <div className="min-w-0">
                         <p className="font-medium text-sm flex items-center gap-2">
                           {r.patients?.first_name} {r.patients?.last_name}
-                          <Badge className={cn("text-[10px]", statusColors[r.status] || "")}>
+                          <Badge className={cn("text-[11px]", statusColors[r.status] || "")}>
                             {r.status === "corrected" ? "Correction Required" : r.status.replace("_", " ")}
                           </Badge>
                         </p>
@@ -213,7 +213,7 @@ export default function MdFeedbackInbox() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-[10px] text-muted-foreground">
+                      <span className="text-[11px] text-muted-foreground">
                         {format(new Date(r.updated_at), "MMM d, h:mm a")}
                       </span>
                       {isExpanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
@@ -248,7 +248,7 @@ export default function MdFeedbackInbox() {
                       {/* Risk & review metadata */}
                       {(r.ai_risk_tier || r.review_duration_seconds) && (
                         <div className="flex gap-3 text-xs text-muted-foreground">
-                          {r.ai_risk_tier && <span>Risk: <Badge variant="outline" className="text-[10px]">{r.ai_risk_tier}</Badge></span>}
+                          {r.ai_risk_tier && <span>Risk: <Badge variant="outline" className="text-[11px]">{r.ai_risk_tier}</Badge></span>}
                           {r.review_duration_seconds && <span>Review time: {r.review_duration_seconds}s</span>}
                         </div>
                       )}

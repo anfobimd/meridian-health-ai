@@ -251,7 +251,7 @@ export default function Waitlist() {
             <CardTitle className="text-sm flex items-center gap-2">
               <Zap className="h-4 w-4 text-warning" />
               Predicted Cancellations — Tomorrow
-              <Badge variant="secondary" className="text-[10px]">{cancelPredictions.length}</Badge>
+              <Badge variant="secondary" className="text-[11px]">{cancelPredictions.length}</Badge>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -262,12 +262,12 @@ export default function Waitlist() {
                     <span className="font-medium">{p.patient_name}</span>
                     <span className="text-muted-foreground ml-2">{p.treatment} • {format(new Date(p.scheduled_at), "h:mm a")}</span>
                   </div>
-                  <Badge variant={p.risk_level === "high" ? "destructive" : "secondary"} className="text-[9px]">
+                  <Badge variant={p.risk_level === "high" ? "destructive" : "secondary"} className="text-[11px]">
                     {p.cancel_probability}% risk
                   </Badge>
                 </div>
               ))}
-              <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+              <p className="text-[11px] text-muted-foreground flex items-center gap-1">
                 <Brain className="h-2.5 w-2.5" />Pre-notify these patients or prepare waitlist backfills
               </p>
             </div>
@@ -285,9 +285,9 @@ export default function Waitlist() {
               <p className="text-sm font-medium">{smsTarget?.patients?.first_name} {smsTarget?.patients?.last_name} — {smsTarget?.patients?.phone || "No phone"}</p>
             </div>
             <div className="space-y-2">
-              <Label className="flex items-center gap-1">Message <Sparkles className="h-3 w-3 text-primary" /><span className="text-[10px] text-primary">AI-drafted</span></Label>
+              <Label className="flex items-center gap-1">Message <Sparkles className="h-3 w-3 text-primary" /><span className="text-[11px] text-primary">AI-drafted</span></Label>
               <Input value={smsDraft} onChange={(e) => setSmsDraft(e.target.value)} />
-              <p className="text-[10px] text-muted-foreground">{smsDraft.length}/160 characters</p>
+              <p className="text-[11px] text-muted-foreground">{smsDraft.length}/160 characters</p>
             </div>
             <Button onClick={sendSlotSms} className="w-full" disabled={sendingSms || !smsTarget?.patients?.phone}>
               {sendingSms ? "Sending..." : "Send SMS"}
@@ -309,7 +309,7 @@ export default function Waitlist() {
                       {idx === 0 ? <TrendingUp className="h-5 w-5 text-primary" /> : <Clock className="h-5 w-5 text-primary" />}
                     </div>
                     {(w as any).priority_score != null && (
-                      <Badge variant="outline" className={cn("text-[9px] px-1.5", scoreColor((w as any).priority_score))}>
+                      <Badge variant="outline" className={cn("text-[11px] px-1.5", scoreColor((w as any).priority_score))}>
                         {(w as any).priority_score}
                       </Badge>
                     )}
@@ -317,7 +317,7 @@ export default function Waitlist() {
                   <div>
                     <p className="text-sm font-medium">
                       {w.patients?.first_name} {w.patients?.last_name}
-                      {idx === 0 && <Badge className="ml-2 text-[9px] bg-primary/10 text-primary border-primary/20">Top Match</Badge>}
+                      {idx === 0 && <Badge className="ml-2 text-[11px] bg-primary/10 text-primary border-primary/20">Top Match</Badge>}
                     </p>
                     <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                       {w.treatments?.name && <Badge variant="outline" className="text-xs">{w.treatments.name}</Badge>}
@@ -327,13 +327,13 @@ export default function Waitlist() {
                       )}
                     </div>
                     {(w as any).ai_rank_reason && (
-                      <p className="text-[10px] text-primary mt-0.5 flex items-center gap-1"><Sparkles className="h-2.5 w-2.5" />{(w as any).ai_rank_reason}</p>
+                      <p className="text-[11px] text-primary mt-0.5 flex items-center gap-1"><Sparkles className="h-2.5 w-2.5" />{(w as any).ai_rank_reason}</p>
                     )}
                     {w.notes && <p className="text-xs text-muted-foreground mt-0.5">{w.notes}</p>}
                     <div className="flex items-center gap-2 mt-0.5">
-                      <p className="text-[10px] text-muted-foreground">Added {format(new Date(w.created_at), "MMM d 'at' h:mm a")}</p>
+                      <p className="text-[11px] text-muted-foreground">Added {format(new Date(w.created_at), "MMM d 'at' h:mm a")}</p>
                       {(w as any).auto_notified_at && (
-                        <Badge variant="outline" className="text-[9px] gap-0.5"><MessageSquare className="h-2 w-2" />Notified</Badge>
+                        <Badge variant="outline" className="text-[11px] gap-0.5"><MessageSquare className="h-2 w-2" />Notified</Badge>
                       )}
                     </div>
                   </div>

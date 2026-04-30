@@ -315,35 +315,35 @@ export default function Packages() {
           <CardContent className="p-4 text-center">
             <Package className="h-5 w-5 mx-auto text-primary mb-1" />
             <p className="text-2xl font-bold font-mono">{activePurchases.length}</p>
-            <p className="text-[10px] text-muted-foreground">Active Packages</p>
+            <p className="text-[11px] text-muted-foreground">Active Packages</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4 text-center">
             <DollarSign className="h-5 w-5 mx-auto text-warning mb-1" />
             <p className="text-2xl font-bold font-mono">${totalDeferred.toFixed(0)}</p>
-            <p className="text-[10px] text-muted-foreground">Deferred Revenue</p>
+            <p className="text-[11px] text-muted-foreground">Deferred Revenue</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4 text-center">
             <TrendingUp className="h-5 w-5 mx-auto text-success mb-1" />
             <p className="text-2xl font-bold font-mono">${totalRecognized.toFixed(0)}</p>
-            <p className="text-[10px] text-muted-foreground">Recognized Revenue</p>
+            <p className="text-[11px] text-muted-foreground">Recognized Revenue</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4 text-center">
             <CheckCircle className="h-5 w-5 mx-auto text-primary mb-1" />
             <p className="text-2xl font-bold font-mono">{completionRate}%</p>
-            <p className="text-[10px] text-muted-foreground">Completion Rate</p>
+            <p className="text-[11px] text-muted-foreground">Completion Rate</p>
           </CardContent>
         </Card>
         <Card className={atRiskCount > 0 ? "border-destructive/30" : ""}>
           <CardContent className="p-4 text-center">
             <AlertTriangle className={`h-5 w-5 mx-auto mb-1 ${atRiskCount > 0 ? "text-destructive" : "text-muted-foreground"}`} />
             <p className="text-2xl font-bold font-mono">{atRiskCount}</p>
-            <p className="text-[10px] text-muted-foreground">At Risk</p>
+            <p className="text-[11px] text-muted-foreground">At Risk</p>
           </CardContent>
         </Card>
       </div>
@@ -400,7 +400,7 @@ export default function Packages() {
                   </div>
                   <div className="flex items-center gap-3">
                     {item.revenue_at_risk && <span className="text-xs text-destructive font-mono">{item.revenue_at_risk}</span>}
-                    <Badge variant="destructive" className="text-[10px]">{item.risk_score}</Badge>
+                    <Badge variant="destructive" className="text-[11px]">{item.risk_score}</Badge>
                   </div>
                 </div>
               ))}
@@ -529,10 +529,10 @@ export default function Packages() {
                   <div className="flex items-start justify-between mb-3">
                     <div>
                       <h3 className="font-semibold text-sm">{pkg.name}</h3>
-                      {pkg.category && <Badge variant="outline" className="text-[10px] mt-1">{pkg.category}</Badge>}
+                      {pkg.category && <Badge variant="outline" className="text-[11px] mt-1">{pkg.category}</Badge>}
                     </div>
                     <div className="flex items-center gap-1">
-                      <Badge variant="secondary" className="text-[10px] capitalize">{pkg.package_type}</Badge>
+                      <Badge variant="secondary" className="text-[11px] capitalize">{pkg.package_type}</Badge>
                       <Button
                         size="sm" variant="ghost" className="h-6 w-6 p-0"
                         onClick={() => togglePackageActive.mutate({ id: pkg.id, is_active: !pkg.is_active })}
@@ -546,22 +546,22 @@ export default function Packages() {
                   <div className="grid grid-cols-3 gap-2 text-center">
                     <div className="p-2 bg-muted/50 rounded">
                       <p className="text-lg font-bold font-mono">${pkg.price}</p>
-                      <p className="text-[9px] text-muted-foreground">Package</p>
+                      <p className="text-[11px] text-muted-foreground">Package</p>
                     </div>
                     <div className="p-2 bg-muted/50 rounded">
                       <p className="text-lg font-bold font-mono">{pkg.session_count}</p>
-                      <p className="text-[9px] text-muted-foreground">Sessions</p>
+                      <p className="text-[11px] text-muted-foreground">Sessions</p>
                     </div>
                     <div className="p-2 bg-muted/50 rounded">
                       {savingsPercent(pkg) > 0 ? (
                         <>
                           <p className="text-lg font-bold font-mono text-success">{savingsPercent(pkg)}%</p>
-                          <p className="text-[9px] text-muted-foreground">Savings</p>
+                          <p className="text-[11px] text-muted-foreground">Savings</p>
                         </>
                       ) : (
                         <>
                           <p className="text-lg font-bold font-mono">{pkg.valid_days}d</p>
-                          <p className="text-[9px] text-muted-foreground">Valid</p>
+                          <p className="text-[11px] text-muted-foreground">Valid</p>
                         </>
                       )}
                     </div>
@@ -603,7 +603,7 @@ export default function Packages() {
                             {atRisk && <AlertTriangle className="h-3.5 w-3.5 text-destructive" />}
                           </div>
                           <div className="flex items-center gap-1">
-                            <Badge className={`text-[10px] ${statusColor(p.status)}`}>{p.status}</Badge>
+                            <Badge className={`text-[11px] ${statusColor(p.status)}`}>{p.status}</Badge>
                             {p.status === "active" && (
                               <>
                                 <Button size="sm" variant="ghost" className="h-7 text-xs"
@@ -664,8 +664,8 @@ export default function Packages() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <p className="text-sm font-medium">{rule.trigger_label}</p>
-                        <Badge variant="outline" className="text-[10px] capitalize">{rule.channel}</Badge>
-                        <Badge variant="outline" className="text-[10px] capitalize">{rule.tone}</Badge>
+                        <Badge variant="outline" className="text-[11px] capitalize">{rule.channel}</Badge>
+                        <Badge variant="outline" className="text-[11px] capitalize">{rule.tone}</Badge>
                       </div>
                       <p className="text-xs text-muted-foreground mt-0.5">{rule.description}</p>
                     </div>

@@ -140,10 +140,10 @@ export function PerformanceGoals() {
 
   const getTrendIndicator = (current: number, target: number) => {
     const percent = (current / target) * 100;
-    if (percent >= 100) return { icon: "🎯", text: "Target Met", color: "text-green-600" };
-    if (percent >= 75) return { icon: "📈", text: "On Track", color: "text-blue-600" };
-    if (percent >= 50) return { icon: "➡️", text: "In Progress", color: "text-yellow-600" };
-    return { icon: "📍", text: "Just Started", color: "text-gray-600" };
+    if (percent >= 100) return { icon: "🎯", text: "Target Met", color: "text-success" };
+    if (percent >= 75) return { icon: "📈", text: "On Track", color: "text-info" };
+    if (percent >= 50) return { icon: "➡️", text: "In Progress", color: "text-warning" };
+    return { icon: "📍", text: "Just Started", color: "text-muted-foreground" };
   };
 
   if (isLoading) {

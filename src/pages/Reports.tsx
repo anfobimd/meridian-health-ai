@@ -270,7 +270,7 @@ export default function Reports() {
                         <TableCell>{r.cancelled}</TableCell>
                         <TableCell>{r.noShow}</TableCell>
                         <TableCell>
-                          <Badge variant={r.utilization >= 80 ? "default" : r.utilization >= 60 ? "secondary" : "outline"} className={`text-[10px] ${r.utilization < 60 ? "border-warning text-warning" : ""}`}>
+                          <Badge variant={r.utilization >= 80 ? "default" : r.utilization >= 60 ? "secondary" : "outline"} className={`text-[11px] ${r.utilization < 60 ? "border-warning text-warning" : ""}`}>
                             {r.utilization}%
                           </Badge>
                         </TableCell>
@@ -361,7 +361,7 @@ export default function Reports() {
                         <TableCell className="font-mono">${(p.price_paid || 0).toLocaleString()}</TableCell>
                         <TableCell className="font-mono text-success">${(p.revenue_recognized_amount || 0).toLocaleString()}</TableCell>
                         <TableCell className="font-mono text-warning">${(p.deferred_revenue_amount || 0).toLocaleString()}</TableCell>
-                        <TableCell><Badge variant="outline" className="text-[10px]">{p.status}</Badge></TableCell>
+                        <TableCell><Badge variant="outline" className="text-[11px]">{p.status}</Badge></TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

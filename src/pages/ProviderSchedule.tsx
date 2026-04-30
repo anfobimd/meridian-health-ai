@@ -189,7 +189,7 @@ export default function ProviderSchedule() {
                   </CardHeader>
                   <CardContent className="px-3 pb-3 space-y-1.5">
                     {slotsByDay[i].length === 0 ? (
-                      <p className="text-[10px] text-muted-foreground italic">Off</p>
+                      <p className="text-[11px] text-muted-foreground italic">Off</p>
                     ) : (
                       slotsByDay[i].map((slot) => (
                         <div

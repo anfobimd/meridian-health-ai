@@ -25,12 +25,12 @@ const STATUS_LABELS: Record<ClearanceStatus, string> = {
 };
 
 const STATUS_COLORS: Record<ClearanceStatus, string> = {
-  sent: "bg-blue-100 text-blue-800",
-  client_submitted: "bg-yellow-100 text-yellow-800",
-  pending_review: "bg-orange-100 text-orange-800",
-  approved: "bg-green-100 text-green-800",
-  changes_requested: "bg-purple-100 text-purple-800",
-  rejected: "bg-red-100 text-red-800",
+  sent: "bg-info/10 text-info",
+  client_submitted: "bg-warning/10 text-warning",
+  pending_review: "bg-warning/10 text-warning",
+  approved: "bg-success/10 text-success",
+  changes_requested: "bg-info/10 text-info",
+  rejected: "bg-destructive/10 text-destructive",
 };
 
 interface ClearanceRequest {

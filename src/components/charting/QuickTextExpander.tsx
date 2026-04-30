@@ -193,7 +193,7 @@ const QuickTextExpander = forwardRef<HTMLTextAreaElement, QuickTextExpanderProps
                   </button>
                 );
               })}
-              <div className="px-2 py-1 text-[10px] text-muted-foreground border-t mt-1">
+              <div className="px-2 py-1 text-[11px] text-muted-foreground border-t mt-1">
                 Tab or Enter to expand · Esc to dismiss
               </div>
             </CardContent>

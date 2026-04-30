@@ -280,7 +280,7 @@ function PortalAuth() {
             )}
           </div>
 
-          <p className="text-[10px] text-center text-muted-foreground">Your data is encrypted and HIPAA-compliant</p>
+          <p className="text-[11px] text-center text-muted-foreground">Your data is encrypted and HIPAA-compliant</p>
         </CardContent>
       </Card>
     </div>
@@ -328,7 +328,7 @@ function AppointmentsTab({ patientId }: { patientId: string }) {
                       </p>
                     </div>
                   </div>
-                  <Badge variant={apt.status === "booked" ? "secondary" : "default"} className="text-[10px]">{apt.status}</Badge>
+                  <Badge variant={apt.status === "booked" ? "secondary" : "default"} className="text-[11px]">{apt.status}</Badge>
                 </CardContent>
               </Card>
             ))}
@@ -352,7 +352,7 @@ function AppointmentsTab({ patientId }: { patientId: string }) {
                       <p className="text-xs text-muted-foreground">{format(new Date(apt.scheduled_at), "MMM d, yyyy")}</p>
                     </div>
                   </div>
-                  <Badge variant="outline" className="text-[10px]">{apt.status}</Badge>
+                  <Badge variant="outline" className="text-[11px]">{apt.status}</Badge>
                 </CardContent>
               </Card>
             ))}
@@ -419,7 +419,7 @@ function TelehealthTab({ patientId }: { patientId: string }) {
                           <Video className="h-3.5 w-3.5" /> Join Video
                         </Button>
                       ) : (
-                        <Badge variant="secondary" className="text-[10px]">
+                        <Badge variant="secondary" className="text-[11px]">
                           <Clock className="h-2.5 w-2.5 mr-0.5" /> Scheduled
                         </Badge>
                       )}
@@ -461,7 +461,7 @@ function TelehealthTab({ patientId }: { patientId: string }) {
                       <p className="text-xs text-muted-foreground">{format(new Date(apt.scheduled_at), "MMM d, yyyy")}</p>
                     </div>
                   </div>
-                  <Badge variant="outline" className="text-[10px]">{apt.status}</Badge>
+                  <Badge variant="outline" className="text-[11px]">{apt.status}</Badge>
                 </CardContent>
               </Card>
             ))}
@@ -500,7 +500,7 @@ function PackagesTab({ patientId }: { patientId: string }) {
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium flex items-center justify-between">
                 {(p.packages as any)?.name || "Package"}
-                <Badge variant={p.status === "active" ? "default" : "secondary"} className="text-[10px]">{p.status}</Badge>
+                <Badge variant={p.status === "active" ? "default" : "secondary"} className="text-[11px]">{p.status}</Badge>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -582,10 +582,10 @@ function RecordsTab({ patientId }: { patientId: string }) {
                 <CardContent className="py-3 px-4">
                   <div className="flex items-center justify-between mb-1">
                     <p className="text-sm font-medium">{format(new Date(n.created_at), "MMM d, yyyy")}</p>
-                    <Badge variant="outline" className="text-[10px]">Signed</Badge>
+                    <Badge variant="outline" className="text-[11px]">Signed</Badge>
                   </div>
                   {n.assessment && <p className="text-xs text-muted-foreground line-clamp-2">{n.assessment}</p>}
-                  {(n.providers as any) && <p className="text-[10px] text-muted-foreground mt-1">— {(n.providers as any).first_name} {(n.providers as any).last_name}</p>}
+                  {(n.providers as any) && <p className="text-[11px] text-muted-foreground mt-1">— {(n.providers as any).first_name} {(n.providers as any).last_name}</p>}
                 </CardContent>
               </Card>
             ))}

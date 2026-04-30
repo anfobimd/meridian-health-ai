@@ -87,13 +87,13 @@ function PatientContextCard({ patientId }: { patientId: string }) {
 
   return (
     <div className="space-y-3 p-3 bg-muted/30 rounded-lg border">
-      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+      <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
         <User className="h-3 w-3" />Patient Context
       </p>
 
       {/* Next Appointment */}
       <div className="space-y-0.5">
-        <p className="text-[10px] text-muted-foreground flex items-center gap-1"><CalendarDays className="h-2.5 w-2.5" />Next Appointment</p>
+        <p className="text-[11px] text-muted-foreground flex items-center gap-1"><CalendarDays className="h-2.5 w-2.5" />Next Appointment</p>
         {nextApt ? (
           <p className="text-xs">
             {format(new Date(nextApt.scheduled_at), "MMM d 'at' h:mm a")}
@@ -106,7 +106,7 @@ function PatientContextCard({ patientId }: { patientId: string }) {
 
       {/* Last Visit */}
       <div className="space-y-0.5">
-        <p className="text-[10px] text-muted-foreground flex items-center gap-1"><Clock className="h-2.5 w-2.5" />Last Visit</p>
+        <p className="text-[11px] text-muted-foreground flex items-center gap-1"><Clock className="h-2.5 w-2.5" />Last Visit</p>
         {lastVisit?.completed_at ? (
           <p className="text-xs">
             {format(new Date(lastVisit.completed_at), "MMM d, yyyy")}
@@ -120,7 +120,7 @@ function PatientContextCard({ patientId }: { patientId: string }) {
       {/* Package Balance */}
       {(packageBalance?.length ?? 0) > 0 && (
         <div className="space-y-0.5">
-          <p className="text-[10px] text-muted-foreground flex items-center gap-1"><Package className="h-2.5 w-2.5" />Package Credits</p>
+          <p className="text-[11px] text-muted-foreground flex items-center gap-1"><Package className="h-2.5 w-2.5" />Package Credits</p>
           {packageBalance!.map((p: any, i: number) => (
             <p key={i} className="text-xs">
               {(p.packages as any)?.name}: {p.sessions_total - (p.sessions_used || 0)} left
@@ -286,14 +286,14 @@ export default function PatientInbox() {
                       <p className="font-medium text-sm">
                         {msg.patients?.first_name} {msg.patients?.last_name}
                       </p>
-                      <Badge variant="outline" className="text-[10px]">{msg.channel}</Badge>
+                      <Badge variant="outline" className="text-[11px]">{msg.channel}</Badge>
                       {msg.ai_intent && (
-                        <Badge className={`text-[10px] ${INTENT_COLORS[msg.ai_intent] || INTENT_COLORS.general}`}>
+                        <Badge className={`text-[11px] ${INTENT_COLORS[msg.ai_intent] || INTENT_COLORS.general}`}>
                           {msg.ai_intent.replace("_", " ")}
                         </Badge>
                       )}
                       {msg.is_resolved && (
-                        <Badge variant="secondary" className="text-[10px] bg-success/10 text-success">
+                        <Badge variant="secondary" className="text-[11px] bg-success/10 text-success">
                           <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" />Resolved
                         </Badge>
                       )}
@@ -301,14 +301,14 @@ export default function PatientInbox() {
                     <p className="text-sm text-muted-foreground line-clamp-2">{msg.content}</p>
                   </div>
                   <div className="flex items-center gap-1.5 flex-shrink-0">
-                    <span className="text-[10px] text-muted-foreground">
+                    <span className="text-[11px] text-muted-foreground">
                       {new Date(msg.created_at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
                     </span>
                     {!msg.ai_intent && (
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-7 text-[10px] px-2"
+                        className="h-7 text-[11px] px-2"
                         onClick={(e) => { e.stopPropagation(); classifyMessage(msg); }}
                         disabled={classifying === msg.id}
                       >
@@ -346,13 +346,13 @@ export default function PatientInbox() {
                 {/* Original Message */}
                 <div className="p-3 rounded-lg bg-muted/50">
                   <div className="flex items-center gap-2 mb-1">
-                    <Badge variant="outline" className="text-[10px]">{selectedMsg.channel}</Badge>
+                    <Badge variant="outline" className="text-[11px]">{selectedMsg.channel}</Badge>
                     {selectedMsg.ai_intent && (
-                      <Badge className={`text-[10px] ${INTENT_COLORS[selectedMsg.ai_intent] || INTENT_COLORS.general}`}>
+                      <Badge className={`text-[11px] ${INTENT_COLORS[selectedMsg.ai_intent] || INTENT_COLORS.general}`}>
                         <Sparkles className="h-2.5 w-2.5 mr-0.5" />{selectedMsg.ai_intent.replace("_", " ")}
                       </Badge>
                     )}
-                    <span className="text-[10px] text-muted-foreground ml-auto">
+                    <span className="text-[11px] text-muted-foreground ml-auto">
                       {new Date(selectedMsg.created_at).toLocaleString()}
                     </span>
                   </div>
@@ -362,7 +362,7 @@ export default function PatientInbox() {
                 {/* AI Draft Reply */}
                 {selectedMsg.ai_draft_reply && (
                   <div className="p-3 rounded-lg border border-primary/20 bg-primary/5">
-                    <p className="text-[10px] font-semibold text-primary uppercase tracking-wider mb-1 flex items-center gap-1">
+                    <p className="text-[11px] font-semibold text-primary uppercase tracking-wider mb-1 flex items-center gap-1">
                       <Sparkles className="h-3 w-3" />AI Draft Reply
                     </p>
                     <p className="text-xs text-foreground">{selectedMsg.ai_draft_reply}</p>

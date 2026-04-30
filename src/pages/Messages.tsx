@@ -240,7 +240,7 @@ export default function Messages() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-6 text-[10px] text-primary"
+                    className="h-6 text-[11px] text-primary"
                     onClick={aiDraftMessage}
                     disabled={aiDrafting}
                   >
@@ -267,7 +267,7 @@ export default function Messages() {
       <div className="flex gap-2">
         <Button variant={tab === "inbox" ? "default" : "outline"} size="sm" onClick={() => { setTab("inbox"); setSelectedId(null); }}>
           <Inbox className="mr-1 h-4 w-4" /> Inbox
-          {unreadCount > 0 && <Badge variant="secondary" className="ml-1.5 text-[10px] h-4 px-1.5">{unreadCount}</Badge>}
+          {unreadCount > 0 && <Badge variant="secondary" className="ml-1.5 text-[11px] h-4 px-1.5">{unreadCount}</Badge>}
         </Button>
         <Button variant={tab === "sent" ? "default" : "outline"} size="sm" onClick={() => { setTab("sent"); setSelectedId(null); }}>
           <Send className="mr-1 h-4 w-4" /> Sent
@@ -299,7 +299,7 @@ export default function Messages() {
                   <p className={cn("text-sm", !m.is_read && tab === "inbox" && "font-semibold")}>
                     {tab === "inbox" ? getSenderName(m.sender_id) : getSenderName(m.recipient_id)}
                   </p>
-                  <span className="text-[10px] text-muted-foreground">
+                  <span className="text-[11px] text-muted-foreground">
                     {format(new Date(m.created_at), "MMM d")}
                   </span>
                 </div>

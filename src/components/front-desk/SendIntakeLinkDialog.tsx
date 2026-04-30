@@ -140,7 +140,7 @@ export function SendIntakeLinkDialog({ open, onOpenChange, patient }: SendIntake
                 <Badge
                   key={opt.value}
                   variant={focusAreas.includes(opt.value) ? "default" : "outline"}
-                  className="cursor-pointer text-[10px] h-6"
+                  className="cursor-pointer text-[11px] h-6"
                   onClick={() => toggleFocus(opt.value)}
                 >
                   {opt.label}
@@ -193,7 +193,7 @@ export function SendIntakeLinkDialog({ open, onOpenChange, patient }: SendIntake
               <div className="flex gap-2">
                 <Input value={generatedUrl} readOnly className="text-xs h-9 bg-muted" />
                 <Button size="sm" variant="outline" onClick={handleCopy} className="h-9 px-3">
-                  {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
+                  {copied ? <Check className="h-3.5 w-3.5 text-success" /> : <Copy className="h-3.5 w-3.5" />}
                 </Button>
               </div>
             </div>

@@ -273,7 +273,7 @@ export function PatientRegistrationDialog({ open, onOpenChange }: Props) {
                           <p className="text-sm font-medium">{d.first_name} {d.last_name}</p>
                           <p className="text-xs text-muted-foreground">{d.email || d.phone || "No contact"} {d.date_of_birth && `• DOB: ${d.date_of_birth}`}</p>
                         </div>
-                        <Badge variant="destructive" className="text-[10px]">Possible Match</Badge>
+                        <Badge variant="destructive" className="text-[11px]">Possible Match</Badge>
                       </div>
                     ))}
                   </div>

@@ -59,14 +59,14 @@ export function QueueCard({ apt, onStatusChange, onNoShow }: {
                 {risk && (
                   <Badge
                     variant={risk.variant}
-                    className="text-[9px] h-4 px-1"
+                    className="text-[11px] h-4 px-1"
                     title={`${apt.patients?.no_show_count} prior no-show(s)`}
                   >
                     <AlertTriangle className="h-2.5 w-2.5 mr-0.5" />{risk.label}
                   </Badge>
                 )}
                 {isWalkin && (
-                  <Badge variant="outline" className="text-[9px] h-4 px-1 border-accent text-accent-foreground">
+                  <Badge variant="outline" className="text-[11px] h-4 px-1 border-accent text-accent-foreground">
                     <UserCheck className="h-2.5 w-2.5 mr-0.5" />Walk-in
                   </Badge>
                 )}
@@ -77,16 +77,16 @@ export function QueueCard({ apt, onStatusChange, onNoShow }: {
               </p>
             </div>
             {waitStr && (
-              <Badge variant="outline" className={`text-[10px] shrink-0 ${isLongWait ? "text-destructive border-destructive/30" : "text-warning border-warning/30"}`}>
+              <Badge variant="outline" className={`text-[11px] shrink-0 ${isLongWait ? "text-destructive border-destructive/30" : "text-warning border-warning/30"}`}>
                 <Clock className="h-2.5 w-2.5 mr-0.5" />{waitStr}
               </Badge>
             )}
           </div>
           {apt.providers && (
-            <p className="text-[10px] text-muted-foreground">Dr. {apt.providers.last_name}</p>
+            <p className="text-[11px] text-muted-foreground">Dr. {apt.providers.last_name}</p>
           )}
           {apt.rooms && (
-            <p className="text-[10px] text-muted-foreground">Room: {apt.rooms.name}</p>
+            <p className="text-[11px] text-muted-foreground">Room: {apt.rooms.name}</p>
           )}
           <div className="flex flex-wrap gap-1.5">
             {action && (

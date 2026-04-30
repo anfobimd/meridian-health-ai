@@ -154,7 +154,7 @@ export default function Medications() {
                 <div className="flex items-center gap-4 pt-2">
                   <label className="flex items-center gap-2 text-sm cursor-pointer">
                     <Switch checked={isControlled} onCheckedChange={setIsControlled} />
-                    <AlertTriangle className="h-4 w-4 text-amber-500" />Controlled Substance
+                    <AlertTriangle className="h-4 w-4 text-warning" />Controlled Substance
                   </label>
                 </div>
                 {isControlled && (
@@ -207,7 +207,7 @@ export default function Medications() {
                       </div>
                       {aiDosing.monitoring_requirements?.length > 0 && (
                         <div>
-                          <p className="text-[10px] font-bold text-muted-foreground uppercase mt-1">Monitoring Required</p>
+                          <p className="text-[11px] font-bold text-muted-foreground uppercase mt-1">Monitoring Required</p>
                           {aiDosing.monitoring_requirements.map((m: any, i: number) => (
                             <div key={i} className="flex items-center gap-2 text-xs mt-1">
                               <Activity className="h-3 w-3 text-warning shrink-0" />
@@ -219,7 +219,7 @@ export default function Medications() {
                       {aiDosing.credential_restrictions?.length > 0 && (
                         <div className="flex flex-wrap gap-1 mt-1">
                           {aiDosing.credential_restrictions.map((r: string, i: number) => (
-                            <Badge key={i} variant="outline" className="text-[9px] border-warning/30 text-warning">{r}</Badge>
+                            <Badge key={i} variant="outline" className="text-[11px] border-warning/30 text-warning">{r}</Badge>
                           ))}
                         </div>
                       )}
@@ -244,7 +244,7 @@ export default function Medications() {
                       <div className="flex items-center gap-2">
                         <ShieldCheck className="h-3.5 w-3.5 text-primary" />
                         <span className="text-xs font-semibold">Formulary Interaction Check</span>
-                        <Badge variant="outline" className={`text-[9px] ${aiInteraction.overall_risk === "warning" ? "border-destructive text-destructive" : aiInteraction.overall_risk === "caution" ? "border-warning text-warning" : "border-success text-success"}`}>
+                        <Badge variant="outline" className={`text-[11px] ${aiInteraction.overall_risk === "warning" ? "border-destructive text-destructive" : aiInteraction.overall_risk === "caution" ? "border-warning text-warning" : "border-success text-success"}`}>
                           {aiInteraction.overall_risk}
                         </Badge>
                       </div>
@@ -255,7 +255,7 @@ export default function Medications() {
                             <div key={i} className={`p-2 rounded border text-xs ${severityColor(int.severity)}`}>
                               <div className="flex items-center gap-2">
                                 <strong>{int.medication}</strong>
-                                <Badge variant="outline" className={`text-[8px] ${severityColor(int.severity)}`}>{int.severity}</Badge>
+                                <Badge variant="outline" className={`text-[11px] ${severityColor(int.severity)}`}>{int.severity}</Badge>
                               </div>
                               <p className="text-muted-foreground mt-0.5">{int.description}</p>
                               {int.clinical_action && <p className="text-primary mt-0.5">→ {int.clinical_action}</p>}
@@ -290,7 +290,7 @@ export default function Medications() {
                     <div className="flex items-center gap-2">
                       <p className="font-medium">{m.name}</p>
                       {m.is_controlled && (
-                        <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
+                        <Badge variant="destructive" className="text-[11px] px-1.5 py-0">
                           <AlertTriangle className="h-3 w-3 mr-0.5" />C{m.schedule_class}
                         </Badge>
                       )}

@@ -221,7 +221,7 @@ export default function MdOversightDashboard() {
         ].map((stat) => (
           <Card key={stat.label}>
             <CardContent className="pt-4 pb-3">
-              <p className="text-[10px] uppercase text-muted-foreground font-bold">{stat.label}</p>
+              <p className="text-[11px] uppercase text-muted-foreground font-bold">{stat.label}</p>
               <p className="text-2xl font-bold mt-1">{stat.value}</p>
             </CardContent>
           </Card>
@@ -245,17 +245,17 @@ export default function MdOversightDashboard() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold truncate">{clinic.name}</p>
-                    <p className="text-[10px] text-muted-foreground truncate">
+                    <p className="text-[11px] text-muted-foreground truncate">
                       {[clinic.city, clinic.state].filter(Boolean).join(", ") || "No location"}
                       {clinic.contractName && ` · ${clinic.contractName}`}
                     </p>
                     <div className="flex items-center gap-2 mt-1">
                       {clinic.pendingCharts > 0 ? (
-                        <Badge variant="destructive" className="text-[9px] px-1.5 py-0">{clinic.pendingCharts} pending</Badge>
+                        <Badge variant="destructive" className="text-[11px] px-1.5 py-0">{clinic.pendingCharts} pending</Badge>
                       ) : (
-                        <Badge variant="secondary" className="text-[9px] px-1.5 py-0">All clear</Badge>
+                        <Badge variant="secondary" className="text-[11px] px-1.5 py-0">All clear</Badge>
                       )}
-                      {clinic.isPrimary && <Badge variant="outline" className="text-[9px] px-1.5 py-0">Primary</Badge>}
+                      {clinic.isPrimary && <Badge variant="outline" className="text-[11px] px-1.5 py-0">Primary</Badge>}
                     </div>
                   </div>
                 </CardContent>
@@ -425,7 +425,7 @@ export default function MdOversightDashboard() {
                         </TableCell>
                         <TableCell>{p.avg_documentation_score || "—"}</TableCell>
                         <TableCell>
-                          <Badge variant={p.coaching_status === "none" ? "secondary" : "outline"} className={p.coaching_status === "probation" ? "border-red-300 text-red-600" : p.coaching_status === "monitoring" ? "border-orange-300 text-orange-600" : ""}>
+                          <Badge variant={p.coaching_status === "none" ? "secondary" : "outline"} className={p.coaching_status === "probation" ? "border-destructive/30 text-destructive" : p.coaching_status === "monitoring" ? "border-warning/30 text-warning" : ""}>
                             {p.coaching_status}
                           </Badge>
                         </TableCell>
@@ -433,7 +433,7 @@ export default function MdOversightDashboard() {
                           {(p.recurring_issues as any[])?.length > 0 ? (
                             <div className="flex gap-1 flex-wrap">
                               {(p.recurring_issues as any[]).slice(0, 2).map((issue: string, i: number) => (
-                                <Badge key={i} variant="outline" className="text-[10px]">{issue}</Badge>
+                                <Badge key={i} variant="outline" className="text-[11px]">{issue}</Badge>
                               ))}
                             </div>
                           ) : "—"}
@@ -457,25 +457,25 @@ export default function MdOversightDashboard() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <Card>
               <CardContent className="pt-4 pb-3">
-                <p className="text-[10px] uppercase text-muted-foreground font-bold">Total AI Calls</p>
+                <p className="text-[11px] uppercase text-muted-foreground font-bold">Total AI Calls</p>
                 <p className="text-2xl font-bold mt-1">{totalCalls}</p>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="pt-4 pb-3">
-                <p className="text-[10px] uppercase text-muted-foreground font-bold">Success Rate</p>
+                <p className="text-[11px] uppercase text-muted-foreground font-bold">Success Rate</p>
                 <p className="text-2xl font-bold mt-1">{totalCalls ? ((successCalls / totalCalls) * 100).toFixed(1) : 0}%</p>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="pt-4 pb-3">
-                <p className="text-[10px] uppercase text-muted-foreground font-bold">Avg Latency</p>
+                <p className="text-[11px] uppercase text-muted-foreground font-bold">Avg Latency</p>
                 <p className="text-2xl font-bold mt-1">{avgLatency}ms</p>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="pt-4 pb-3">
-                <p className="text-[10px] uppercase text-muted-foreground font-bold">Rubber Stamps</p>
+                <p className="text-[11px] uppercase text-muted-foreground font-bold">Rubber Stamps</p>
                 <p className="text-2xl font-bold mt-1">{reviewStats?.rubberStamps || 0}</p>
               </CardContent>
             </Card>
@@ -573,14 +573,14 @@ export default function MdOversightDashboard() {
             <div className="grid grid-cols-2 gap-2">
               <Card>
                 <CardContent className="pt-3 pb-2">
-                  <p className="text-[10px] uppercase text-muted-foreground font-bold">Correction Rate</p>
+                  <p className="text-[11px] uppercase text-muted-foreground font-bold">Correction Rate</p>
                   <p className="text-lg font-bold">{((selectedProviderIntel?.correction_rate || 0) * 100).toFixed(1)}%</p>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="pt-3 pb-2">
-                  <p className="text-[10px] uppercase text-muted-foreground font-bold">Status</p>
-                  <Badge variant="outline" className={selectedProviderIntel?.coaching_status === "probation" ? "border-red-300 text-red-600 mt-1" : selectedProviderIntel?.coaching_status === "monitoring" ? "border-orange-300 text-orange-600 mt-1" : "mt-1"}>
+                  <p className="text-[11px] uppercase text-muted-foreground font-bold">Status</p>
+                  <Badge variant="outline" className={selectedProviderIntel?.coaching_status === "probation" ? "border-destructive/30 text-destructive mt-1" : selectedProviderIntel?.coaching_status === "monitoring" ? "border-warning/30 text-warning mt-1" : "mt-1"}>
                     {selectedProviderIntel?.coaching_status || "none"}
                   </Badge>
                 </CardContent>
@@ -591,7 +591,7 @@ export default function MdOversightDashboard() {
             {selectedProviderIntel?.coaching_notes && (
               <Card>
                 <CardContent className="pt-3 pb-2">
-                  <p className="text-[10px] uppercase text-muted-foreground font-bold mb-1">AI Coaching Summary</p>
+                  <p className="text-[11px] uppercase text-muted-foreground font-bold mb-1">AI Coaching Summary</p>
                   <p className="text-sm">{selectedProviderIntel.coaching_notes}</p>
                 </CardContent>
               </Card>
@@ -632,14 +632,14 @@ export default function MdOversightDashboard() {
                         <div className="flex items-start justify-between">
                           <div>
                             <div className="flex items-center gap-2">
-                              <Badge variant="outline" className="text-[10px]">{action.action_type}</Badge>
+                              <Badge variant="outline" className="text-[11px]">{action.action_type}</Badge>
                               <span className="text-sm font-medium">{action.title}</span>
                             </div>
                             {action.description && <p className="text-xs text-muted-foreground mt-1">{action.description}</p>}
                           </div>
-                          {action.is_resolved && <Badge variant="secondary" className="text-[10px]">Resolved</Badge>}
+                          {action.is_resolved && <Badge variant="secondary" className="text-[11px]">Resolved</Badge>}
                         </div>
-                        <p className="text-[10px] text-muted-foreground mt-1">
+                        <p className="text-[11px] text-muted-foreground mt-1">
                           {action.created_by === "ai" ? "AI-generated" : "Manual"} • {new Date(action.created_at).toLocaleDateString()}
                         </p>
                       </CardContent>

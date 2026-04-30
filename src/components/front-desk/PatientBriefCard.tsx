@@ -77,7 +77,7 @@ export function PatientBriefCard({ patientId, patientName, onClose }: {
                 <p className="font-medium text-xs text-muted-foreground uppercase tracking-wider mb-0.5">Alerts</p>
                 <div className="flex flex-wrap gap-1">
                   {brief.alerts.map((a, i) => (
-                    <Badge key={i} variant="destructive" className="text-[10px]">
+                    <Badge key={i} variant="destructive" className="text-[11px]">
                       <AlertTriangle className="h-2.5 w-2.5 mr-0.5" />{a}
                     </Badge>
                   ))}

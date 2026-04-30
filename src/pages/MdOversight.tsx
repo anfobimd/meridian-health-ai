@@ -31,17 +31,17 @@ const tierColors: Record<RiskTier, string> = {
 };
 
 const tierBadge: Record<RiskTier, string> = {
-  low: "bg-green-500/10 text-green-700 border-green-500/30",
-  medium: "bg-yellow-500/10 text-yellow-700 border-yellow-500/30",
-  high: "bg-orange-500/10 text-orange-700 border-orange-500/30",
-  critical: "bg-red-500/10 text-red-700 border-red-500/30",
+  low: "bg-success/10 text-success border-success/30",
+  medium: "bg-warning/10 text-warning border-warning/30",
+  high: "bg-warning/10 text-warning border-warning/30",
+  critical: "bg-destructive/10 text-destructive border-destructive/30",
 };
 
 const approvalBadge: Record<string, { label: string; class: string }> = {
-  pending: { label: "Pending", class: "bg-amber-100 text-amber-800 border-amber-200" },
+  pending: { label: "Pending", class: "bg-warning/10 text-warning border-warning/30" },
   approved: { label: "Approved", class: "bg-emerald-100 text-emerald-800 border-emerald-200" },
-  modified: { label: "Modified", class: "bg-blue-100 text-blue-800 border-blue-200" },
-  rejected: { label: "Rejected", class: "bg-red-100 text-red-800 border-red-200" },
+  modified: { label: "Modified", class: "bg-info/10 text-info border-info/30" },
+  rejected: { label: "Rejected", class: "bg-destructive/10 text-destructive border-destructive/30" },
 };
 
 const LAB_REFS: Record<string, { label: string; unit: string; low: number; high: number }> = {
@@ -382,7 +382,7 @@ export default function MdOversight() {
               <FileText className="h-4 w-4 text-primary" />
             </div>
             <div className="min-w-0">
-              <p className="text-[10px] uppercase text-muted-foreground font-bold truncate">Charts Pending</p>
+              <p className="text-[11px] uppercase text-muted-foreground font-bold truncate">Charts Pending</p>
               <p className="text-2xl font-bold mt-0.5">{pendingCharts}</p>
             </div>
           </CardContent>
@@ -393,7 +393,7 @@ export default function MdOversight() {
               <FlaskConical className="h-4 w-4 text-primary" />
             </div>
             <div className="min-w-0">
-              <p className="text-[10px] uppercase text-muted-foreground font-bold truncate">Hormones</p>
+              <p className="text-[11px] uppercase text-muted-foreground font-bold truncate">Hormones</p>
               <p className="text-2xl font-bold mt-0.5">{pendingHormones}</p>
             </div>
           </CardContent>
@@ -404,7 +404,7 @@ export default function MdOversight() {
               <Clock className="h-4 w-4 text-primary" />
             </div>
             <div className="min-w-0">
-              <p className="text-[10px] uppercase text-muted-foreground font-bold truncate">Total Queue</p>
+              <p className="text-[11px] uppercase text-muted-foreground font-bold truncate">Total Queue</p>
               <p className="text-2xl font-bold mt-0.5">{pendingCharts + pendingHormones}</p>
             </div>
           </CardContent>
@@ -415,7 +415,7 @@ export default function MdOversight() {
               <CheckCircle className="h-4 w-4 text-primary" />
             </div>
             <div className="min-w-0">
-              <p className="text-[10px] uppercase text-muted-foreground font-bold truncate">Batch Ready</p>
+              <p className="text-[11px] uppercase text-muted-foreground font-bold truncate">Batch Ready</p>
               <p className="text-2xl font-bold mt-0.5">{lowRiskReviews.length}</p>
             </div>
           </CardContent>
@@ -427,11 +427,11 @@ export default function MdOversight() {
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="charts" className="gap-1 text-xs sm:text-sm">
             <FileText className="h-3 w-3" /> <span className="hidden xs:inline">Chart</span> Reviews
-            {pendingCharts > 0 && <Badge variant="destructive" className="ml-1 text-[9px] px-1.5 py-0">{pendingCharts}</Badge>}
+            {pendingCharts > 0 && <Badge variant="destructive" className="ml-1 text-[11px] px-1.5 py-0">{pendingCharts}</Badge>}
           </TabsTrigger>
           <TabsTrigger value="hormones" className="gap-1 text-xs sm:text-sm">
             <FlaskConical className="h-3 w-3" /> <span className="hidden xs:inline">Hormone</span> Approvals
-            {pendingHormones > 0 && <Badge variant="destructive" className="ml-1 text-[9px] px-1.5 py-0">{pendingHormones}</Badge>}
+            {pendingHormones > 0 && <Badge variant="destructive" className="ml-1 text-[11px] px-1.5 py-0">{pendingHormones}</Badge>}
           </TabsTrigger>
         </TabsList>
 
@@ -523,15 +523,15 @@ export default function MdOversight() {
                           <TableCell onClick={() => openChartReview(review)}>
                             <div className="flex gap-1 flex-wrap">
                               {flags.slice(0, 2).map((f: any, i: number) => (
-                                <Badge key={i} variant="outline" className="text-[10px]">
+                                <Badge key={i} variant="outline" className="text-[11px]">
                                   {f.severity === "critical" ? "🔴" : f.severity === "warning" ? "🟡" : "🔵"} {f.flag}
                                 </Badge>
                               ))}
-                              {flags.length > 2 && <Badge variant="outline" className="text-[10px]">+{flags.length - 2}</Badge>}
+                              {flags.length > 2 && <Badge variant="outline" className="text-[11px]">+{flags.length - 2}</Badge>}
                             </div>
                           </TableCell>
                           <TableCell onClick={() => openChartReview(review)}>
-                            <div className="h-8 w-8 rounded-full border-2 flex items-center justify-center text-[10px] font-bold"
+                            <div className="h-8 w-8 rounded-full border-2 flex items-center justify-center text-[11px] font-bold"
                               style={{ borderColor: (a?.documentation_score || 0) >= 80 ? "hsl(var(--primary))" : (a?.documentation_score || 0) >= 50 ? "orange" : "red" }}>
                               {a?.documentation_score ?? "—"}
                             </div>
@@ -593,7 +593,7 @@ export default function MdOversight() {
                         </div>
                         <div className="flex flex-wrap gap-1 flex-1">
                           {(visit.intake_focus || []).slice(0, 3).map((f: string) => (
-                            <Badge key={f} variant="outline" className="text-[10px] px-1.5 py-0">
+                            <Badge key={f} variant="outline" className="text-[11px] px-1.5 py-0">
                               {f.replace("hormone_", "").replace("peptide_", "").replace(/_/g, " ")}
                             </Badge>
                           ))}
@@ -601,7 +601,7 @@ export default function MdOversight() {
                         <div className="flex items-center gap-3 flex-shrink-0">
                           <span className="text-xs text-muted-foreground">{format(parseISO(visit.visit_date), "MMM d, yyyy")}</span>
                           {hasAiRec ? (
-                            <Badge className={`${badge.class} border text-[10px]`}>{badge.label}</Badge>
+                            <Badge className={`${badge.class} border text-[11px]`}>{badge.label}</Badge>
                           ) : (
                             <Button
                               size="sm"
@@ -636,10 +636,10 @@ export default function MdOversight() {
                 Review — {patient?.first_name} {patient?.last_name}
               </span>
               <div className="flex items-center gap-2 flex-shrink-0">
-                <div className={`flex items-center gap-1 text-xs sm:text-sm font-mono ${elapsed >= threshold ? "text-green-600" : "text-orange-500"}`}>
+                <div className={`flex items-center gap-1 text-xs sm:text-sm font-mono ${elapsed >= threshold ? "text-success" : "text-warning"}`}>
                   <Clock className="h-3 w-3 sm:h-4 sm:w-4" />{formatTime(elapsed)}/{formatTime(threshold)}
                 </div>
-                {elapsed < threshold && <span className="text-[9px] sm:text-[10px] text-orange-500">Below min</span>}
+                {elapsed < threshold && <span className="text-[11px] sm:text-[11px] text-warning">Below min</span>}
               </div>
             </DialogTitle>
           </DialogHeader>
@@ -660,10 +660,10 @@ export default function MdOversight() {
 
               {((analysis.ai_flags as any[]) || []).length > 0 && (
                 <Card>
-                  <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-orange-500" /> AI Flags ({(analysis.ai_flags as any[]).length})</CardTitle></CardHeader>
+                  <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-warning" /> AI Flags ({(analysis.ai_flags as any[]).length})</CardTitle></CardHeader>
                   <CardContent className="space-y-2">
                     {(analysis.ai_flags as any[]).map((flag: any, i: number) => (
-                      <div key={i} className={`p-2 rounded border text-sm ${flag.severity === "critical" ? "border-red-300 bg-red-50" : flag.severity === "warning" ? "border-yellow-300 bg-yellow-50" : "border-blue-300 bg-blue-50"}`}>
+                      <div key={i} className={`p-2 rounded border text-sm ${flag.severity === "critical" ? "border-destructive/30 bg-destructive/10" : flag.severity === "warning" ? "border-warning/30 bg-warning/10" : "border-info/30 bg-info/10"}`}>
                         <span className="font-medium">{flag.flag}</span><span className="text-muted-foreground ml-2">— {flag.detail}</span>
                       </div>
                     ))}
@@ -679,7 +679,7 @@ export default function MdOversight() {
                     <span>Correction Rate: {((providerIntel.correction_rate as number) * 100).toFixed(1)}%</span>
                     <span>Avg Doc Score: {providerIntel.avg_documentation_score}</span>
                     {providerIntel.coaching_status !== "none" && (
-                      <Badge variant="outline" className="text-orange-600 border-orange-300">Coaching: {providerIntel.coaching_status}</Badge>
+                      <Badge variant="outline" className="text-warning border-warning/30">Coaching: {providerIntel.coaching_status}</Badge>
                     )}
                   </CardContent>
                 </Card>
@@ -740,7 +740,7 @@ export default function MdOversight() {
       {/* Critical chart confirmation */}
       <Dialog open={!!confirmAction} onOpenChange={() => setConfirmAction(null)}>
         <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle className="text-red-600 flex items-center gap-2"><AlertTriangle className="h-5 w-5" /> Confirm Critical Chart Approval</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle className="text-destructive flex items-center gap-2"><AlertTriangle className="h-5 w-5" /> Confirm Critical Chart Approval</DialogTitle></DialogHeader>
           <p className="text-sm">This is a <strong>CRITICAL</strong> risk chart without comment. Approve anyway?</p>
           <div className="flex gap-2 justify-end">
             <Button variant="outline" onClick={() => setConfirmAction(null)}>Cancel</Button>
@@ -776,11 +776,11 @@ export default function MdOversight() {
                       <div className="p-3 bg-muted/50 rounded-lg">
                         <div className="flex items-center gap-1.5 mb-1.5">
                           <Target className="h-3.5 w-3.5 text-primary" />
-                          <p className="text-[10px] font-bold text-primary uppercase tracking-wider">Focus Areas</p>
+                          <p className="text-[11px] font-bold text-primary uppercase tracking-wider">Focus Areas</p>
                         </div>
                         <div className="flex flex-wrap gap-1">
                           {(selectedHormone.intake_focus as string[]).map((f: string) => (
-                            <Badge key={f} variant="secondary" className="text-[10px]">
+                            <Badge key={f} variant="secondary" className="text-[11px]">
                               {f.replace("hormone_", "").replace("peptide_", "").replace(/_/g, " ")}
                             </Badge>
                           ))}
@@ -792,11 +792,11 @@ export default function MdOversight() {
                       <div className="p-3 bg-muted/50 rounded-lg">
                         <div className="flex items-center gap-1.5 mb-1.5">
                           <Activity className="h-3.5 w-3.5 text-primary" />
-                          <p className="text-[10px] font-bold text-primary uppercase tracking-wider">Reported Symptoms</p>
+                          <p className="text-[11px] font-bold text-primary uppercase tracking-wider">Reported Symptoms</p>
                         </div>
                         <div className="flex flex-wrap gap-1">
                           {(selectedHormone.intake_symptoms as string[]).map((s: string) => (
-                            <Badge key={s} variant="outline" className="text-[10px]">{s}</Badge>
+                            <Badge key={s} variant="outline" className="text-[11px]">{s}</Badge>
                           ))}
                         </div>
                       </div>
@@ -806,11 +806,11 @@ export default function MdOversight() {
                       <div className="p-3 bg-muted/50 rounded-lg">
                         <div className="flex items-center gap-1.5 mb-1.5">
                           <CheckCircle className="h-3.5 w-3.5 text-primary" />
-                          <p className="text-[10px] font-bold text-primary uppercase tracking-wider">Patient Goals</p>
+                          <p className="text-[11px] font-bold text-primary uppercase tracking-wider">Patient Goals</p>
                         </div>
                         <div className="flex flex-wrap gap-1">
                           {(selectedHormone.intake_goals as string[]).map((g: string) => (
-                            <Badge key={g} variant="outline" className="text-[10px]">{g}</Badge>
+                            <Badge key={g} variant="outline" className="text-[11px]">{g}</Badge>
                           ))}
                         </div>
                       </div>
@@ -820,11 +820,11 @@ export default function MdOversight() {
                       <div className="p-3 bg-muted/50 rounded-lg">
                         <div className="flex items-center gap-1.5 mb-1.5">
                           <Pill className="h-3.5 w-3.5 text-primary" />
-                          <p className="text-[10px] font-bold text-primary uppercase tracking-wider">Peptide Categories</p>
+                          <p className="text-[11px] font-bold text-primary uppercase tracking-wider">Peptide Categories</p>
                         </div>
                         <div className="flex flex-wrap gap-1">
                           {(selectedHormone.peptide_categories as string[]).map((c: string) => (
-                            <Badge key={c} variant="secondary" className="text-[10px]">{c.replace("peptide_", "").replace(/_/g, " ")}</Badge>
+                            <Badge key={c} variant="secondary" className="text-[11px]">{c.replace("peptide_", "").replace(/_/g, " ")}</Badge>
                           ))}
                         </div>
                       </div>
@@ -840,7 +840,7 @@ export default function MdOversight() {
                       </div>
                       <div className="flex flex-wrap gap-1">
                         {(selectedHormone.peptide_contraindications as string[]).map((c: string) => (
-                          <Badge key={c} variant="destructive" className="text-[10px]">{c}</Badge>
+                          <Badge key={c} variant="destructive" className="text-[11px]">{c}</Badge>
                         ))}
                       </div>
                     </div>
@@ -855,7 +855,7 @@ export default function MdOversight() {
                             <Beaker className="h-4 w-4 text-primary" />
                             <span className="text-sm font-medium">Lab Values ({labValues.length})</span>
                             {abnormalLabs.length > 0 && (
-                              <Badge variant="destructive" className="text-[9px] px-1.5 py-0">{abnormalLabs.length} abnormal</Badge>
+                              <Badge variant="destructive" className="text-[11px] px-1.5 py-0">{abnormalLabs.length} abnormal</Badge>
                             )}
                           </div>
                           {labsOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
@@ -864,12 +864,12 @@ export default function MdOversight() {
                       <CollapsibleContent>
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
                           {labValues.map((lab) => (
-                            <div key={lab.key} className={`p-2 rounded border text-xs ${lab.flag === "low" ? "border-blue-300 bg-blue-50" : lab.flag === "high" ? "border-red-300 bg-red-50" : "border-border bg-background"}`}>
-                              <p className="text-muted-foreground text-[10px]">{lab.label}</p>
+                            <div key={lab.key} className={`p-2 rounded border text-xs ${lab.flag === "low" ? "border-info/30 bg-info/10" : lab.flag === "high" ? "border-destructive/30 bg-destructive/10" : "border-border bg-background"}`}>
+                              <p className="text-muted-foreground text-[11px]">{lab.label}</p>
                               <p className="font-bold">
                                 {lab.value} <span className="font-normal text-muted-foreground">{lab.unit}</span>
                                 {lab.flag !== "normal" && (
-                                  <span className={`ml-1 font-bold ${lab.flag === "low" ? "text-blue-600" : "text-red-600"}`}>
+                                  <span className={`ml-1 font-bold ${lab.flag === "low" ? "text-info" : "text-destructive"}`}>
                                     {lab.flag === "low" ? "↓" : "↑"}
                                   </span>
                                 )}
@@ -885,21 +885,21 @@ export default function MdOversight() {
                   {aiSections ? (
                     <>
                       <div className="p-3 bg-primary/5 rounded-lg">
-                        <p className="text-[10px] font-bold text-primary uppercase tracking-wider mb-1">Clinical Summary</p>
+                        <p className="text-[11px] font-bold text-primary uppercase tracking-wider mb-1">Clinical Summary</p>
                         <p className="text-sm">{aiSections.summary}</p>
                       </div>
 
                       {aiSections.risk_flags && (
-                        <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                          <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wider mb-1">Risk Flags</p>
-                          <p className="text-sm text-amber-900">{aiSections.risk_flags}</p>
+                        <div className="p-3 bg-warning/10 border border-warning/30 rounded-lg">
+                          <p className="text-[11px] font-bold text-warning uppercase tracking-wider mb-1">Risk Flags</p>
+                          <p className="text-sm text-warning">{aiSections.risk_flags}</p>
                         </div>
                       )}
 
                       {/* Editable Treatment */}
                       <div className="border rounded-lg overflow-hidden">
                         <button onClick={() => setExpandedSections(p => ({ ...p, treatment: !p.treatment }))} className="flex items-center justify-between w-full p-3 bg-muted/50 hover:bg-muted transition-colors">
-                          <div className="flex items-center gap-2"><FileText className="h-4 w-4 text-primary" /><span className="text-sm font-medium">Treatment Plan</span><Badge variant="outline" className="text-[9px] ml-1">editable</Badge></div>
+                          <div className="flex items-center gap-2"><FileText className="h-4 w-4 text-primary" /><span className="text-sm font-medium">Treatment Plan</span><Badge variant="outline" className="text-[11px] ml-1">editable</Badge></div>
                           {expandedSections.treatment ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                         </button>
                         {expandedSections.treatment && (
@@ -907,8 +907,8 @@ export default function MdOversight() {
                             <Textarea value={editedTreatment} onChange={(e) => setEditedTreatment(e.target.value)} className="min-h-[180px] text-sm font-mono" />
                             {editedTreatment !== (aiSections.treatment_recommendation || "") && (
                               <div className="flex items-center gap-2 mt-2">
-                                <Edit3 className="h-3 w-3 text-amber-600" /><span className="text-[10px] text-amber-600 font-medium">Modified from AI original</span>
-                                <Button variant="ghost" size="sm" className="text-[10px] h-6 ml-auto" onClick={() => setEditedTreatment(aiSections.treatment_recommendation || "")}>Reset to AI version</Button>
+                                <Edit3 className="h-3 w-3 text-warning" /><span className="text-[11px] text-warning font-medium">Modified from AI original</span>
+                                <Button variant="ghost" size="sm" className="text-[11px] h-6 ml-auto" onClick={() => setEditedTreatment(aiSections.treatment_recommendation || "")}>Reset to AI version</Button>
                               </div>
                             )}
                           </div>
@@ -918,7 +918,7 @@ export default function MdOversight() {
                       {/* Editable Monitoring */}
                       <div className="border rounded-lg overflow-hidden">
                         <button onClick={() => setExpandedSections(p => ({ ...p, monitoring: !p.monitoring }))} className="flex items-center justify-between w-full p-3 bg-muted/50 hover:bg-muted transition-colors">
-                          <div className="flex items-center gap-2"><FlaskConical className="h-4 w-4 text-primary" /><span className="text-sm font-medium">Monitoring Plan</span><Badge variant="outline" className="text-[9px] ml-1">editable</Badge></div>
+                          <div className="flex items-center gap-2"><FlaskConical className="h-4 w-4 text-primary" /><span className="text-sm font-medium">Monitoring Plan</span><Badge variant="outline" className="text-[11px] ml-1">editable</Badge></div>
                           {expandedSections.monitoring ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                         </button>
                         {expandedSections.monitoring && (
@@ -926,8 +926,8 @@ export default function MdOversight() {
                             <Textarea value={editedMonitoring} onChange={(e) => setEditedMonitoring(e.target.value)} className="min-h-[120px] text-sm font-mono" />
                             {editedMonitoring !== (aiSections.monitoring_plan || "") && (
                               <div className="flex items-center gap-2 mt-2">
-                                <Edit3 className="h-3 w-3 text-amber-600" /><span className="text-[10px] text-amber-600 font-medium">Modified from AI original</span>
-                                <Button variant="ghost" size="sm" className="text-[10px] h-6 ml-auto" onClick={() => setEditedMonitoring(aiSections.monitoring_plan || "")}>Reset to AI version</Button>
+                                <Edit3 className="h-3 w-3 text-warning" /><span className="text-[11px] text-warning font-medium">Modified from AI original</span>
+                                <Button variant="ghost" size="sm" className="text-[11px] h-6 ml-auto" onClick={() => setEditedMonitoring(aiSections.monitoring_plan || "")}>Reset to AI version</Button>
                               </div>
                             )}
                           </div>

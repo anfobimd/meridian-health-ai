@@ -825,7 +825,7 @@ export default function ContractsAdmin() {
                       <CardTitle className="text-base flex items-center gap-2">
                         <Building2 className="h-4 w-4 text-primary" />
                         {c.name}
-                        <Badge variant={c.is_active ? "default" : "secondary"} className="text-[10px]">{c.is_active ? "Active" : "Inactive"}</Badge>
+                        <Badge variant={c.is_active ? "default" : "secondary"} className="text-[11px]">{c.is_active ? "Active" : "Inactive"}</Badge>
                       </CardTitle>
                       <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
                         {((c as any).city || (c as any).state) && (
@@ -878,10 +878,10 @@ export default function ContractsAdmin() {
                           <div key={a.id} className="flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs">
                             <span className="font-medium">{a.providers?.first_name} {a.providers?.last_name}</span>
                             {a.providers?.credentials && <span className="text-muted-foreground">{a.providers.credentials}</span>}
-                            <Badge variant="outline" className="text-[9px] px-1">{a.role_at_clinic?.replace(/_/g, " ")}</Badge>
-                            {a.is_primary && <Badge className="text-[9px] px-1">Primary</Badge>}
+                            <Badge variant="outline" className="text-[11px] px-1">{a.role_at_clinic?.replace(/_/g, " ")}</Badge>
+                            {a.is_primary && <Badge className="text-[11px] px-1">Primary</Badge>}
                             {notifyCount > 0 && (
-                              <Badge variant="secondary" className="text-[9px] px-1 gap-0.5" title={a.notification_sent_at ? `Last sent ${format(new Date(a.notification_sent_at), "PPp")}` : ""}>
+                              <Badge variant="secondary" className="text-[11px] px-1 gap-0.5" title={a.notification_sent_at ? `Last sent ${format(new Date(a.notification_sent_at), "PPp")}` : ""}>
                                 <Mail className="h-2.5 w-2.5" />
                                 Sent {notifyCount > 1 ? `${notifyCount}×` : ""}
                               </Badge>
@@ -946,8 +946,8 @@ export default function ContractsAdmin() {
                         {a.providers?.credentials ? `, ${a.providers.credentials}` : ""}
                       </TableCell>
                       <TableCell>{a.clinics?.name || "—"}</TableCell>
-                      <TableCell><Badge variant="outline" className="text-[10px]">{a.role_at_clinic?.replace(/_/g, " ")}</Badge></TableCell>
-                      <TableCell>{a.is_primary ? <Badge className="text-[10px]">Primary</Badge> : "—"}</TableCell>
+                      <TableCell><Badge variant="outline" className="text-[11px]">{a.role_at_clinic?.replace(/_/g, " ")}</Badge></TableCell>
+                      <TableCell>{a.is_primary ? <Badge className="text-[11px]">Primary</Badge> : "—"}</TableCell>
                       <TableCell>
                         <Button size="sm" variant="ghost" onClick={() => removeAssignment.mutate(a.id)}>
                           <X className="h-3 w-3" />

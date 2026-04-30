@@ -296,9 +296,9 @@ export default function PatientRecord() {
                         </div>
                         <span className="text-xs text-muted-foreground">{format(parseISO(note.created_at), "MMM d, yyyy")}</span>
                       </div>
-                      {note.subjective && <div className="mb-2"><p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">SUBJECTIVE</p><p className="text-sm">{note.subjective}</p></div>}
-                      {note.assessment && <div className="mb-2"><p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">ASSESSMENT</p><p className="text-sm">{note.assessment}</p></div>}
-                      {note.plan && <div><p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">PLAN</p><p className="text-sm">{note.plan}</p></div>}
+                      {note.subjective && <div className="mb-2"><p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">SUBJECTIVE</p><p className="text-sm">{note.subjective}</p></div>}
+                      {note.assessment && <div className="mb-2"><p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">ASSESSMENT</p><p className="text-sm">{note.assessment}</p></div>}
+                      {note.plan && <div><p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">PLAN</p><p className="text-sm">{note.plan}</p></div>}
                     </div>
                   ))}
                 </div>
@@ -349,9 +349,9 @@ export default function PatientRecord() {
                     <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
                       {LAB_FIELDS.filter((f) => visit[f.key] != null).map((f) => (
                         <div key={f.key} className="p-2 bg-muted/50 rounded text-center">
-                          <p className="text-[10px] text-muted-foreground font-medium">{f.label}</p>
+                          <p className="text-[11px] text-muted-foreground font-medium">{f.label}</p>
                           <p className="text-sm font-mono font-semibold">{visit[f.key]}</p>
-                          <p className="text-[9px] text-muted-foreground">{f.unit}</p>
+                          <p className="text-[11px] text-muted-foreground">{f.unit}</p>
                         </div>
                       ))}
                     </div>
@@ -359,7 +359,7 @@ export default function PatientRecord() {
                     {/* AI recommendation preview */}
                     {visit.ai_recommendation && (
                       <div className="mt-3 p-3 bg-primary/5 border border-primary/10 rounded-md">
-                        <p className="text-[10px] font-bold text-primary uppercase tracking-wider mb-1">AI Recommendation</p>
+                        <p className="text-[11px] font-bold text-primary uppercase tracking-wider mb-1">AI Recommendation</p>
                         <p className="text-xs text-foreground line-clamp-3">{visit.ai_recommendation}</p>
                       </div>
                     )}
@@ -464,7 +464,7 @@ export default function PatientRecord() {
                         {Array.from({ length: purchase.sessions_total }, (_, i) => (
                           <div
                             key={i}
-                            className={`w-6 h-6 rounded-full border-2 flex items-center justify-center text-[10px] ${
+                            className={`w-6 h-6 rounded-full border-2 flex items-center justify-center text-[11px] ${
                               i < purchase.sessions_used
                                 ? "bg-primary border-primary text-primary-foreground"
                                 : "border-muted-foreground/30"
@@ -496,7 +496,7 @@ export default function PatientRecord() {
                       {/* Session history */}
                       {purchase.patient_package_sessions?.length > 0 && (
                         <div className="mt-3 space-y-1">
-                          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Redeemed Sessions</p>
+                          <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Redeemed Sessions</p>
                           {purchase.patient_package_sessions.map((s: any) => (
                             <div key={s.id} className="flex justify-between text-xs text-muted-foreground">
                               <span>{s.treatment_name || "Session"}</span>

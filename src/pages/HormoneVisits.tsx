@@ -229,19 +229,19 @@ export default function HormoneVisits() {
           ) : aiResult ? (
             <div className="space-y-4">
               <div className="p-3 bg-primary/5 rounded-lg">
-                <p className="text-[10px] font-bold text-primary uppercase tracking-wider mb-1">Summary</p>
+                <p className="text-[11px] font-bold text-primary uppercase tracking-wider mb-1">Summary</p>
                 <p className="text-sm">{aiResult.summary}</p>
               </div>
               <div>
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Treatment Recommendation</p>
+                <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Treatment Recommendation</p>
                 <p className="text-sm whitespace-pre-wrap">{aiResult.treatment_recommendation}</p>
               </div>
               <div>
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Monitoring Plan</p>
+                <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Monitoring Plan</p>
                 <p className="text-sm whitespace-pre-wrap">{aiResult.monitoring_plan}</p>
               </div>
               <div className="p-3 bg-destructive/5 rounded-lg">
-                <p className="text-[10px] font-bold text-destructive uppercase tracking-wider mb-1">Risk Flags</p>
+                <p className="text-[11px] font-bold text-destructive uppercase tracking-wider mb-1">Risk Flags</p>
                 <p className="text-sm whitespace-pre-wrap">{aiResult.risk_flags}</p>
               </div>
             </div>

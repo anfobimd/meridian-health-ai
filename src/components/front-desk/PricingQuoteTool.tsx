@@ -119,7 +119,7 @@ export function PricingQuoteTool({ patientId, patientName }: PricingQuoteToolPro
       <div className="max-h-[250px] overflow-y-auto space-y-3">
         {categories.map((cat) => (
           <div key={cat}>
-            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">{cat}</p>
+            <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">{cat}</p>
             <div className="space-y-1">
               {filtered.filter((t) => (t.category || "General") === cat).map((t) => (
                 <label key={t.id} className="flex items-center gap-2 p-1.5 rounded hover:bg-muted/50 cursor-pointer">
@@ -133,7 +133,7 @@ export function PricingQuoteTool({ patientId, patientName }: PricingQuoteToolPro
                       ${isMember && (t as any).member_price ? (t as any).member_price : t.price || 0}
                     </span>
                     {isMember && (t as any).member_price && (t as any).member_price < (t.price || 0) && (
-                      <span className="text-[9px] text-success ml-1">
+                      <span className="text-[11px] text-success ml-1">
                         (save ${((t.price || 0) - (t as any).member_price).toFixed(0)})
                       </span>
                     )}
@@ -156,7 +156,7 @@ export function PricingQuoteTool({ patientId, patientName }: PricingQuoteToolPro
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
               <DollarSign className="h-4 w-4 text-primary" />Quote Summary
-              {isMember && <Badge variant="secondary" className="text-[9px]">Member</Badge>}
+              {isMember && <Badge variant="secondary" className="text-[11px]">Member</Badge>}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -167,7 +167,7 @@ export function PricingQuoteTool({ patientId, patientName }: PricingQuoteToolPro
                   <span>{item.name}</span>
                   <div className="flex items-center gap-1.5">
                     {item.regular_price && item.regular_price > item.price && (
-                      <span className="text-[10px] text-muted-foreground line-through">${item.regular_price}</span>
+                      <span className="text-[11px] text-muted-foreground line-through">${item.regular_price}</span>
                     )}
                     <span className="font-mono">${item.price}</span>
                   </div>
@@ -182,7 +182,7 @@ export function PricingQuoteTool({ patientId, patientName }: PricingQuoteToolPro
             {/* Package options */}
             {quote.package_options?.length > 0 && (
               <div className="space-y-2">
-                <p className="text-[10px] font-bold text-muted-foreground uppercase flex items-center gap-1">
+                <p className="text-[11px] font-bold text-muted-foreground uppercase flex items-center gap-1">
                   <Sparkles className="h-2.5 w-2.5 text-primary" />AI Package Alternatives
                 </p>
                 {quote.package_options.map((pkg: any, i: number) => (
@@ -192,8 +192,8 @@ export function PricingQuoteTool({ patientId, patientName }: PricingQuoteToolPro
                       <span className="text-xs font-mono font-bold">${pkg.package_price}</span>
                     </div>
                     <div className="flex items-center gap-2 mt-1">
-                      <Badge variant="outline" className="text-[9px] text-success">Save ${pkg.savings} ({pkg.savings_pct}%)</Badge>
-                      <span className="text-[10px] text-muted-foreground">Covers: {pkg.covers?.join(", ")}</span>
+                      <Badge variant="outline" className="text-[11px] text-success">Save ${pkg.savings} ({pkg.savings_pct}%)</Badge>
+                      <span className="text-[11px] text-muted-foreground">Covers: {pkg.covers?.join(", ")}</span>
                     </div>
                   </div>
                 ))}
@@ -203,7 +203,7 @@ export function PricingQuoteTool({ patientId, patientName }: PricingQuoteToolPro
             {/* AI recommendation */}
             {quote.recommendation && (
               <div className="p-2 bg-primary/5 border border-primary/20 rounded">
-                <p className="text-[10px] text-primary flex items-center gap-1 mb-0.5"><Sparkles className="h-2.5 w-2.5" />AI Recommendation</p>
+                <p className="text-[11px] text-primary flex items-center gap-1 mb-0.5"><Sparkles className="h-2.5 w-2.5" />AI Recommendation</p>
                 <p className="text-xs">{quote.recommendation}</p>
               </div>
             )}

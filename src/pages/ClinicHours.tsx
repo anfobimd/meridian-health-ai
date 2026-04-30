@@ -123,7 +123,7 @@ export default function ClinicHours() {
 
             {aiAnalysis.underutilized_windows?.length > 0 && (
               <div>
-                <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1.5">Underutilized Windows</p>
+                <p className="text-[11px] font-bold text-muted-foreground uppercase mb-1.5">Underutilized Windows</p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                   {aiAnalysis.underutilized_windows.map((w: any, i: number) => (
                     <div key={i} className="p-2.5 rounded-lg border bg-muted/30 text-xs">
@@ -143,13 +143,13 @@ export default function ClinicHours() {
 
             {aiAnalysis.coverage_gaps?.length > 0 && (
               <div>
-                <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1.5">Coverage Gaps</p>
+                <p className="text-[11px] font-bold text-muted-foreground uppercase mb-1.5">Coverage Gaps</p>
                 <div className="space-y-1.5">
                   {aiAnalysis.coverage_gaps.map((g: any, i: number) => (
                     <div key={i} className="flex items-center justify-between p-2 rounded border border-destructive/20 bg-destructive/5 text-xs">
                       <div>
                         <span className="font-medium">{g.day}{g.time_range ? ` · ${g.time_range}` : ""}</span>
-                        <Badge variant="outline" className="ml-2 text-[8px]">{g.demand_level} demand</Badge>
+                        <Badge variant="outline" className="ml-2 text-[11px]">{g.demand_level} demand</Badge>
                       </div>
                       <span className="text-muted-foreground">{g.recommendation}</span>
                     </div>

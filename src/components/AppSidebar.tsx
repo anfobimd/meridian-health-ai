@@ -254,7 +254,7 @@ export function AppSidebar() {
           <Activity className="h-5 w-5 text-sidebar-primary" />
           <span className="font-serif text-base font-semibold text-white tracking-tight">Meridian</span>
         </div>
-        <p className="text-[9px] font-bold tracking-[0.14em] uppercase text-sidebar-primary mt-0.5">WELLNESS EHR</p>
+        <p className="text-[11px] font-bold tracking-[0.14em] uppercase text-sidebar-primary mt-0.5">WELLNESS EHR</p>
       </div>
 
       {isAdminLike && (
@@ -269,13 +269,13 @@ export function AppSidebar() {
       >
         <Search className="h-3 w-3" />
         <span className="flex-1 text-left">Search…</span>
-        <kbd className="text-[9px] bg-sidebar-muted px-1 py-0.5 rounded font-mono">⌘K</kbd>
+        <kbd className="text-[11px] bg-sidebar-muted px-1 py-0.5 rounded font-mono">⌘K</kbd>
       </button>
 
       <div className="flex-1 overflow-y-auto px-2 py-3">
         {visibleSections.map((section) => (
           <div key={section.label}>
-            <p className="px-3 pt-4 pb-1 text-[9px] font-bold tracking-[0.14em] uppercase text-sidebar-foreground/25">{section.label}</p>
+            <p className="px-3 pt-4 pb-1 text-[11px] font-bold tracking-[0.14em] uppercase text-sidebar-foreground/25">{section.label}</p>
             {section.items.map((item) => {
               const isActive = item.to === "/" ? location.pathname === "/" : location.pathname.startsWith(item.to);
               const badgeCount = item.badgeKey ? badges[item.badgeKey] || 0 : 0;
@@ -295,7 +295,7 @@ export function AppSidebar() {
                   <item.icon className="h-[14px] w-[14px] flex-shrink-0" />
                   <span className="flex-1">{item.label}</span>
                   {badgeCount > 0 && (
-                    <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-destructive text-[10px] font-semibold text-destructive-foreground px-1">
+                    <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-destructive text-[11px] font-semibold text-destructive-foreground px-1">
                       {badgeCount > 9 ? "9+" : badgeCount}
                     </span>
                   )}
@@ -308,12 +308,12 @@ export function AppSidebar() {
 
       <div className="px-3 py-3 border-t border-sidebar-border space-y-2">
         <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-[10px] font-bold text-sidebar-primary flex-shrink-0">
+          <div className="w-7 h-7 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-[11px] font-bold text-sidebar-primary flex-shrink-0">
             {initials}
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-[11.5px] text-white truncate font-medium">{displayName}</p>
-            <p className="text-[10px] text-sidebar-foreground/40 truncate">{user?.email}</p>
+            <p className="text-[11px] text-sidebar-foreground/40 truncate">{user?.email}</p>
           </div>
         </div>
         <button

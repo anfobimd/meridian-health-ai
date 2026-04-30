@@ -89,15 +89,15 @@ export function MembershipEnrollPanel({ patientId, patientName, open, onOpenChan
           {spendData && spendData.total_6mo > 0 && (
             <div className="grid grid-cols-3 gap-2">
               <div className="text-center p-2 bg-muted/50 rounded-md border">
-                <p className="text-[10px] text-muted-foreground">6-Month Spend</p>
+                <p className="text-[11px] text-muted-foreground">6-Month Spend</p>
                 <p className="text-sm font-mono font-bold">${spendData.total_6mo}</p>
               </div>
               <div className="text-center p-2 bg-muted/50 rounded-md border">
-                <p className="text-[10px] text-muted-foreground">Monthly Avg</p>
+                <p className="text-[11px] text-muted-foreground">Monthly Avg</p>
                 <p className="text-sm font-mono font-bold">${spendData.monthly_avg}</p>
               </div>
               <div className="text-center p-2 bg-muted/50 rounded-md border">
-                <p className="text-[10px] text-muted-foreground">Avg/Visit</p>
+                <p className="text-[11px] text-muted-foreground">Avg/Visit</p>
                 <p className="text-sm font-mono font-bold">${spendData.avg_per_visit}</p>
               </div>
             </div>
@@ -115,12 +115,12 @@ export function MembershipEnrollPanel({ patientId, patientName, open, onOpenChan
                 <div className="flex items-center gap-2">
                   <Badge className="bg-primary text-primary-foreground">{aiRec.recommended_tier}</Badge>
                   {aiRec.projected_annual_savings > 0 && (
-                    <Badge variant="outline" className="text-success text-[9px]">
+                    <Badge variant="outline" className="text-success text-[11px]">
                       <TrendingUp className="h-2.5 w-2.5 mr-0.5" />Save ${aiRec.projected_annual_savings}/yr
                     </Badge>
                   )}
                   {aiRec.break_even_months > 0 && (
-                    <span className="text-[10px] text-muted-foreground">Break-even: {aiRec.break_even_months} months</span>
+                    <span className="text-[11px] text-muted-foreground">Break-even: {aiRec.break_even_months} months</span>
                   )}
                 </div>
                 <p className="text-xs">{aiRec.reasoning}</p>
@@ -132,7 +132,7 @@ export function MembershipEnrollPanel({ patientId, patientName, open, onOpenChan
 
           {/* Tier Comparison with Projections */}
           <div className="space-y-2">
-            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Tier Comparison</p>
+            <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Tier Comparison</p>
             {projections.map((tier) => (
               <Card key={tier.id} className={aiRec?.recommended_tier === tier.id ? "border-primary/50 bg-primary/5" : ""}>
                 <CardContent className="p-3">
@@ -140,21 +140,21 @@ export function MembershipEnrollPanel({ patientId, patientName, open, onOpenChan
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium">{tier.label}</span>
-                        {aiRec?.recommended_tier === tier.id && <Badge className="text-[9px] bg-primary">Recommended</Badge>}
+                        {aiRec?.recommended_tier === tier.id && <Badge className="text-[11px] bg-primary">Recommended</Badge>}
                       </div>
-                      <p className="text-[10px] text-muted-foreground">{tier.description}</p>
+                      <p className="text-[11px] text-muted-foreground">{tier.description}</p>
                     </div>
                     <span className="text-lg font-mono font-bold">${tier.price}<span className="text-xs text-muted-foreground">/mo</span></span>
                   </div>
                   {spendData && spendData.total_6mo > 0 && (
                     <div className="flex items-center gap-3 mt-1.5">
                       {tier.projected_savings > 0 && (
-                        <Badge variant="outline" className="text-[9px] text-success">
+                        <Badge variant="outline" className="text-[11px] text-success">
                           <TrendingUp className="h-2.5 w-2.5 mr-0.5" />~${tier.projected_savings}/yr savings
                         </Badge>
                       )}
                       {tier.break_even_months > 0 && tier.break_even_months <= 12 && (
-                        <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                        <span className="text-[11px] text-muted-foreground flex items-center gap-0.5">
                           <CalendarDays className="h-2.5 w-2.5" />Break-even: {tier.break_even_months}mo
                         </span>
                       )}
@@ -165,7 +165,7 @@ export function MembershipEnrollPanel({ patientId, patientName, open, onOpenChan
             ))}
           </div>
 
-          <p className="text-[10px] text-muted-foreground text-center">
+          <p className="text-[11px] text-muted-foreground text-center">
             Enrollment managed in Membership Billing. Use this panel for patient-facing consultation.
           </p>
         </div>

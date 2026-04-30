@@ -216,9 +216,9 @@ export function TelehealthRx({ patientId, encounterId, embedded = false }: Teleh
                             <span className="font-medium">{med.name}</span>
                             {med.generic_name && <span className="text-muted-foreground italic ml-1">({med.generic_name})</span>}
                             <div className="flex gap-1.5 mt-0.5">
-                              <Badge variant="outline" className="text-[9px]">{med.category}</Badge>
-                              <Badge variant="secondary" className="text-[9px]">{med.route}</Badge>
-                              {med.is_controlled && <Badge variant="destructive" className="text-[9px]">C{med.schedule_class}</Badge>}
+                              <Badge variant="outline" className="text-[11px]">{med.category}</Badge>
+                              <Badge variant="secondary" className="text-[11px]">{med.route}</Badge>
+                              {med.is_controlled && <Badge variant="destructive" className="text-[11px]">C{med.schedule_class}</Badge>}
                             </div>
                           </button>
                         ))}
@@ -301,7 +301,7 @@ export function TelehealthRx({ patientId, encounterId, embedded = false }: Teleh
                     {aiDosing.monitoring_labs?.length > 0 && (
                       <div className="flex flex-wrap gap-1">
                         {aiDosing.monitoring_labs.map((lab: string, i: number) => (
-                          <Badge key={i} variant="outline" className="text-[9px]">{lab}</Badge>
+                          <Badge key={i} variant="outline" className="text-[11px]">{lab}</Badge>
                         ))}
                       </div>
                     )}
@@ -326,7 +326,7 @@ export function TelehealthRx({ patientId, encounterId, embedded = false }: Teleh
                     <div className="flex items-center gap-2">
                       <ShieldCheck className="h-3.5 w-3.5 text-primary" />
                       <span className="text-xs font-semibold">Interaction Check</span>
-                      <Badge variant="outline" className={`text-[9px] ${aiInteraction.overall_risk === "warning" ? "border-destructive text-destructive" : aiInteraction.overall_risk === "caution" ? "border-warning text-warning" : "border-success text-success"}`}>
+                      <Badge variant="outline" className={`text-[11px] ${aiInteraction.overall_risk === "warning" ? "border-destructive text-destructive" : aiInteraction.overall_risk === "caution" ? "border-warning text-warning" : "border-success text-success"}`}>
                         {aiInteraction.overall_risk}
                       </Badge>
                     </div>
@@ -377,14 +377,14 @@ export function TelehealthRx({ patientId, encounterId, embedded = false }: Teleh
                           {rx.dosage} • {rx.frequency} • {rx.route}
                           {rx.refills != null && ` • ${rx.refills} refills`}
                         </p>
-                        <p className="text-[10px] text-muted-foreground">
+                        <p className="text-[11px] text-muted-foreground">
                           {rx.providers ? `Dr. ${rx.providers.last_name}` : "Unknown"} • Started {rx.start_date ? format(parseISO(rx.start_date), "MMM d, yyyy") : "N/A"}
                           {rx.pharmacy && ` • ${rx.pharmacy}`}
                         </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      <Badge className="bg-success/10 text-success text-[10px]"><CheckCircle className="h-2.5 w-2.5 mr-0.5" />Active</Badge>
+                      <Badge className="bg-success/10 text-success text-[11px]"><CheckCircle className="h-2.5 w-2.5 mr-0.5" />Active</Badge>
                       <Button size="sm" variant="ghost" className="text-xs text-destructive h-7" onClick={() => discontinueRx.mutate(rx.id)}>
                         <XCircle className="h-3 w-3 mr-1" />D/C
                       </Button>
@@ -409,12 +409,12 @@ export function TelehealthRx({ patientId, encounterId, embedded = false }: Teleh
                       <div className="min-w-0">
                         <p className="font-medium text-sm truncate">{rx.medication_name}</p>
                         <p className="text-xs text-muted-foreground">{rx.dosage} • {rx.frequency} • {rx.route}</p>
-                        <p className="text-[10px] text-muted-foreground">
+                        <p className="text-[11px] text-muted-foreground">
                           {rx.start_date && format(parseISO(rx.start_date), "MMM d")} – {rx.end_date ? format(parseISO(rx.end_date), "MMM d, yyyy") : "ongoing"}
                         </p>
                       </div>
                     </div>
-                    <Badge variant="secondary" className="text-[10px]"><Clock className="h-2.5 w-2.5 mr-0.5" />Discontinued</Badge>
+                    <Badge variant="secondary" className="text-[11px]"><Clock className="h-2.5 w-2.5 mr-0.5" />Discontinued</Badge>
                   </CardContent>
                 </Card>
               ))

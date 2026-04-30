@@ -83,7 +83,7 @@ function ActionItemRow({ item, onNav }: { item: any; onNav: (route: string) => v
   return (
     <div className={`flex items-center justify-between p-3 rounded-lg border ${urgencyStyles[item.urgency] || urgencyStyles.low}`}>
       <div className="flex items-center gap-3 min-w-0 flex-1">
-        <Badge variant="outline" className={`text-[9px] shrink-0 ${
+        <Badge variant="outline" className={`text-[11px] shrink-0 ${
           item.urgency === "critical" ? "border-destructive text-destructive" :
           item.urgency === "high" ? "border-warning text-warning" :
           "border-muted-foreground text-muted-foreground"
@@ -343,13 +343,13 @@ export default function Dashboard() {
       {/* KPI Row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard label="Today's Patients" value={todayTotal} icon={Calendar} color="primary"
-          sub={<div className="flex items-center gap-1.5"><Progress value={todayCapacity} className="h-1.5 w-16" /><span className="text-[10px] text-muted-foreground">{todayCapacity}% done</span></div>} />
+          sub={<div className="flex items-center gap-1.5"><Progress value={todayCapacity} className="h-1.5 w-16" /><span className="text-[11px] text-muted-foreground">{todayCapacity}% done</span></div>} />
         <KpiCard label="MTD Revenue" value={`$${(monthRevenue ?? 0).toLocaleString()}`} icon={DollarSign} color="success"
-          sub={<p className={`text-[10px] ${revenueGrowth >= 0 ? "text-success" : "text-destructive"}`}>{revenueGrowth >= 0 ? "↑" : "↓"} {Math.abs(revenueGrowth)}% vs last month</p>} />
+          sub={<p className={`text-[11px] ${revenueGrowth >= 0 ? "text-success" : "text-destructive"}`}>{revenueGrowth >= 0 ? "↑" : "↓"} {Math.abs(revenueGrowth)}% vs last month</p>} />
         <KpiCard label="Active Patients" value={patientCount ?? 0} icon={Users} color="info"
-          sub={<p className="text-[10px] text-muted-foreground">{providerCount} providers active</p>} />
+          sub={<p className="text-[11px] text-muted-foreground">{providerCount} providers active</p>} />
         <KpiCard label="Action Items" value={totalAlerts} icon={Bell} color={totalAlerts > 0 ? "warning" : "muted-foreground"} alert={totalAlerts > 0}
-          sub={<p className="text-[10px] text-muted-foreground">Requires attention</p>} />
+          sub={<p className="text-[11px] text-muted-foreground">Requires attention</p>} />
       </div>
 
       {/* AI Briefing — Auto-loaded */}
@@ -362,7 +362,7 @@ export default function Dashboard() {
               </div>
               <div>
                 <p className="text-sm font-semibold">AI Clinic Briefing</p>
-                <p className="text-[10px] text-muted-foreground">Auto-generated from live clinic data</p>
+                <p className="text-[11px] text-muted-foreground">Auto-generated from live clinic data</p>
               </div>
             </div>
             <Button size="sm" variant="ghost" onClick={loadBriefing} disabled={briefingLoading} className="text-xs">
@@ -379,7 +379,7 @@ export default function Dashboard() {
               <p className="text-sm leading-relaxed">{aiBriefing.narrative}</p>
               {aiBriefing.priorities?.length > 0 && (
                 <div className="space-y-1.5">
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Top Priorities</p>
+                  <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Top Priorities</p>
                   {aiBriefing.priorities.map((p: string, i: number) => (
                     <div key={i} className="flex items-start gap-2">
                       <Target className="h-3 w-3 text-primary mt-0.5 shrink-0" />
@@ -391,7 +391,7 @@ export default function Dashboard() {
               {aiBriefing.alerts?.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mt-2">
                   {aiBriefing.alerts.map((a: string, i: number) => (
-                    <Badge key={i} variant="outline" className="text-[10px] border-warning/30 text-warning">
+                    <Badge key={i} variant="outline" className="text-[11px] border-warning/30 text-warning">
                       <AlertCircle className="h-2.5 w-2.5 mr-1" />{a}
                     </Badge>
                   ))}
@@ -400,11 +400,11 @@ export default function Dashboard() {
               {/* Provider flags */}
               {aiBriefing.provider_flags?.length > 0 && (
                 <div className="mt-2 space-y-1">
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Provider Alerts</p>
+                  <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Provider Alerts</p>
                   {aiBriefing.provider_flags.map((pf: any, i: number) => (
                     <div key={i} className="flex items-center justify-between p-2 rounded bg-warning/5 border border-warning/20 text-xs">
                       <span className="font-medium">{pf.name}: <span className="text-muted-foreground">{pf.issue}</span></span>
-                      <span className="text-primary text-[10px]">{pf.action}</span>
+                      <span className="text-primary text-[11px]">{pf.action}</span>
                     </div>
                   ))}
                 </div>
@@ -437,7 +437,7 @@ export default function Dashboard() {
               <div className="space-y-3">
                 <div className="flex items-baseline gap-4">
                   <div>
-                    <p className="text-[10px] text-muted-foreground uppercase">Predicted EOM</p>
+                    <p className="text-[11px] text-muted-foreground uppercase">Predicted EOM</p>
                     <p className="text-2xl font-bold">${revForecast.predicted_eom?.toLocaleString()}</p>
                   </div>
                   <Badge variant="outline" className={`text-xs ${
@@ -452,7 +452,7 @@ export default function Dashboard() {
                 {revForecast.risk_factors?.length > 0 && (
                   <div className="flex flex-wrap gap-1">
                     {revForecast.risk_factors.map((r: string, i: number) => (
-                      <Badge key={i} variant="secondary" className="text-[10px]">⚠ {r}</Badge>
+                      <Badge key={i} variant="secondary" className="text-[11px]">⚠ {r}</Badge>
                     ))}
                   </div>
                 )}
@@ -474,11 +474,11 @@ export default function Dashboard() {
           <CardContent className="px-5 pb-4 space-y-3">
             {expiringContracts && expiringContracts.length > 0 ? (
               <div>
-                <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1">Expiring Contracts</p>
+                <p className="text-[11px] font-bold text-muted-foreground uppercase mb-1">Expiring Contracts</p>
                 {expiringContracts.map((c: any) => (
                   <div key={c.id} className="flex items-center justify-between p-1.5 text-xs">
                     <span className="truncate">{c.name}</span>
-                    <Badge variant="outline" className="text-[9px] border-destructive/30 text-destructive shrink-0">
+                    <Badge variant="outline" className="text-[11px] border-destructive/30 text-destructive shrink-0">
                       {c.end_date ? format(parseISO(c.end_date), "MMM d") : "—"}
                     </Badge>
                   </div>
@@ -487,11 +487,11 @@ export default function Dashboard() {
             ) : null}
             {coachingProviders && coachingProviders.length > 0 ? (
               <div>
-                <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1">Coaching Needed</p>
+                <p className="text-[11px] font-bold text-muted-foreground uppercase mb-1">Coaching Needed</p>
                 {coachingProviders.map((cp: any) => (
                   <div key={cp.provider_id} className="flex items-center justify-between p-1.5 text-xs">
                     <span>{cp.providers?.first_name} {cp.providers?.last_name}</span>
-                    <Badge variant={cp.coaching_status === "probation" ? "destructive" : "secondary"} className="text-[9px]">
+                    <Badge variant={cp.coaching_status === "probation" ? "destructive" : "secondary"} className="text-[11px]">
                       {cp.coaching_status} · {Math.round((cp.correction_rate || 0) * 100)}%
                     </Badge>
                   </div>
@@ -595,7 +595,7 @@ export default function Dashboard() {
                   <p className="text-xs text-muted-foreground">No pending items</p>
                 </div>
               )}
-              <p className="text-[10px] text-muted-foreground text-center">Click "Analyze" for AI-prioritized action items with urgency ranking</p>
+              <p className="text-[11px] text-muted-foreground text-center">Click "Analyze" for AI-prioritized action items with urgency ranking</p>
             </div>
           ) : (
             <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
@@ -632,12 +632,12 @@ export default function Dashboard() {
                       <div key={apt.id} className={`flex items-center justify-between p-2.5 rounded-lg bg-muted/30 border-l-2 ${statusColors[apt.status] || "border-l-muted"}`}>
                         <div>
                           <p className="text-xs font-medium">{apt.patients?.first_name} {apt.patients?.last_name}</p>
-                          <p className="text-[10px] text-muted-foreground">
+                          <p className="text-[11px] text-muted-foreground">
                             {format(parseISO(apt.scheduled_at), "h:mm a")} · {apt.treatments?.name || "General"}
                             {apt.providers && <span> · {apt.providers.first_name} {apt.providers.last_name}</span>}
                           </p>
                         </div>
-                        <Badge variant="secondary" className="text-[9px] h-5">
+                        <Badge variant="secondary" className="text-[11px] h-5">
                           {apt.status === "in_progress" ? "active" : apt.status.replace("_", " ")}
                         </Badge>
                       </div>
@@ -671,7 +671,7 @@ export default function Dashboard() {
                   <div key={p.id} className="flex items-center gap-2">
                     <div className="w-20 text-xs font-medium truncate">{p.name.split(" ")[0]}</div>
                     <Progress value={p.utilization} className="h-1.5 flex-1" />
-                    <span className="text-[10px] font-mono w-8 text-right">{p.utilization}%</span>
+                    <span className="text-[11px] font-mono w-8 text-right">{p.utilization}%</span>
                   </div>
                 ))}
               </div>

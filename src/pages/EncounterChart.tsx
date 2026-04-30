@@ -638,9 +638,9 @@ export default function EncounterChart() {
               <span className="ml-2 text-sm font-semibold text-primary">{fieldValues[key] || min}</span>
             </Label>
             <div className="flex items-center gap-3">
-              <span className="text-[10px] text-muted-foreground whitespace-nowrap">{config.label_lo || min}</span>
+              <span className="text-[11px] text-muted-foreground whitespace-nowrap">{config.label_lo || min}</span>
               <Slider min={min} max={max} step={1} value={[val]} onValueChange={([v]) => updateField(key, String(v))} className="flex-1" />
-              <span className="text-[10px] text-muted-foreground whitespace-nowrap">{config.label_hi || max}</span>
+              <span className="text-[11px] text-muted-foreground whitespace-nowrap">{config.label_hi || max}</span>
             </div>
           </div>
         );
@@ -709,8 +709,8 @@ export default function EncounterChart() {
                         <p className="font-semibold text-sm">{t.name}</p>
                         <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{t.description}</p>
                         <div className="flex items-center gap-2 mt-2">
-                          <Badge variant="secondary" className="text-[10px]">{t.category}</Badge>
-                          {t.usage_count > 0 && <span className="text-[10px] text-muted-foreground">{t.usage_count} uses</span>}
+                          <Badge variant="secondary" className="text-[11px]">{t.category}</Badge>
+                          {t.usage_count > 0 && <span className="text-[11px] text-muted-foreground">{t.usage_count} uses</span>}
                         </div>
                       </div>
                     </div>
@@ -732,7 +732,7 @@ export default function EncounterChart() {
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-sm">{t.name}</p>
                       <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{t.description}</p>
-                      <Badge variant="secondary" className="text-[10px] mt-2">{t.category}</Badge>
+                      <Badge variant="secondary" className="text-[11px] mt-2">{t.category}</Badge>
                     </div>
                   </div>
                 </CardContent>
@@ -768,8 +768,8 @@ export default function EncounterChart() {
               <h1 className="text-xl font-bold flex items-center gap-2">
                 <span className="text-2xl">{activeTemplate?.icon || "📋"}</span>
                 {activeTemplate?.name || "Chart"}
-                {encounter?.status === "signed" && <Badge className="text-[10px] bg-green-600">Signed</Badge>}
-                {isReadOnly && <Badge variant="outline" className="text-[10px]"><Eye className="h-2.5 w-2.5 mr-0.5" />View Only</Badge>}
+                {encounter?.status === "signed" && <Badge className="text-[11px] bg-success">Signed</Badge>}
+                {isReadOnly && <Badge variant="outline" className="text-[11px]"><Eye className="h-2.5 w-2.5 mr-0.5" />View Only</Badge>}
               </h1>
               <p className="text-sm text-muted-foreground">
                 {encounter?.patients?.first_name} {encounter?.patients?.last_name}
@@ -818,13 +818,13 @@ export default function EncounterChart() {
                   <Badge
                     key={label}
                     variant="outline"
-                    className="text-[10px] border-warning/40 text-warning bg-warning/5"
+                    className="text-[11px] border-warning/40 text-warning bg-warning/5"
                   >
                     {label}
                   </Badge>
                 ))}
                 {completeness.missingLabels.length > 8 && (
-                  <span className="text-[10px] text-muted-foreground">
+                  <span className="text-[11px] text-muted-foreground">
                     +{completeness.missingLabels.length - 8} more
                   </span>
                 )}
@@ -848,7 +848,7 @@ export default function EncounterChart() {
       <Dialog open={safetyWarnings.length > 0} onOpenChange={() => setSafetyWarnings([])}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-amber-600">
+            <DialogTitle className="flex items-center gap-2 text-warning">
               <AlertTriangle className="h-5 w-5" /> Safety Check — Missing Fields
             </DialogTitle>
             <DialogDescription>
@@ -857,8 +857,8 @@ export default function EncounterChart() {
           </DialogHeader>
           <div className="space-y-2 max-h-60 overflow-y-auto">
             {safetyWarnings.map((w, i) => (
-              <div key={i} className="flex items-start gap-2 text-sm p-2 bg-amber-50 dark:bg-amber-950/20 rounded">
-                <AlertTriangle className="h-3.5 w-3.5 text-amber-600 mt-0.5 shrink-0" />
+              <div key={i} className="flex items-start gap-2 text-sm p-2 bg-warning/10 dark:bg-warning/20 rounded">
+                <AlertTriangle className="h-3.5 w-3.5 text-warning mt-0.5 shrink-0" />
                 <span>{w}</span>
               </div>
             ))}
@@ -916,7 +916,7 @@ export default function EncounterChart() {
                     <div className="flex items-center gap-2">
                       <span>{section.icon}</span>
                       <span className="font-semibold text-sm">{section.title}</span>
-                      {section.is_required && <Badge variant="outline" className="text-[9px]">Required</Badge>}
+                      {section.is_required && <Badge variant="outline" className="text-[11px]">Required</Badge>}
                     </div>
                     {openSections.has(section.id) ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
                   </CardContent>
@@ -968,11 +968,11 @@ export default function EncounterChart() {
                   </p>
                 </div>
               ) : encounter?.status === "signed" ? (
-                <div className="flex items-start justify-between gap-3 rounded-md border border-green-600/30 bg-green-600/5 p-2.5 text-xs">
+                <div className="flex items-start justify-between gap-3 rounded-md border border-success/30 bg-success/5 p-2.5 text-xs">
                   <div className="flex items-start gap-2">
-                    <Lock className="h-3.5 w-3.5 mt-0.5 shrink-0 text-green-700" />
+                    <Lock className="h-3.5 w-3.5 mt-0.5 shrink-0 text-success" />
                     <p className="text-muted-foreground">
-                      <span className="font-medium text-green-700">Chart signed &amp; locked.</span>{" "}
+                      <span className="font-medium text-success">Chart signed &amp; locked.</span>{" "}
                       SOAP fields are read-only. To make corrections, add an{" "}
                       <span className="font-medium text-foreground">Addendum</span> below, or reopen the chart to edit.
                     </p>
@@ -1007,7 +1007,7 @@ export default function EncounterChart() {
                       {section}
                     </Label>
                     {!isSigned && (
-                      <Button variant="ghost" size="sm" className="h-6 text-[10px] text-primary" onClick={() => generateAiSoap(section)} disabled={aiLoading[section]}>
+                      <Button variant="ghost" size="sm" className="h-6 text-[11px] text-primary" onClick={() => generateAiSoap(section)} disabled={aiLoading[section]}>
                         {aiLoading[section] ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Sparkles className="h-3 w-3 mr-1" />}
                         AI Draft
                       </Button>
@@ -1062,19 +1062,19 @@ export default function EncounterChart() {
                 <p className="font-semibold text-sm mb-2">Billing Codes</p>
                 <div className="space-y-2">
                   <div>
-                    <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-1">ICD-10</p>
+                    <p className="text-[11px] font-semibold text-muted-foreground uppercase mb-1">ICD-10</p>
                     <div className="flex flex-wrap gap-1">
                       {activeTemplate.default_icd10.map((code: string) => (
-                        <Badge key={code} variant="outline" className="text-[10px] font-mono">{code}</Badge>
+                        <Badge key={code} variant="outline" className="text-[11px] font-mono">{code}</Badge>
                       ))}
                     </div>
                   </div>
                   {activeTemplate?.default_cpt?.length > 0 && (
                     <div>
-                      <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-1">CPT</p>
+                      <p className="text-[11px] font-semibold text-muted-foreground uppercase mb-1">CPT</p>
                       <div className="flex flex-wrap gap-1">
                         {activeTemplate.default_cpt.map((code: string) => (
-                          <Badge key={code} className="text-[10px] font-mono bg-primary/10 text-primary">{code}</Badge>
+                          <Badge key={code} className="text-[11px] font-mono bg-primary/10 text-primary">{code}</Badge>
                         ))}
                       </div>
                     </div>
@@ -1092,7 +1092,7 @@ export default function EncounterChart() {
                   <p className="font-semibold text-sm flex items-center gap-1.5">
                     <ClipboardList className="h-4 w-4" /> Orders
                   </p>
-                  <Badge variant="secondary" className="text-[10px]">{selectedOrders.size} selected</Badge>
+                  <Badge variant="secondary" className="text-[11px]">{selectedOrders.size} selected</Badge>
                 </div>
                 <div className="space-y-2">
                   {orderSets.map((order) => {
@@ -1120,9 +1120,9 @@ export default function EncounterChart() {
                             <span>{typeIcons[order.order_type] || "📋"}</span>
                             {order.label}
                           </p>
-                          {order.description && <p className="text-[10px] text-muted-foreground mt-0.5">{order.description}</p>}
+                          {order.description && <p className="text-[11px] text-muted-foreground mt-0.5">{order.description}</p>}
                         </div>
-                        <Badge variant="outline" className="text-[9px] shrink-0">{order.order_type}</Badge>
+                        <Badge variant="outline" className="text-[11px] shrink-0">{order.order_type}</Badge>
                       </label>
                     );
                   })}

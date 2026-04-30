@@ -52,11 +52,11 @@ export function IdentityVerifyPanel({ patient, onVerified }: Props) {
           <ShieldCheck className="h-3 w-3" />Identity Verification
         </h3>
         {isVerified ? (
-          <Badge variant="secondary" className="bg-success/10 text-success text-[10px]">
+          <Badge variant="secondary" className="bg-success/10 text-success text-[11px]">
             <CheckCircle2 className="h-3 w-3 mr-0.5" />Verified
           </Badge>
         ) : (
-          <Badge variant="outline" className="text-[10px] text-warning">
+          <Badge variant="outline" className="text-[11px] text-warning">
             <AlertTriangle className="h-3 w-3 mr-0.5" />Not Verified
           </Badge>
         )}

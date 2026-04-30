@@ -238,8 +238,8 @@ export default function TemplateManager() {
                                   <li key={f.id} className="text-xs text-muted-foreground flex items-center gap-1">
                                     <span className="w-1 h-1 rounded-full bg-muted-foreground/50" />
                                     {f.label}
-                                    <Badge variant="outline" className="text-[9px] h-4 px-1">{f.field_type}</Badge>
-                                    {f.is_required && <Badge variant="destructive" className="text-[9px] h-4 px-1">Req</Badge>}
+                                    <Badge variant="outline" className="text-[11px] h-4 px-1">{f.field_type}</Badge>
+                                    {f.is_required && <Badge variant="destructive" className="text-[11px] h-4 px-1">Req</Badge>}
                                   </li>
                                 ))}
                             </ul>

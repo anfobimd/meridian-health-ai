@@ -75,11 +75,11 @@ export function FollowUpBooker({
       )}
       <div className="flex gap-2">
         <div className="flex-1 space-y-1">
-          <Label className="text-[10px]">Date</Label>
+          <Label className="text-[11px]">Date</Label>
           <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="h-8 text-xs" />
         </div>
         <div className="w-24 space-y-1">
-          <Label className="text-[10px]">Time</Label>
+          <Label className="text-[11px]">Time</Label>
           <Input type="time" value={time} onChange={e => setTime(e.target.value)} className="h-8 text-xs" />
         </div>
       </div>

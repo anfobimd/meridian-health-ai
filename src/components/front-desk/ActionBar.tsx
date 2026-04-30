@@ -158,7 +158,7 @@ export function ActionBar() {
         <div className="flex items-center gap-1.5">
           <Sparkles className="h-3.5 w-3.5 text-primary" />
           <span className="text-xs font-semibold text-primary">Action Items</span>
-          <Badge variant="secondary" className="text-[9px] h-4 px-1.5">{visibleAlerts.length}</Badge>
+          <Badge variant="secondary" className="text-[11px] h-4 px-1.5">{visibleAlerts.length}</Badge>
         </div>
         <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => refetch()}>
           <RefreshCw className="h-3 w-3" />
@@ -179,10 +179,10 @@ export function ActionBar() {
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-medium truncate">{alert.title}</p>
-                <p className="text-[10px] text-muted-foreground truncate">{alert.detail}</p>
+                <p className="text-[11px] text-muted-foreground truncate">{alert.detail}</p>
               </div>
               <div className="flex items-center gap-1 shrink-0">
-                <Badge variant="outline" className="text-[9px] h-4 px-1 hidden sm:flex">{alert.action_label}</Badge>
+                <Badge variant="outline" className="text-[11px] h-4 px-1 hidden sm:flex">{alert.action_label}</Badge>
                 <button
                   onClick={(e) => { e.stopPropagation(); setDismissed(prev => new Set(prev).add(alert.id)); }}
                   className="opacity-0 group-hover:opacity-100 transition-opacity"

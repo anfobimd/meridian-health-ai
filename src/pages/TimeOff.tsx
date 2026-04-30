@@ -14,7 +14,7 @@ import { Plus, Loader2, CalendarOff, Trash2, Check, X } from "lucide-react";
 import { format } from "date-fns";
 
 const statusColors: Record<string, string> = {
-  pending: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
+  pending: "bg-warning/10 text-warning dark:bg-warning dark:text-warning",
   approved: "bg-primary/10 text-primary",
   rejected: "bg-destructive/10 text-destructive",
 };

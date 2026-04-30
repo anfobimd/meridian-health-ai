@@ -121,7 +121,7 @@ export default function Benchmarks() {
                 </TableRow>
               </TableBody>
             </Table>
-            <p className="text-[10px] text-muted-foreground mt-2">Green = top quartile · Red = bottom quartile. Click column headers to sort.</p>
+            <p className="text-[11px] text-muted-foreground mt-2">Green = top quartile · Red = bottom quartile. Click column headers to sort.</p>
           </CardContent>
         </Card>
       )}

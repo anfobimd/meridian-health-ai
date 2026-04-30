@@ -108,7 +108,7 @@ export default function SignaturePad({ onSignature, width = 400, height = 150 }:
         )}
       </div>
       <div className="flex items-center justify-between">
-        <p className="text-[10px] text-muted-foreground">Sign using your mouse or finger</p>
+        <p className="text-[11px] text-muted-foreground">Sign using your mouse or finger</p>
         <Button variant="ghost" size="sm" onClick={clear} disabled={!hasDrawn} className="text-xs h-7">
           <Eraser className="h-3 w-3 mr-1" /> Clear
         </Button>

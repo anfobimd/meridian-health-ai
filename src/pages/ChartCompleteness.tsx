@@ -253,7 +253,7 @@ export default function ChartCompleteness() {
                 {overdueData.by_provider.map((p: any, i: number) => (
                   <div key={i} className="flex items-center justify-between py-1 text-sm">
                     <span>{p.name}</span>
-                    <Badge variant={p.overdue_count > 3 ? "destructive" : "secondary"} className="text-[10px]">{p.overdue_count} overdue</Badge>
+                    <Badge variant={p.overdue_count > 3 ? "destructive" : "secondary"} className="text-[11px]">{p.overdue_count} overdue</Badge>
                   </div>
                 ))}
               </div>
@@ -262,7 +262,7 @@ export default function ChartCompleteness() {
                 {overdueData.predictions.slice(0, 5).map((p: any, i: number) => (
                   <div key={i} className="flex items-center justify-between py-1 text-xs">
                     <span>{p.provider} • {p.encounter_type}</span>
-                    <Badge variant={p.risk_level === "critical" ? "destructive" : p.risk_level === "high" ? "secondary" : "outline"} className="text-[9px]">
+                    <Badge variant={p.risk_level === "critical" ? "destructive" : p.risk_level === "high" ? "secondary" : "outline"} className="text-[11px]">
                       {p.hours_since_start}h ago
                     </Badge>
                   </div>
@@ -336,11 +336,11 @@ export default function ChartCompleteness() {
                   <TableRow key={item.encounterId}>
                     <TableCell className="font-medium">{item.patientName}</TableCell>
                     <TableCell className="text-sm">{item.providerName}</TableCell>
-                    <TableCell><Badge variant="outline" className="text-[10px]">{item.encounterType}</Badge></TableCell>
+                    <TableCell><Badge variant="outline" className="text-[11px]">{item.encounterType}</Badge></TableCell>
                     <TableCell className="text-xs text-muted-foreground">{format(parseISO(item.signedAt), "MMM d, yyyy")}</TableCell>
                     <TableCell>
                       <Badge variant={item.score === 100 ? "secondary" : "outline"}
-                        className={`text-[10px] ${item.score < 67 ? "border-destructive text-destructive" : item.score < 100 ? "border-warning text-warning" : "text-success"}`}>
+                        className={`text-[11px] ${item.score < 67 ? "border-destructive text-destructive" : item.score < 100 ? "border-warning text-warning" : "text-success"}`}>
                         {item.score}%
                       </Badge>
                     </TableCell>

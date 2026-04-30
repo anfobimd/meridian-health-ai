@@ -199,7 +199,7 @@ export default function UserManagement() {
                           {u.last_sign_in_at ? format(new Date(u.last_sign_in_at), "MMM d, h:mm a") : "Never"}
                         </TableCell>
                         <TableCell>
-                          {u.email_confirmed_at ? <Badge variant="outline" className="text-green-600">Yes</Badge> : <Badge variant="outline" className="text-orange-600">Pending</Badge>}
+                          {u.email_confirmed_at ? <Badge variant="outline" className="text-success">Yes</Badge> : <Badge variant="outline" className="text-warning">Pending</Badge>}
                         </TableCell>
                         <TableCell className="text-right">
                           <Select

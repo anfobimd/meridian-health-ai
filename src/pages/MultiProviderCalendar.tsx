@@ -78,7 +78,7 @@ export default function MultiProviderCalendar() {
 
   const statusColor = (s: string) => {
     if (s === "completed") return "bg-emerald-500/20 border-emerald-500/40 text-emerald-700";
-    if (s === "checked_in" || s === "roomed") return "bg-blue-500/20 border-blue-500/40 text-blue-700";
+    if (s === "checked_in" || s === "roomed") return "bg-info/20 border-info/40 text-info";
     if (s === "no_show") return "bg-destructive/20 border-destructive/40 text-destructive";
     return "bg-primary/10 border-primary/30 text-primary";
   };
@@ -147,14 +147,14 @@ export default function MultiProviderCalendar() {
                     <span className="text-muted-foreground ml-2">w/ {d.provider} • {d.treatment}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Badge variant={d.severity === "critical" ? "destructive" : "secondary"} className="text-[9px]">
+                    <Badge variant={d.severity === "critical" ? "destructive" : "secondary"} className="text-[11px]">
                       {d.delay_minutes} min late
                     </Badge>
                   </div>
                 </div>
               ))}
               {delays.some(d => d.severity === "critical") && (
-                <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                <p className="text-[11px] text-muted-foreground flex items-center gap-1">
                   <Brain className="h-2.5 w-2.5" />Consider reassigning patients or adjusting downstream appointments
                 </p>
               )}
@@ -183,7 +183,7 @@ export default function MultiProviderCalendar() {
                     <div>{p.first_name} {p.last_name?.charAt(0)}.</div>
                     {util && (
                       <div className="flex items-center justify-center gap-1 mt-0.5">
-                        <Badge variant="outline" className={cn("text-[8px]",
+                        <Badge variant="outline" className={cn("text-[11px]",
                           util.utilization_pct >= 80 ? "text-success border-success/30" :
                           util.utilization_pct >= 50 ? "text-primary border-primary/30" :
                           "text-muted-foreground"
@@ -191,7 +191,7 @@ export default function MultiProviderCalendar() {
                           {util.utilization_pct}% done
                         </Badge>
                         {provDelays.length > 0 && (
-                          <Badge variant="destructive" className="text-[8px]">
+                          <Badge variant="destructive" className="text-[11px]">
                             <Clock className="h-2 w-2 mr-0.5" />{provDelays.length}
                           </Badge>
                         )}
@@ -231,7 +231,7 @@ export default function MultiProviderCalendar() {
                             <div
                               key={a.id}
                               className={cn(
-                                "rounded px-1.5 py-0.5 text-[10px] border mb-0.5 transition-all hover:shadow-sm hover:scale-[1.02] hover:cursor-pointer",
+                                "rounded px-1.5 py-0.5 text-[11px] border mb-0.5 transition-all hover:shadow-sm hover:scale-[1.02] hover:cursor-pointer",
                                 statusColor(a.status),
                                 delay && "ring-1 ring-warning",
                               )}
@@ -242,7 +242,7 @@ export default function MultiProviderCalendar() {
                                 {risk && (
                                   <Badge
                                     variant={risk.variant}
-                                    className="text-[9px] h-4 px-1 shrink-0"
+                                    className="text-[11px] h-4 px-1 shrink-0"
                                     title={`${(a.patients as any)?.no_show_count} prior no-show(s)`}
                                   >
                                     {risk.label}
@@ -300,11 +300,11 @@ export default function MultiProviderCalendar() {
                       >
                         {dayAppts.length > 0 && (
                           <div className="flex items-center gap-1 flex-wrap">
-                            <Badge variant="secondary" className="text-[10px]">{dayAppts.length} appt{dayAppts.length > 1 ? "s" : ""}</Badge>
+                            <Badge variant="secondary" className="text-[11px]">{dayAppts.length} appt{dayAppts.length > 1 ? "s" : ""}</Badge>
                             {cellRisk && (
                               <Badge
                                 variant={cellRisk.variant}
-                                className="text-[9px] h-4 px-1"
+                                className="text-[11px] h-4 px-1"
                                 title={`${riskCount} patient(s) with no-show history`}
                               >
                                 {cellRisk.label}
@@ -350,7 +350,7 @@ export default function MultiProviderCalendar() {
                       {hasBookings && <ExternalLink className="h-3 w-3 text-muted-foreground" />}
                     </p>
                     <p className="text-2xl font-bold">{roomAppts.length}</p>
-                    <p className="text-[10px] text-muted-foreground">{roomAppts.length === 1 ? "booking" : "bookings"}{hasBookings ? " — click to view" : ""}</p>
+                    <p className="text-[11px] text-muted-foreground">{roomAppts.length === 1 ? "booking" : "bookings"}{hasBookings ? " — click to view" : ""}</p>
                   </button>
                 );
               })}
@@ -390,7 +390,7 @@ export default function MultiProviderCalendar() {
                           <span className="font-medium">
                             {a.patients?.first_name} {a.patients?.last_name}
                           </span>
-                          <Badge variant="outline" className="text-[10px] capitalize">{a.status?.replace(/_/g, " ")}</Badge>
+                          <Badge variant="outline" className="text-[11px] capitalize">{a.status?.replace(/_/g, " ")}</Badge>
                         </div>
                         <div className="text-xs text-muted-foreground flex items-center gap-2 flex-wrap">
                           <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{format(parseISO(a.scheduled_at), "h:mm a")}</span>

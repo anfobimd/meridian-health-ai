@@ -293,7 +293,7 @@ export default function ProviderDay() {
             <p className="text-xs font-semibold text-primary flex items-center gap-1.5">
               <Sparkles className="h-3.5 w-3.5" /> AI Day Brief
             </p>
-            <Button variant="ghost" size="sm" className="h-6 text-[10px] text-muted-foreground" onClick={loadDayBrief} disabled={dayBriefLoading}>
+            <Button variant="ghost" size="sm" className="h-6 text-[11px] text-muted-foreground" onClick={loadDayBrief} disabled={dayBriefLoading}>
               <RefreshCw className={`h-3 w-3 mr-1 ${dayBriefLoading ? "animate-spin" : ""}`} />
               Refresh
             </Button>
@@ -343,7 +343,7 @@ export default function ProviderDay() {
                       </div>
                     )}
                     {isLapsed(currentApt.patients) && (
-                      <Badge variant="outline" className="mt-1 text-[10px] border-warning/40 text-warning">
+                      <Badge variant="outline" className="mt-1 text-[11px] border-warning/40 text-warning">
                         <Clock className="h-2.5 w-2.5 mr-0.5" /> Returning after lapse
                       </Badge>
                     )}
@@ -408,36 +408,36 @@ export default function ProviderDay() {
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
                         {apt.visit_type === "telehealth" && (
-                          <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">
+                          <Badge variant="outline" className="text-[11px] border-primary/30 text-primary">
                             <Video className="h-2.5 w-2.5 mr-0.5" />Video
                           </Badge>
                         )}
                         {apt.visit_type === "phone" && (
-                          <Badge variant="outline" className="text-[10px]">
+                          <Badge variant="outline" className="text-[11px]">
                             <Phone className="h-2.5 w-2.5 mr-0.5" />Phone
                           </Badge>
                         )}
                         {apt.intake_form_id && (
-                          <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">
+                          <Badge variant="outline" className="text-[11px] border-primary/30 text-primary">
                             <ClipboardList className="h-2.5 w-2.5 mr-0.5" />Intake ✓
                           </Badge>
                         )}
                         {lapsed && (
-                          <Badge variant="outline" className="text-[10px] border-warning/30 text-warning">
+                          <Badge variant="outline" className="text-[11px] border-warning/30 text-warning">
                             <Clock className="h-2.5 w-2.5 mr-0.5" />Lapsed
                           </Badge>
                         )}
                         {pkgs.length > 0 && (
-                          <Badge variant="outline" className="text-[10px]">
+                          <Badge variant="outline" className="text-[11px]">
                             <Package className="h-2.5 w-2.5 mr-0.5" />{pkgs.length} pkg
                           </Badge>
                         )}
                         {apt.patients?.allergies?.length > 0 && (
-                          <Badge variant="outline" className="text-[10px] border-destructive/30 text-destructive">
+                          <Badge variant="outline" className="text-[11px] border-destructive/30 text-destructive">
                             <AlertTriangle className="h-2.5 w-2.5 mr-0.5" />Allergy
                           </Badge>
                         )}
-                        <Badge variant="secondary" className={`text-[10px] ${statusColor[apt.status] || ""}`}>
+                        <Badge variant="secondary" className={`text-[11px] ${statusColor[apt.status] || ""}`}>
                           {statusLabel[apt.status] || apt.status}
                         </Badge>
                         <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => loadAiBrief(apt)} disabled={briefLoading[apt.id]} aria-label="Generate AI brief for this patient">

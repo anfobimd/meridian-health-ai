@@ -36,10 +36,10 @@ interface AuditLog {
 }
 
 const ACTION_COLORS: Record<AuditAction, string> = {
-  create: "bg-green-100 text-green-800",
-  update: "bg-blue-100 text-blue-800",
-  delete: "bg-red-100 text-red-800",
-  login: "bg-gray-100 text-gray-800",
+  create: "bg-success/10 text-success",
+  update: "bg-info/10 text-info",
+  delete: "bg-destructive/10 text-destructive",
+  login: "bg-gray-100 text-muted-foreground",
 };
 
 export function AuditLog() {

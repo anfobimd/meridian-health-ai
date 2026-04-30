@@ -233,7 +233,7 @@ export default function ProviderProfile() {
           {completeness.percent === 100 ? (
             <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
           ) : (
-            <AlertCircle className="h-5 w-5 text-amber-500 shrink-0" />
+            <AlertCircle className="h-5 w-5 text-warning shrink-0" />
           )}
           <div className="flex-1">
             <div className="flex items-center justify-between mb-1">

@@ -77,7 +77,7 @@ export function InsurancePanel({ patientId }: Props) {
         <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
           <Shield className="h-3 w-3" />Insurance
         </h3>
-        <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2" onClick={() => setAddOpen(true)}>
+        <Button variant="ghost" size="sm" className="h-6 text-[11px] px-2" onClick={() => setAddOpen(true)}>
           <Plus className="h-2.5 w-2.5 mr-0.5" />Add
         </Button>
       </div>
@@ -88,9 +88,9 @@ export function InsurancePanel({ patientId }: Props) {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium">{ins.provider_name}</span>
-                {ins.is_primary && <Badge variant="secondary" className="text-[10px]">Primary</Badge>}
+                {ins.is_primary && <Badge variant="secondary" className="text-[11px]">Primary</Badge>}
               </div>
-              <Badge className={`text-[10px] ${statusColor(ins.eligibility_status)}`}>
+              <Badge className={`text-[11px] ${statusColor(ins.eligibility_status)}`}>
                 {ins.eligibility_status === "eligible" && <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" />}
                 {ins.eligibility_status === "ineligible" && <AlertTriangle className="h-2.5 w-2.5 mr-0.5" />}
                 {ins.eligibility_status}
@@ -101,7 +101,7 @@ export function InsurancePanel({ patientId }: Props) {
             <Button
               variant="outline"
               size="sm"
-              className="h-6 text-[10px] mt-1"
+              className="h-6 text-[11px] mt-1"
               onClick={() => checkEligibility.mutate(ins.id)}
               disabled={checkEligibility.isPending}
             >

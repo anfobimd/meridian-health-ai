@@ -119,7 +119,7 @@ export function BeforeAfterCompare({
         >
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-full p-2 shadow-lg">
             <svg
-              className="w-4 h-4 text-gray-600"
+              className="w-4 h-4 text-muted-foreground"
               fill="currentColor"
               viewBox="0 0 24 24"
             >

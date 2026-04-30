@@ -208,9 +208,9 @@ export default function ProviderPerformanceDashboard() {
             )}
             {providerIntel && (
               <div className="flex gap-3 mt-2 flex-wrap">
-                <Badge variant="outline" className="text-[10px]">Correction Rate: {((providerIntel.correction_rate || 0) * 100).toFixed(1)}%</Badge>
-                <Badge variant="outline" className="text-[10px]">Coaching Status: {providerIntel.coaching_status || "none"}</Badge>
-                <Badge variant="outline" className="text-[10px]">Total Charts: {providerIntel.total_charts || 0}</Badge>
+                <Badge variant="outline" className="text-[11px]">Correction Rate: {((providerIntel.correction_rate || 0) * 100).toFixed(1)}%</Badge>
+                <Badge variant="outline" className="text-[11px]">Coaching Status: {providerIntel.coaching_status || "none"}</Badge>
+                <Badge variant="outline" className="text-[11px]">Total Charts: {providerIntel.total_charts || 0}</Badge>
               </div>
             )}
           </CardContent>
@@ -299,7 +299,7 @@ export default function ProviderPerformanceDashboard() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <Card><CardContent className="p-4 text-center"><p className="text-[11px] font-medium text-muted-foreground uppercase">Total Reviewed</p><p className="text-2xl font-bold mt-1">{chartStats?.total ?? 0}</p></CardContent></Card>
             <Card><CardContent className="p-4 text-center"><p className="text-[11px] font-medium text-muted-foreground uppercase">Approved</p><p className="text-2xl font-bold mt-1 text-emerald-600">{chartStats?.approved ?? 0}</p></CardContent></Card>
-            <Card><CardContent className="p-4 text-center"><p className="text-[11px] font-medium text-muted-foreground uppercase">Corrected</p><p className={`text-2xl font-bold mt-1 ${(chartStats?.corrected ?? 0) > 0 ? "text-amber-600" : ""}`}>{chartStats?.corrected ?? 0}</p></CardContent></Card>
+            <Card><CardContent className="p-4 text-center"><p className="text-[11px] font-medium text-muted-foreground uppercase">Corrected</p><p className={`text-2xl font-bold mt-1 ${(chartStats?.corrected ?? 0) > 0 ? "text-warning" : ""}`}>{chartStats?.corrected ?? 0}</p></CardContent></Card>
             <Card><CardContent className="p-4 text-center"><p className="text-[11px] font-medium text-muted-foreground uppercase">Pending</p><p className="text-2xl font-bold mt-1">{chartStats?.pending ?? 0}</p></CardContent></Card>
           </div>
           <Card>
@@ -309,7 +309,7 @@ export default function ProviderPerformanceDashboard() {
               <p className="text-xs text-muted-foreground mt-1">Approval rate: <span className="font-bold">{chartStats?.approvalRate ?? 0}%</span></p>
               {providerIntel?.correction_rate != null && (
                 <p className="text-xs mt-1">
-                  <Badge variant={providerIntel.correction_rate > 0.15 ? "destructive" : "outline"} className="text-[10px]">
+                  <Badge variant={providerIntel.correction_rate > 0.15 ? "destructive" : "outline"} className="text-[11px]">
                     Correction rate: {(providerIntel.correction_rate * 100).toFixed(1)}%
                   </Badge>
                 </p>

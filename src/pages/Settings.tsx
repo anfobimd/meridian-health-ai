@@ -278,10 +278,10 @@ export default function Settings() {
   const verifiedFactors = mfaFactors.filter((f) => f.status === "verified");
 
   const tierColor = (tier: string) => {
-    if (tier === "excellent" || tier === "Excellent") return "text-green-600";
+    if (tier === "excellent" || tier === "Excellent") return "text-success";
     if (tier === "strong" || tier === "Strong") return "text-primary";
-    if (tier === "good" || tier === "Good") return "text-yellow-600";
-    if (tier === "fair" || tier === "Fair") return "text-orange-500";
+    if (tier === "good" || tier === "Good") return "text-warning";
+    if (tier === "fair" || tier === "Fair") return "text-warning";
     return "text-destructive";
   };
 
@@ -361,9 +361,9 @@ export default function Settings() {
                 </div>
                 {/* AI warnings */}
                 {aiScore?.warnings && aiScore.warnings.length > 0 && (
-                  <div className="space-y-1 rounded-md border border-orange-200 bg-orange-50 p-2 dark:border-orange-900 dark:bg-orange-950/30">
+                  <div className="space-y-1 rounded-md border border-warning/30 bg-warning/10 p-2 dark:border-warning/30 dark:bg-warning/30">
                     {aiScore.warnings.map((w, i) => (
-                      <p key={i} className="text-xs text-orange-700 dark:text-orange-400 flex items-center gap-1">
+                      <p key={i} className="text-xs text-warning dark:text-warning flex items-center gap-1">
                         <AlertTriangle className="h-3 w-3 shrink-0" /> {w}
                       </p>
                     ))}
@@ -507,7 +507,7 @@ export default function Settings() {
                       />
                     </div>
                     <p className="text-xs text-muted-foreground text-center max-w-sm break-all">
-                      Or manually enter: <code className="bg-muted px-1 py-0.5 rounded text-[10px]">{qrUri}</code>
+                      Or manually enter: <code className="bg-muted px-1 py-0.5 rounded text-[11px]">{qrUri}</code>
                     </p>
                   </div>
                   <div className="space-y-2">

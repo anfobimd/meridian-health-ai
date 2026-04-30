@@ -113,7 +113,7 @@ export function SignLockWorkflow({
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle className="flex items-center gap-2">
-                <AlertCircle className="h-5 w-5 text-amber-600" />
+                <AlertCircle className="h-5 w-5 text-warning" />
                 Sign and Lock Note?
               </AlertDialogTitle>
               <AlertDialogDescription className="text-base">
@@ -147,8 +147,8 @@ export function SignLockWorkflow({
     return (
       <div className="flex flex-col gap-3 p-4 border border-border rounded-lg bg-muted/50">
         <div className="flex items-center gap-2">
-          <Lock className="h-4 w-4 text-green-600" />
-          <Badge variant="outline" className="bg-green-50">
+          <Lock className="h-4 w-4 text-success" />
+          <Badge variant="outline" className="bg-success/10">
             Signed & Locked
           </Badge>
           <span className="text-sm text-muted-foreground">
@@ -182,10 +182,10 @@ export function SignLockWorkflow({
     const signedDate = signedAt ? new Date(signedAt).toLocaleDateString() : "Unknown";
 
     return (
-      <div className="flex flex-col gap-3 p-4 border border-border rounded-lg bg-blue-50">
+      <div className="flex flex-col gap-3 p-4 border border-border rounded-lg bg-info/10">
         <div className="flex items-center gap-2">
-          <Lock className="h-4 w-4 text-blue-600" />
-          <Badge className="bg-blue-600">Reviewed</Badge>
+          <Lock className="h-4 w-4 text-info" />
+          <Badge className="bg-info">Reviewed</Badge>
           <span className="text-sm text-muted-foreground">
             Reviewed on {signedDate}
           </span>
@@ -202,10 +202,10 @@ export function SignLockWorkflow({
     const signedDate = signedAt ? new Date(signedAt).toLocaleDateString() : "Unknown";
 
     return (
-      <div className="flex flex-col gap-3 p-4 border border-border rounded-lg bg-orange-50">
+      <div className="flex flex-col gap-3 p-4 border border-border rounded-lg bg-warning/10">
         <div className="flex items-center gap-2">
-          <Lock className="h-4 w-4 text-orange-600" />
-          <Badge variant="outline" className="bg-orange-50 text-orange-900">
+          <Lock className="h-4 w-4 text-warning" />
+          <Badge variant="outline" className="bg-warning/10 text-warning">
             Corrected
           </Badge>
           <span className="text-sm text-muted-foreground">

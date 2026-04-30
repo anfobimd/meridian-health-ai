@@ -336,7 +336,7 @@ export default function MembershipBilling() {
                           </div>
                         </TableCell>
                         <TableCell className="font-mono">${m.monthly_rate}/mo</TableCell>
-                        <TableCell>{m.founding_rate_locked ? <Badge className="bg-amber-500/10 text-amber-600 border-amber-200">Year 1 Lock</Badge> : "—"}</TableCell>
+                        <TableCell>{m.founding_rate_locked ? <Badge className="bg-warning/10 text-warning border-warning/30">Year 1 Lock</Badge> : "—"}</TableCell>
                         <TableCell><Badge variant={m.status === "active" || m.is_active ? "default" : "secondary"}>{m.status || (m.is_active ? "active" : "inactive")}</Badge></TableCell>
                       </TableRow>
                     ))}

@@ -134,11 +134,11 @@ export function TreatmentRecommendations({ patientId, patientName }: TreatmentRe
                     <div className="flex-1 space-y-1.5">
                       <div className="flex items-center gap-2 flex-wrap">
                         <h4 className="font-semibold text-sm">{rec.treatment_name}</h4>
-                        <Badge variant={priorityColor(rec.priority)} className="text-[10px]">
+                        <Badge variant={priorityColor(rec.priority)} className="text-[11px]">
                           {rec.priority}
                         </Badge>
                         {rec.category && (
-                          <Badge variant="outline" className="text-[10px]">
+                          <Badge variant="outline" className="text-[11px]">
                             {rec.category}
                           </Badge>
                         )}
@@ -160,7 +160,7 @@ export function TreatmentRecommendations({ patientId, patientName }: TreatmentRe
                         <Package className="h-3 w-3" />
                         {rec.package_suggestion.name}
                       </span>
-                      <Badge variant="secondary" className="text-[10px]">
+                      <Badge variant="secondary" className="text-[11px]">
                         Save {rec.package_suggestion.savings}
                       </Badge>
                     </div>

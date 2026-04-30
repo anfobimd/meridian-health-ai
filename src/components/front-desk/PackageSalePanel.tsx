@@ -104,7 +104,7 @@ export function PackageSalePanel({ patientId, patientName, open, onOpenChange }:
           {/* Purchase History */}
           {(purchaseHistory?.length ?? 0) > 0 && (
             <div className="space-y-1.5">
-              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+              <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
                 <History className="h-3 w-3" />Purchase History
               </p>
               {purchaseHistory!.map((p: any) => (
@@ -116,8 +116,8 @@ export function PackageSalePanel({ patientId, patientName, open, onOpenChange }:
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Badge variant={p.status === "active" ? "default" : "secondary"} className="text-[9px]">{p.status}</Badge>
-                    <span className="text-[10px] text-muted-foreground">
+                    <Badge variant={p.status === "active" ? "default" : "secondary"} className="text-[11px]">{p.status}</Badge>
+                    <span className="text-[11px] text-muted-foreground">
                       {format(new Date(p.purchased_at), "MMM d, yyyy")}
                     </span>
                   </div>
@@ -146,14 +146,14 @@ export function PackageSalePanel({ patientId, patientName, open, onOpenChange }:
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-medium">{rec.package_name}</span>
                       <div className="flex items-center gap-1.5">
-                        {rec.estimated_savings && <Badge variant="outline" className="text-[9px] text-success">{rec.estimated_savings} savings</Badge>}
-                        <Badge variant={rec.urgency === "high" ? "destructive" : "secondary"} className="text-[9px]">{rec.urgency}</Badge>
+                        {rec.estimated_savings && <Badge variant="outline" className="text-[11px] text-success">{rec.estimated_savings} savings</Badge>}
+                        <Badge variant={rec.urgency === "high" ? "destructive" : "secondary"} className="text-[11px]">{rec.urgency}</Badge>
                       </div>
                     </div>
-                    <p className="text-[10px] text-muted-foreground">{rec.reasoning}</p>
-                    {rec.synergy_note && <p className="text-[10px] text-primary">{rec.synergy_note}</p>}
+                    <p className="text-[11px] text-muted-foreground">{rec.reasoning}</p>
+                    {rec.synergy_note && <p className="text-[11px] text-primary">{rec.synergy_note}</p>}
                     {rec.package_id && (
-                      <Button size="sm" variant="outline" className="text-[10px] h-6 mt-1" onClick={() => setSelectedPkg(rec.package_id)}>
+                      <Button size="sm" variant="outline" className="text-[11px] h-6 mt-1" onClick={() => setSelectedPkg(rec.package_id)}>
                         Select This Package
                       </Button>
                     )}
@@ -199,7 +199,7 @@ export function PackageSalePanel({ patientId, patientName, open, onOpenChange }:
                         <CalendarDays className="h-2.5 w-2.5" />Valid {pkg.valid_days} days
                       </span>
                     )}
-                    {savings > 0 && <Badge variant="outline" className="text-success text-[9px]">
+                    {savings > 0 && <Badge variant="outline" className="text-success text-[11px]">
                       <TrendingUp className="h-2.5 w-2.5 mr-0.5" />Save ${savings}
                     </Badge>}
                   </div>

@@ -214,7 +214,7 @@ export default function RoomsDevices() {
                         <DoorOpen className="h-5 w-5 text-primary" />
                         <span className="font-semibold text-sm">{room.name}</span>
                       </div>
-                      <Badge variant="secondary" className="text-[10px]">{room.room_type}</Badge>
+                      <Badge variant="secondary" className="text-[11px]">{room.room_type}</Badge>
                     </div>
                     {room.providers && (
                       <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -292,7 +292,7 @@ export default function RoomsDevices() {
                         <Cpu className="h-5 w-5 text-primary" />
                         <span className="font-semibold text-sm">{device.name}</span>
                       </div>
-                      <Badge variant="secondary" className="text-[10px]">{device.device_type?.replace("_", " ")}</Badge>
+                      <Badge variant="secondary" className="text-[11px]">{device.device_type?.replace("_", " ")}</Badge>
                     </div>
                     {device.rooms && (
                       <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -358,7 +358,7 @@ export default function RoomsDevices() {
                   <Card key={req.id}>
                     <CardContent className="p-3 flex items-center justify-between">
                       <span className="text-sm">{treatment?.name ?? "Unknown"} → {(device as any)?.name ?? "Unknown"}</span>
-                      <Badge variant={req.is_required ? "default" : "secondary"} className="text-[10px]">
+                      <Badge variant={req.is_required ? "default" : "secondary"} className="text-[11px]">
                         {req.is_required ? "Required" : "Preferred"}
                       </Badge>
                     </CardContent>

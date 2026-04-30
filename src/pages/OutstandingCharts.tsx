@@ -101,9 +101,9 @@ export default function OutstandingCharts() {
 
   const getAgeBadge = (createdAt: string) => {
     const hours = differenceInHours(new Date(), parseISO(createdAt));
-    if (hours > 72) return <Badge variant="destructive" className="text-[10px]">{Math.round(hours / 24)}d overdue</Badge>;
-    if (hours > 24) return <Badge className="text-[10px] bg-warning text-warning-foreground">{Math.round(hours / 24)}d</Badge>;
-    return <Badge variant="secondary" className="text-[10px]">{hours}h</Badge>;
+    if (hours > 72) return <Badge variant="destructive" className="text-[11px]">{Math.round(hours / 24)}d overdue</Badge>;
+    if (hours > 24) return <Badge className="text-[11px] bg-warning text-warning-foreground">{Math.round(hours / 24)}d</Badge>;
+    return <Badge variant="secondary" className="text-[11px]">{hours}h</Badge>;
   };
 
   return (
@@ -171,8 +171,8 @@ export default function OutstandingCharts() {
                   <TableRow key={e.id}>
                     <TableCell className="font-medium">{e.patients?.first_name} {e.patients?.last_name}</TableCell>
                     <TableCell className="text-sm">{e.providers?.first_name} {e.providers?.last_name}</TableCell>
-                    <TableCell><Badge variant="outline" className="text-[10px]">{e.encounter_type || "General"}</Badge></TableCell>
-                    <TableCell><Badge variant="secondary" className="text-[10px]">{e.status}</Badge></TableCell>
+                    <TableCell><Badge variant="outline" className="text-[11px]">{e.encounter_type || "General"}</Badge></TableCell>
+                    <TableCell><Badge variant="secondary" className="text-[11px]">{e.status}</Badge></TableCell>
                     <TableCell className="text-xs text-muted-foreground">{format(parseISO(e.created_at), "MMM d, h:mm a")}</TableCell>
                     <TableCell>{getAgeBadge(e.created_at)}</TableCell>
                   </TableRow>
@@ -219,11 +219,11 @@ export default function OutstandingCharts() {
                     <TableCell>{p.count}</TableCell>
                     <TableCell>
                       {p.avgHours > 48 ? (
-                        <Badge variant="destructive" className="text-[10px]">Needs Improvement</Badge>
+                        <Badge variant="destructive" className="text-[11px]">Needs Improvement</Badge>
                       ) : p.avgHours > 24 ? (
-                        <Badge className="text-[10px] bg-warning text-warning-foreground">Moderate</Badge>
+                        <Badge className="text-[11px] bg-warning text-warning-foreground">Moderate</Badge>
                       ) : (
-                        <Badge variant="secondary" className="text-[10px]">Good</Badge>
+                        <Badge variant="secondary" className="text-[11px]">Good</Badge>
                       )}
                     </TableCell>
                   </TableRow>

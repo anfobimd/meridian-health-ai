@@ -126,7 +126,7 @@ export function CheckoutPanel({ appointmentId, open, onOpenChange }: {
                       <AlertTriangle className="h-4 w-4 text-warning mt-0.5 shrink-0" />
                     )}
                     <span>{item.item}</span>
-                    <Badge variant={item.severity === "critical" ? "destructive" : "secondary"} className="ml-auto text-[10px]">
+                    <Badge variant={item.severity === "critical" ? "destructive" : "secondary"} className="ml-auto text-[11px]">
                       {item.severity}
                     </Badge>
                   </div>

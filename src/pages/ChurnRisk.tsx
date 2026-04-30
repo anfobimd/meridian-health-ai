@@ -19,8 +19,8 @@ import { toast } from "sonner";
 
 const tierConfig = {
   critical: { color: "bg-destructive text-destructive-foreground", icon: AlertTriangle, label: "Critical" },
-  high: { color: "bg-orange-500 text-white", icon: TrendingDown, label: "High" },
-  medium: { color: "bg-yellow-500 text-black", icon: Activity, label: "Medium" },
+  high: { color: "bg-warning text-white", icon: TrendingDown, label: "High" },
+  medium: { color: "bg-warning text-black", icon: Activity, label: "Medium" },
   low: { color: "bg-emerald-500 text-white", icon: Shield, label: "Low" },
 };
 

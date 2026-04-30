@@ -66,8 +66,8 @@ export function PhotoGallery({ patientId }: PhotoGalleryProps) {
         )}
         <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-background/80 to-transparent p-2">
           <div className="flex gap-1">
-            <Badge variant="secondary" className="text-[10px] capitalize">{photo.photo_type}</Badge>
-            <Badge variant="outline" className="text-[10px] capitalize">{photo.body_area}</Badge>
+            <Badge variant="secondary" className="text-[11px] capitalize">{photo.photo_type}</Badge>
+            <Badge variant="outline" className="text-[11px] capitalize">{photo.body_area}</Badge>
           </div>
         </div>
       </div>

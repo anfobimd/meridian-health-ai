@@ -20,7 +20,7 @@ import { getNoShowRisk } from "@/lib/no-show-risk";
 const statusColors: Record<string, string> = {
   booked: "bg-primary/10 text-primary",
   checked_in: "bg-warning/10 text-warning",
-  roomed: "bg-blue-500/10 text-blue-600",
+  roomed: "bg-info/10 text-info",
   in_progress: "bg-accent/10 text-accent",
   completed: "bg-success/10 text-success",
   no_show: "bg-destructive/10 text-destructive",
@@ -426,7 +426,7 @@ export default function Appointments() {
             <div className="flex items-center gap-2 mb-2">
               {["Patient & Treatment", "Provider", "Date & Slot"].map((label, i) => (
                 <div key={label} className="flex items-center gap-1.5">
-                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold ${
                     bookingStep > i ? "bg-primary text-primary-foreground" : bookingStep === i ? "bg-primary/20 text-primary border border-primary" : "bg-muted text-muted-foreground"
                   }`}>
                     {bookingStep > i ? <Check className="h-3 w-3" /> : i + 1}
@@ -462,7 +462,7 @@ export default function Appointments() {
 
                 {bookVisitType === "telehealth" && (
                   <div className="space-y-2">
-                    <Label>Video Room URL <span className="text-muted-foreground text-[10px]">(optional — auto-generated if blank)</span></Label>
+                    <Label>Video Room URL <span className="text-muted-foreground text-[11px]">(optional — auto-generated if blank)</span></Label>
                     <Input value={bookVideoUrl} onChange={(e) => setBookVideoUrl(e.target.value)} placeholder="https://meet.example.com/room-id" />
                   </div>
                 )}
@@ -484,11 +484,11 @@ export default function Appointments() {
                       <AlertTriangle className="h-3 w-3" />
                       No-Show Risk: {noShowRisk.risk_level.toUpperCase()} ({noShowRisk.risk_score}%)
                     </p>
-                    <p className="text-[10px] text-muted-foreground">
+                    <p className="text-[11px] text-muted-foreground">
                       {noShowRisk.no_show_count} no-shows out of {noShowRisk.total_appointments} appointments ({noShowRisk.no_show_rate}% rate)
                     </p>
                     {noShowRisk.needs_deposit && (
-                      <p className="text-[10px] font-medium text-destructive flex items-center gap-1">
+                      <p className="text-[11px] font-medium text-destructive flex items-center gap-1">
                         <ShieldAlert className="h-2.5 w-2.5" />{noShowRisk.deposit_reason}
                       </p>
                     )}
@@ -512,7 +512,7 @@ export default function Appointments() {
                     <p className="text-xs font-medium text-primary flex items-center gap-1">
                       <Timer className="h-3 w-3" />Duration adjusted: {durationEstimate.base_duration} → {durationEstimate.suggested_duration} min
                     </p>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">{durationEstimate.reason}</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">{durationEstimate.reason}</p>
                   </div>
                 )}
 
@@ -529,11 +529,11 @@ export default function Appointments() {
                       .filter((r: any) => r.severity !== "info")
                       .map((r: any, i: number) => (
                         <div key={i} className="flex items-start gap-1.5">
-                          <Badge variant={r.severity === "critical" ? "destructive" : "secondary"} className="text-[9px] flex-shrink-0">{r.severity}</Badge>
-                          <p className="text-[10px] text-muted-foreground"><span className="font-medium">{r.label}:</span> {r.detail}</p>
+                          <Badge variant={r.severity === "critical" ? "destructive" : "secondary"} className="text-[11px] flex-shrink-0">{r.severity}</Badge>
+                          <p className="text-[11px] text-muted-foreground"><span className="font-medium">{r.label}:</span> {r.detail}</p>
                         </div>
                       ))}
-                    <p className="text-[10px] text-muted-foreground italic mt-1">{contraindicationCheck.narrative}</p>
+                    <p className="text-[11px] text-muted-foreground italic mt-1">{contraindicationCheck.narrative}</p>
                   </div>
                 )}
 
@@ -565,14 +565,14 @@ export default function Appointments() {
                               {i === 2 && "🥉 "}
                               {prov ? `Dr. ${prov.last_name}, ${prov.first_name}` : r.id}
                             </span>
-                            <Badge variant="outline" className="text-[9px]">{r.score}%</Badge>
+                            <Badge variant="outline" className="text-[11px]">{r.score}%</Badge>
                           </div>
-                          <p className="text-[10px] text-muted-foreground mt-0.5">{r.reason}</p>
+                          <p className="text-[11px] text-muted-foreground mt-0.5">{r.reason}</p>
                         </button>
                       );
                     })}
                     {providerMatch.narrative && (
-                      <p className="text-[10px] text-muted-foreground italic">{providerMatch.narrative}</p>
+                      <p className="text-[11px] text-muted-foreground italic">{providerMatch.narrative}</p>
                     )}
                   </div>
                 )}
@@ -735,7 +735,7 @@ export default function Appointments() {
             <div className="space-y-4">
               {(["subjective", "objective", "assessment", "plan"] as const).map((section) => (
                 <div key={section}>
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">{section}</p>
+                  <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">{section}</p>
                   <Textarea value={soapNote[section] || ""} onChange={(e) => setSoapNote({ ...soapNote, [section]: e.target.value })} rows={3} className="text-sm" />
                 </div>
               ))}
@@ -772,7 +772,7 @@ export default function Appointments() {
                 <p className="text-xs font-medium text-primary flex items-center gap-1"><Sparkles className="h-3 w-3" />Waitlist Matches for This Slot</p>
                 {waitlistMatches.matches.slice(0, 3).map((m: any, i: number) => (
                   <div key={i} className="p-2 bg-primary/5 rounded border border-primary/20 text-xs">
-                    <div className="flex justify-between"><span className="font-medium">{m.patient_name}</span><Badge variant="outline" className="text-[9px]">{m.fit_score}%</Badge></div>
+                    <div className="flex justify-between"><span className="font-medium">{m.patient_name}</span><Badge variant="outline" className="text-[11px]">{m.fit_score}%</Badge></div>
                     <p className="text-muted-foreground mt-0.5">{m.reason}</p>
                   </div>
                 ))}
@@ -791,7 +791,7 @@ export default function Appointments() {
             <p className="text-sm text-muted-foreground">Send a "We missed you" message to this no-show patient?</p>
             <div className="rounded-md border border-primary/30 bg-primary/5 p-3">
               <Textarea value={reEngageDraft} onChange={(e) => setReEngageDraft(e.target.value)} rows={3} className="text-sm" />
-              <p className="text-[10px] text-muted-foreground mt-1">{reEngageDraft.length}/160 characters</p>
+              <p className="text-[11px] text-muted-foreground mt-1">{reEngageDraft.length}/160 characters</p>
             </div>
             <div className="flex gap-2">
               <Button className="flex-1" onClick={async () => {
@@ -827,7 +827,7 @@ export default function Appointments() {
                          return risk ? (
                            <Badge
                              variant={risk.variant}
-                             className="ml-2 text-[10px] h-5"
+                             className="ml-2 text-[11px] h-5"
                              title={`${apt.patients?.no_show_count} prior no-show(s)`}
                            >
                              {risk.label}
@@ -839,10 +839,10 @@ export default function Appointments() {
                       {apt.treatments?.name ?? "General"} • Dr. {apt.providers?.last_name ?? "Unassigned"} • {format(parseISO(apt.scheduled_at), "MMM d, yyyy 'at' h:mm a")}
                     </p>
                     <div className="flex items-center gap-2 mt-1 flex-wrap">
-                      {apt.visit_type === "telehealth" && <Badge className="bg-blue-500/10 text-blue-600 text-[10px] gap-1"><Video className="h-2.5 w-2.5" />Telehealth</Badge>}
-                      {apt.visit_type === "phone" && <Badge className="bg-amber-500/10 text-amber-600 text-[10px] gap-1"><Phone className="h-2.5 w-2.5" />Phone</Badge>}
-                      {apt.rooms && <Badge variant="outline" className="text-[10px] gap-1"><DoorOpen className="h-2.5 w-2.5" />{apt.rooms.name}</Badge>}
-                      {apt.devices && <Badge variant="outline" className="text-[10px] gap-1"><Cpu className="h-2.5 w-2.5" />{apt.devices.name}</Badge>}
+                      {apt.visit_type === "telehealth" && <Badge className="bg-info/10 text-info text-[11px] gap-1"><Video className="h-2.5 w-2.5" />Telehealth</Badge>}
+                      {apt.visit_type === "phone" && <Badge className="bg-warning/10 text-warning text-[11px] gap-1"><Phone className="h-2.5 w-2.5" />Phone</Badge>}
+                      {apt.rooms && <Badge variant="outline" className="text-[11px] gap-1"><DoorOpen className="h-2.5 w-2.5" />{apt.rooms.name}</Badge>}
+                      {apt.devices && <Badge variant="outline" className="text-[11px] gap-1"><Cpu className="h-2.5 w-2.5" />{apt.devices.name}</Badge>}
                     </div>
                   </div>
                 </div>
@@ -878,7 +878,7 @@ export default function Appointments() {
                   )}
                   <Badge variant="secondary" className={statusColors[apt.status] ?? ""}>{apt.status.replace("_", " ")}</Badge>
                   {apt.cancellation_reason && apt.status === "cancelled" && (
-                    <span className="text-[10px] text-muted-foreground italic">{apt.cancellation_reason}</span>
+                    <span className="text-[11px] text-muted-foreground italic">{apt.cancellation_reason}</span>
                   )}
                 </div>
               </CardContent>

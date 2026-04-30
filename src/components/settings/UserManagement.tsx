@@ -334,20 +334,20 @@ export function UserManagement() {
   const roleBadge = (role: AppRole | null) => {
     if (!role) return <Badge variant="outline" className="text-muted-foreground">No role</Badge>;
     const colors: Record<AppRole, string> = {
-      super_admin: "bg-red-600/10 text-red-700 border-red-600/20",
+      super_admin: "bg-destructive/10 text-destructive border-destructive/20",
       admin: "bg-destructive/10 text-destructive border-destructive/20",
-      clinic_owner: "bg-purple-600/10 text-purple-700 border-purple-600/20",
+      clinic_owner: "bg-info/10 text-info border-info/20",
       medical_director: "bg-indigo-600/10 text-indigo-700 border-indigo-600/20",
-      physician: "bg-blue-600/10 text-blue-700 border-blue-600/20",
+      physician: "bg-info/10 text-info border-info/20",
       nurse_practitioner: "bg-cyan-600/10 text-cyan-700 border-cyan-600/20",
       physician_assistant: "bg-teal-600/10 text-teal-700 border-teal-600/20",
       registered_nurse: "bg-emerald-600/10 text-emerald-700 border-emerald-600/20",
       provider: "bg-primary/10 text-primary border-primary/20",
       aesthetician: "bg-pink-600/10 text-pink-700 border-pink-600/20",
       front_desk: "bg-accent text-accent-foreground",
-      billing: "bg-amber-600/10 text-amber-700 border-amber-600/20",
-      marketing: "bg-orange-600/10 text-orange-700 border-orange-600/20",
-      user: "bg-gray-500/10 text-gray-600 border-gray-500/20",
+      billing: "bg-warning/10 text-warning border-warning/20",
+      marketing: "bg-warning/10 text-warning border-warning/20",
+      user: "bg-gray-500/10 text-muted-foreground border-gray-500/20",
     };
     return <Badge variant="outline" className={colors[role] ?? ""}>{role.replace(/_/g, " ")}</Badge>;
   };
@@ -483,7 +483,7 @@ export function UserManagement() {
                                   </div>
                                 )}
                                 {u.email && <p className="text-xs text-muted-foreground">{u.email}</p>}
-                                <p className="text-[10px] text-muted-foreground/60 truncate max-w-[180px]">{u.user_id}</p>
+                                <p className="text-[11px] text-muted-foreground/60 truncate max-w-[180px]">{u.user_id}</p>
                               </div>
                             </TableCell>
                             <TableCell>{roleBadge(u.role)}</TableCell>

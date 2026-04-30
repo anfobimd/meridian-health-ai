@@ -416,7 +416,7 @@ export function ClinicalPhotos() {
       ) : (
         <div>
           {compareMode && (
-            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between">
+            <div className="mb-4 p-3 bg-info/10 border border-info/30 rounded-lg flex items-center justify-between">
               <div className="text-sm">
                 <p className="font-semibold">
                   {selectedPhotos.length === 2 && samePatient
@@ -474,8 +474,8 @@ export function ClinicalPhotos() {
                       className="w-full h-full object-cover"
                     />
                     {compareMode && selectedPhotos.includes(photo.id) && (
-                      <div className="absolute inset-0 bg-blue-500/20 flex items-center justify-center">
-                        <div className="bg-blue-500 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold">
+                      <div className="absolute inset-0 bg-info/20 flex items-center justify-center">
+                        <div className="bg-info text-white rounded-full w-8 h-8 flex items-center justify-center font-bold">
                           {selectedPhotos.indexOf(photo.id) + 1}
                         </div>
                       </div>

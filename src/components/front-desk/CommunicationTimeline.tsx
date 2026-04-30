@@ -146,13 +146,13 @@ export function CommunicationTimeline({ patientId, patientName, patientPhone }: 
                   ) : (
                     <ArrowUp className="h-2.5 w-2.5 text-primary" />
                   )}
-                  <Badge variant="outline" className="text-[9px] h-4">{msg.channel}</Badge>
+                  <Badge variant="outline" className="text-[11px] h-4">{msg.channel}</Badge>
                   {msg.ai_intent && (
-                    <Badge variant="secondary" className="text-[9px] h-4">
+                    <Badge variant="secondary" className="text-[11px] h-4">
                       <Sparkles className="h-2 w-2 mr-0.5" />{msg.ai_intent}
                     </Badge>
                   )}
-                  <span className="text-[10px] text-muted-foreground ml-auto">
+                  <span className="text-[11px] text-muted-foreground ml-auto">
                     {new Date(msg.created_at).toLocaleString(undefined, {
                       month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
                     })}
@@ -160,7 +160,7 @@ export function CommunicationTimeline({ patientId, patientName, patientPhone }: 
                 </div>
                 <p className="text-xs">{msg.content}</p>
                 {msg.delivery_status && (
-                  <p className="text-[10px] text-muted-foreground mt-1">{msg.delivery_status}</p>
+                  <p className="text-[11px] text-muted-foreground mt-1">{msg.delivery_status}</p>
                 )}
               </div>
             </div>

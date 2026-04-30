@@ -170,7 +170,7 @@ export default function AutomationRules() {
                 <p className="text-muted-foreground mt-0.5">{a.recommendation}</p>
               </div>
             ))}
-            <p className="text-[10px] text-muted-foreground">{aiFatigue.narrative}</p>
+            <p className="text-[11px] text-muted-foreground">{aiFatigue.narrative}</p>
           </CardContent>
         </Card>
       )}
@@ -207,10 +207,10 @@ export default function AutomationRules() {
                 <div>
                   <p className="font-medium">{s.title}</p>
                   <p className="text-muted-foreground mt-0.5">{s.description}</p>
-                  {s.trigger && <Badge variant="outline" className="text-[9px] mt-1 mr-1">{s.trigger}</Badge>}
-                  {s.action && <Badge variant="outline" className="text-[9px] mt-1">{s.action}</Badge>}
+                  {s.trigger && <Badge variant="outline" className="text-[11px] mt-1 mr-1">{s.trigger}</Badge>}
+                  {s.action && <Badge variant="outline" className="text-[11px] mt-1">{s.action}</Badge>}
                 </div>
-                <Badge variant={s.priority === "high" ? "destructive" : s.priority === "medium" ? "secondary" : "outline"} className="text-[9px] flex-shrink-0">{s.priority}</Badge>
+                <Badge variant={s.priority === "high" ? "destructive" : s.priority === "medium" ? "secondary" : "outline"} className="text-[11px] flex-shrink-0">{s.priority}</Badge>
               </div>
             ))}
           </CardContent>

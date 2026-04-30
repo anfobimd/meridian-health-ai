@@ -20,10 +20,10 @@ const NOTE_TYPES = [
 ] as const;
 
 const typeColors: Record<string, string> = {
-  phone_call: "bg-blue-500/10 text-blue-700 dark:text-blue-400",
-  scheduling: "bg-purple-500/10 text-purple-700 dark:text-purple-400",
-  billing: "bg-green-500/10 text-green-700 dark:text-green-400",
-  patient_request: "bg-orange-500/10 text-orange-700 dark:text-orange-400",
+  phone_call: "bg-info/10 text-info dark:text-info",
+  scheduling: "bg-info/10 text-info dark:text-info",
+  billing: "bg-success/10 text-success dark:text-success",
+  patient_request: "bg-warning/10 text-warning dark:text-warning",
   general: "bg-muted text-muted-foreground",
 };
 
@@ -78,7 +78,7 @@ export function AdminNotesPanel({
         <div className="flex items-center gap-2">
           <StickyNote className="h-4 w-4 text-primary" />
           <span className="font-semibold text-sm">Admin Notes</span>
-          <Badge variant="secondary" className="text-[10px] ml-auto">{notes?.length ?? 0}</Badge>
+          <Badge variant="secondary" className="text-[11px] ml-auto">{notes?.length ?? 0}</Badge>
         </div>
 
         {/* Compose */}
@@ -126,15 +126,15 @@ export function AdminNotesPanel({
               return (
                 <div key={note.id} className="border rounded-lg p-2.5 space-y-1">
                   <div className="flex items-center gap-1.5">
-                    <Badge className={`text-[9px] h-4 px-1.5 ${typeColors[note.note_type] || typeColors.general}`}>
+                    <Badge className={`text-[11px] h-4 px-1.5 ${typeColors[note.note_type] || typeColors.general}`}>
                       <Icon className="h-2.5 w-2.5 mr-0.5" />{typeInfo.label}
                     </Badge>
-                    <span className="text-[10px] text-muted-foreground ml-auto">
+                    <span className="text-[11px] text-muted-foreground ml-auto">
                       {format(parseISO(note.created_at), "MMM d, h:mm a")}
                     </span>
                   </div>
                   <p className="text-xs">{note.content}</p>
-                  <p className="text-[10px] text-muted-foreground">
+                  <p className="text-[11px] text-muted-foreground">
                     — {(note as any).profiles?.display_name || "Staff"}
                   </p>
                 </div>

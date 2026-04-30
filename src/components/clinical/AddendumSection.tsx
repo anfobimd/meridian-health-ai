@@ -70,8 +70,8 @@ export function AddendumSection({ noteId, noteStatus }: AddendumSectionProps) {
           {addenda.map((a) => (
             <div key={a.id} className="bg-muted/50 rounded-md p-3 text-sm space-y-1">
               <div className="flex items-center gap-2">
-                <Badge variant="outline" className="text-[10px]">Addendum</Badge>
-                <span className="text-[10px] text-muted-foreground">
+                <Badge variant="outline" className="text-[11px]">Addendum</Badge>
+                <span className="text-[11px] text-muted-foreground">
                   {format(parseISO(a.created_at), "MMM d, yyyy h:mm a")}
                 </span>
               </div>

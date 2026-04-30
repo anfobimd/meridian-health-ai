@@ -154,8 +154,8 @@ function SliderOverlay({ before, after, pos, onPosChange }: { before: any; after
         <div className="absolute top-0 bottom-0" style={{ left: `${pos}%` }}>
           <div className="w-0.5 h-full bg-primary shadow-lg" />
         </div>
-        <div className="absolute top-2 left-2"><Badge className="text-[10px]">Before</Badge></div>
-        <div className="absolute top-2 right-2"><Badge variant="secondary" className="text-[10px]">After</Badge></div>
+        <div className="absolute top-2 left-2"><Badge className="text-[11px]">Before</Badge></div>
+        <div className="absolute top-2 right-2"><Badge variant="secondary" className="text-[11px]">After</Badge></div>
       </div>
       <Slider value={[pos]} onValueChange={(v) => onPosChange(v[0])} min={0} max={100} step={1} />
     </div>

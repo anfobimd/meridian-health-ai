@@ -149,7 +149,7 @@ export function IntakeReviewPanel({ appointmentId, patientId }: { appointmentId?
         <Card>
           <CardContent className="p-3 space-y-2">
             <p className="text-xs font-semibold flex items-center gap-1"><ClipboardList className="h-3 w-3 text-primary" /> Intake Form</p>
-            <Badge variant="outline" className="text-[9px]">{intakeForm.form_type} · Submitted {intakeForm.submitted_at ? format(parseISO(intakeForm.submitted_at), "M/d h:mm a") : "—"}</Badge>
+            <Badge variant="outline" className="text-[11px]">{intakeForm.form_type} · Submitted {intakeForm.submitted_at ? format(parseISO(intakeForm.submitted_at), "M/d h:mm a") : "—"}</Badge>
             {Object.entries(responses).slice(0, 15).map(([key, val]) => (
               <div key={key} className="text-xs">
                 <span className="text-muted-foreground">{key.replace(/_/g, " ")}:</span>{" "}
@@ -180,8 +180,8 @@ export function IntakeReviewPanel({ appointmentId, patientId }: { appointmentId?
             />
             {(hormoneVisit.intake_symptoms?.length ?? 0) > 0 && (
               <div>
-                <p className="text-[10px] text-muted-foreground">Symptoms</p>
-                <div className="flex flex-wrap gap-1">{hormoneVisit.intake_symptoms.map((s: string) => <Badge key={s} variant="outline" className="text-[9px]">{s}</Badge>)}</div>
+                <p className="text-[11px] text-muted-foreground">Symptoms</p>
+                <div className="flex flex-wrap gap-1">{hormoneVisit.intake_symptoms.map((s: string) => <Badge key={s} variant="outline" className="text-[11px]">{s}</Badge>)}</div>
               </div>
             )}
           </CardContent>
@@ -452,7 +452,7 @@ function QuickChart({ encounterId, patientId, readOnly = false }: { encounterId:
           <div className="flex items-center justify-between">
             <Label className="text-xs font-semibold uppercase tracking-wider">{section[0].toUpperCase()}{section.slice(1)}</Label>
             {!readOnly && (
-              <Button variant="ghost" size="sm" className="h-5 text-[10px] text-primary" onClick={() => generateAi(section)} disabled={aiLoading[section]}>
+              <Button variant="ghost" size="sm" className="h-5 text-[11px] text-primary" onClick={() => generateAi(section)} disabled={aiLoading[section]}>
                 {aiLoading[section] ? <Loader2 className="h-2.5 w-2.5 animate-spin mr-0.5" /> : <Sparkles className="h-2.5 w-2.5 mr-0.5" />}
                 AI
               </Button>

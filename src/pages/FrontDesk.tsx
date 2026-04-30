@@ -252,7 +252,7 @@ export default function FrontDesk() {
                     <kpi.icon className={`h-4 w-4 ${kpi.iconText}`} />
                   </div>
                   <div>
-                    <p className="text-[10px] text-muted-foreground font-medium uppercase">{kpi.label}</p>
+                    <p className="text-[11px] text-muted-foreground font-medium uppercase">{kpi.label}</p>
                     <p className="text-lg font-bold">{kpi.value}</p>
                   </div>
                 </div>
@@ -282,7 +282,7 @@ export default function FrontDesk() {
           <div className="flex items-center gap-2 px-1">
             <AlertTriangle className="h-3.5 w-3.5 text-destructive" />
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">No-Show</span>
-            <Badge variant="secondary" className="ml-auto text-[10px] h-5">{stats.noShow}</Badge>
+            <Badge variant="secondary" className="ml-auto text-[11px] h-5">{stats.noShow}</Badge>
           </div>
           <div className="space-y-2 min-h-[120px] rounded-lg border-t-2 border-t-destructive bg-muted/20 p-2">
             {filtered.filter((a: any) => a.status === "no_show").length === 0 ? (
@@ -308,7 +308,7 @@ export default function FrontDesk() {
                 <div className="flex items-center gap-2 px-1">
                   <col.icon className="h-3.5 w-3.5 text-muted-foreground" />
                   <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{col.label}</span>
-                  <Badge variant="secondary" className="ml-auto text-[10px] h-5">{colApts.length}</Badge>
+                  <Badge variant="secondary" className="ml-auto text-[11px] h-5">{colApts.length}</Badge>
                 </div>
                 <div className={`space-y-2 min-h-[120px] rounded-lg border-t-2 ${col.color} bg-muted/20 p-2`}>
                   {colApts.length === 0 && (

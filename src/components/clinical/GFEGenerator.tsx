@@ -266,8 +266,8 @@ export function GFEGenerator({ patientId, appointmentId, treatments }: GFEGenera
 
             {discounts > 0 && (
               <div className="flex justify-between text-sm border-t pt-2">
-                <span className="text-green-700">Package Discount</span>
-                <span className="font-semibold text-green-700">
+                <span className="text-success">Package Discount</span>
+                <span className="font-semibold text-success">
                   -${discounts.toFixed(2)}
                 </span>
               </div>
@@ -279,10 +279,10 @@ export function GFEGenerator({ patientId, appointmentId, treatments }: GFEGenera
             </div>
           </div>
 
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-2">
+          <div className="bg-info/10 border border-info/30 rounded-lg p-4 space-y-2">
             <div className="flex items-start gap-2">
-              <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
-              <div className="text-sm text-blue-900">
+              <AlertCircle className="h-5 w-5 text-info mt-0.5 flex-shrink-0" />
+              <div className="text-sm text-info">
                 <p className="font-semibold mb-2">No Surprises Act Disclaimer</p>
                 <p>{NO_SURPRISES_ACT_DISCLAIMER}</p>
               </div>

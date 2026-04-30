@@ -163,18 +163,18 @@ export function PhotoConsentGate({ patientId, children, fallback }: PhotoConsent
   // Default fallback if none provided
   if (!fallback) {
     fallback = (
-      <Card className="border-amber-200 bg-amber-50">
+      <Card className="border-warning/30 bg-warning/10">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-amber-900">
+          <CardTitle className="flex items-center gap-2 text-warning">
             <Camera className="h-5 w-5" />
             Photo Consent Required
           </CardTitle>
-          <CardDescription className="text-amber-800">
+          <CardDescription className="text-warning">
             This patient has not consented to clinical photography.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <p className="text-sm text-amber-900">
+          <p className="text-sm text-warning">
             Clinical photos help document treatment progress and support clinical decision-making.
             Request consent to proceed.
           </p>

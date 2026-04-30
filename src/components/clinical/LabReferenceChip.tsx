@@ -130,7 +130,7 @@ export function LabReferenceChip({ labKey, value, shortLabel, className, compact
           >
             <div className="flex items-center justify-center gap-1">
               <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", styles.dot)} aria-hidden />
-              <span className="text-[10px] text-muted-foreground leading-none">{display}</span>
+              <span className="text-[11px] text-muted-foreground leading-none">{display}</span>
             </div>
             <p className={cn("font-semibold text-xs leading-tight mt-0.5", styles.text)}>
               {numeric != null && !isNaN(numeric) ? numeric : "—"}
@@ -202,7 +202,7 @@ export function LabReferenceStrip({ labs, hideEmpty = true, className, compact =
 
   return (
     <div className={cn("space-y-1.5", className)}>
-      <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+      <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
         <span className="font-semibold uppercase tracking-wider">Reference Check</span>
         {counts.critical > 0 && <span className="text-destructive font-medium">● {counts.critical} critical</span>}
         {counts.out > 0 && <span className="text-destructive">● {counts.out} out</span>}

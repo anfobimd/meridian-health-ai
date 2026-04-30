@@ -293,7 +293,7 @@ export default function RemoteIntake() {
             <Activity className="h-6 w-6 text-primary" />
             <div>
               <h1 className="font-serif font-semibold text-lg">{clinicName}</h1>
-              <p className="text-[10px] font-bold tracking-[0.14em] uppercase text-primary">REMOTE INTAKE</p>
+              <p className="text-[11px] font-bold tracking-[0.14em] uppercase text-primary">REMOTE INTAKE</p>
             </div>
           </div>
           <Badge variant="outline" className="text-xs">{progressPct}% Complete</Badge>
@@ -356,17 +356,17 @@ export default function RemoteIntake() {
                   <div className="p-4 rounded-lg bg-muted/50">
                     <Clock className="h-5 w-5 text-primary mx-auto mb-2" />
                     <p className="text-xs font-semibold">~10 minutes</p>
-                    <p className="text-[10px] text-muted-foreground">Estimated time</p>
+                    <p className="text-[11px] text-muted-foreground">Estimated time</p>
                   </div>
                   <div className="p-4 rounded-lg bg-muted/50">
                     <Shield className="h-5 w-5 text-primary mx-auto mb-2" />
                     <p className="text-xs font-semibold">HIPAA Secure</p>
-                    <p className="text-[10px] text-muted-foreground">Encrypted & private</p>
+                    <p className="text-[11px] text-muted-foreground">Encrypted & private</p>
                   </div>
                   <div className="p-4 rounded-lg bg-muted/50">
                     <FlaskConical className="h-5 w-5 text-primary mx-auto mb-2" />
                     <p className="text-xs font-semibold">AI-Assisted</p>
-                    <p className="text-[10px] text-muted-foreground">Lab auto-extraction</p>
+                    <p className="text-[11px] text-muted-foreground">Lab auto-extraction</p>
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground text-center">Your progress is saved automatically. You can return to finish later.</p>
@@ -484,7 +484,7 @@ export default function RemoteIntake() {
                         <Label htmlFor={`intake-${f.key}`} className="text-xs text-muted-foreground">{f.label}</Label>
                         <Input id={`intake-${f.key}`} type="number" step="any" placeholder="—" value={labValues[f.key] ?? ""} onChange={e => setLabValues(p => ({ ...p, [f.key]: e.target.value }))} className="h-8 text-sm" />
                       </div>
-                      <span className="text-[10px] text-muted-foreground pb-2">{f.unit}</span>
+                      <span className="text-[11px] text-muted-foreground pb-2">{f.unit}</span>
                     </div>
                   ))}
                 </div>
@@ -556,7 +556,7 @@ export default function RemoteIntake() {
                           {generalSig ? <CheckCircle className="h-4 w-4 text-primary" /> : <div className="h-4 w-4 rounded-full border-2 border-muted-foreground/30" />}
                           <span className="text-sm font-medium">General Consent</span>
                         </div>
-                        <Badge variant={generalSig ? "default" : "outline"} className="text-[10px]">{generalSig ? "Signed" : "Required"}</Badge>
+                        <Badge variant={generalSig ? "default" : "outline"} className="text-[11px]">{generalSig ? "Signed" : "Required"}</Badge>
                       </CollapsibleTrigger>
                       <CollapsibleContent>
                         <div className="px-3 pb-3 space-y-3 border-t">
@@ -575,7 +575,7 @@ export default function RemoteIntake() {
                           {telehealthSig ? <CheckCircle className="h-4 w-4 text-primary" /> : <div className="h-4 w-4 rounded-full border-2 border-muted-foreground/30" />}
                           <span className="text-sm font-medium">Telehealth Consent</span>
                         </div>
-                        <Badge variant={telehealthSig ? "default" : "outline"} className="text-[10px]">{telehealthSig ? "Signed" : "Required"}</Badge>
+                        <Badge variant={telehealthSig ? "default" : "outline"} className="text-[11px]">{telehealthSig ? "Signed" : "Required"}</Badge>
                       </CollapsibleTrigger>
                       <CollapsibleContent>
                         <div className="px-3 pb-3 space-y-3 border-t">
@@ -621,7 +621,7 @@ export default function RemoteIntake() {
           )}
         </div>
 
-        <p className="text-center text-[10px] text-muted-foreground">
+        <p className="text-center text-[11px] text-muted-foreground">
           Powered by {clinicName} • Your data is encrypted and HIPAA-compliant
         </p>
       </div>

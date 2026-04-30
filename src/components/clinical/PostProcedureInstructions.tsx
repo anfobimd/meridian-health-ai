@@ -442,9 +442,9 @@ export function PostProcedureInstructions({
 
             {/* Warnings */}
             {selectedTemplate.warnings && selectedTemplate.warnings.length > 0 && (
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-2">
-                <h4 className="font-semibold text-sm text-amber-900">Important Warnings:</h4>
-                <ul className="list-disc list-inside space-y-1 text-sm text-amber-900">
+              <div className="bg-warning/10 border border-warning/30 rounded-lg p-3 space-y-2">
+                <h4 className="font-semibold text-sm text-warning">Important Warnings:</h4>
+                <ul className="list-disc list-inside space-y-1 text-sm text-warning">
                   {selectedTemplate.warnings.map((warn, idx) => (
                     <li key={idx}>{warn}</li>
                   ))}

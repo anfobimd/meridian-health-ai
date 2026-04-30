@@ -237,28 +237,28 @@ export default function ProviderMarketplace() {
           <CardContent className="pt-4 pb-3 text-center">
             <DollarSign className="h-5 w-5 mx-auto text-primary mb-1" />
             <p className="text-2xl font-mono font-bold">${thisMonthEarnings.toLocaleString()}</p>
-            <p className="text-[10px] uppercase text-muted-foreground font-bold">MTD Net Revenue</p>
+            <p className="text-[11px] uppercase text-muted-foreground font-bold">MTD Net Revenue</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4 pb-3 text-center">
             <TrendingUp className="h-5 w-5 mx-auto text-primary mb-1" />
             <p className="text-2xl font-mono font-bold">${effectiveRate.toFixed(0)}</p>
-            <p className="text-[10px] uppercase text-muted-foreground font-bold">Effective $/hr</p>
+            <p className="text-[11px] uppercase text-muted-foreground font-bold">Effective $/hr</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4 pb-3 text-center">
             <Inbox className="h-5 w-5 mx-auto text-primary mb-1" />
             <p className="text-2xl font-mono font-bold">{pendingBookings.length}</p>
-            <p className="text-[10px] uppercase text-muted-foreground font-bold">Pending Requests</p>
+            <p className="text-[11px] uppercase text-muted-foreground font-bold">Pending Requests</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4 pb-3 text-center">
             <Star className="h-5 w-5 mx-auto text-primary mb-1" />
             <p className="text-2xl font-mono font-bold">{membership?.tier || "—"}</p>
-            <p className="text-[10px] uppercase text-muted-foreground font-bold">Membership Tier</p>
+            <p className="text-[11px] uppercase text-muted-foreground font-bold">Membership Tier</p>
           </CardContent>
         </Card>
       </div>
@@ -268,7 +268,7 @@ export default function ProviderMarketplace() {
           <TabsTrigger value="profile"><User className="h-3 w-3 mr-1" /> My Profile</TabsTrigger>
           <TabsTrigger value="bookings" className="gap-1">
             <Inbox className="h-3 w-3" /> Booking Inbox
-            {pendingBookings.length > 0 && <Badge variant="destructive" className="ml-1 text-[9px] px-1.5 py-0">{pendingBookings.length}</Badge>}
+            {pendingBookings.length > 0 && <Badge variant="destructive" className="ml-1 text-[11px] px-1.5 py-0">{pendingBookings.length}</Badge>}
           </TabsTrigger>
           <TabsTrigger value="earnings"><DollarSign className="h-3 w-3 mr-1" /> Earnings</TabsTrigger>
         </TabsList>
@@ -405,15 +405,15 @@ export default function ProviderMarketplace() {
           <div className="grid grid-cols-3 gap-3">
             <Card><CardContent className="pt-4 pb-3 text-center">
               <p className="text-xl font-mono font-bold">${totalNet.toLocaleString()}</p>
-              <p className="text-[10px] uppercase text-muted-foreground font-bold">All-Time Net</p>
+              <p className="text-[11px] uppercase text-muted-foreground font-bold">All-Time Net</p>
             </CardContent></Card>
             <Card><CardContent className="pt-4 pb-3 text-center">
               <p className="text-xl font-mono font-bold">{totalHours.toFixed(1)}h</p>
-              <p className="text-[10px] uppercase text-muted-foreground font-bold">Total Hours</p>
+              <p className="text-[11px] uppercase text-muted-foreground font-bold">Total Hours</p>
             </CardContent></Card>
             <Card><CardContent className="pt-4 pb-3 text-center">
               <p className="text-xl font-mono font-bold">{earnings?.length ?? 0}</p>
-              <p className="text-[10px] uppercase text-muted-foreground font-bold">Sessions</p>
+              <p className="text-[11px] uppercase text-muted-foreground font-bold">Sessions</p>
             </CardContent></Card>
           </div>
 
@@ -451,12 +451,12 @@ export default function ProviderMarketplace() {
             {intel && (
               <div className="grid grid-cols-2 gap-2">
                 <Card><CardContent className="pt-3 pb-2">
-                  <p className="text-[10px] uppercase text-muted-foreground font-bold">Correction Rate</p>
+                  <p className="text-[11px] uppercase text-muted-foreground font-bold">Correction Rate</p>
                   <p className="text-lg font-bold">{((intel.correction_rate || 0) * 100).toFixed(1)}%</p>
                 </CardContent></Card>
                 <Card><CardContent className="pt-3 pb-2">
-                  <p className="text-[10px] uppercase text-muted-foreground font-bold">Coaching Status</p>
-                  <Badge variant="outline" className={`mt-1 ${intel.coaching_status === "probation" ? "border-red-300 text-red-600" : intel.coaching_status === "monitoring" ? "border-orange-300 text-orange-600" : ""}`}>
+                  <p className="text-[11px] uppercase text-muted-foreground font-bold">Coaching Status</p>
+                  <Badge variant="outline" className={`mt-1 ${intel.coaching_status === "probation" ? "border-destructive/30 text-destructive" : intel.coaching_status === "monitoring" ? "border-warning/30 text-warning" : ""}`}>
                     {intel.coaching_status || "none"}
                   </Badge>
                 </CardContent></Card>
@@ -465,7 +465,7 @@ export default function ProviderMarketplace() {
 
             {intel?.coaching_notes && (
               <Card><CardContent className="pt-3 pb-2">
-                <p className="text-[10px] uppercase text-muted-foreground font-bold mb-1">AI Summary</p>
+                <p className="text-[11px] uppercase text-muted-foreground font-bold mb-1">AI Summary</p>
                 <p className="text-sm">{intel.coaching_notes}</p>
               </CardContent></Card>
             )}
@@ -485,7 +485,7 @@ export default function ProviderMarketplace() {
                     <Card key={action.id}>
                       <CardContent className="pt-3 pb-2">
                         <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="text-[10px]">{action.action_type}</Badge>
+                          <Badge variant="outline" className="text-[11px]">{action.action_type}</Badge>
                           <span className="text-sm font-medium">{action.title}</span>
                         </div>
                         {action.description && <p className="text-xs text-muted-foreground mt-1">{action.description}</p>}

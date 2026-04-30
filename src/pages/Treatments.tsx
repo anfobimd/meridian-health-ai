@@ -197,11 +197,11 @@ export default function Treatments() {
                 <div className="flex items-center gap-6 pt-2">
                   <label className="flex items-center gap-2 text-sm cursor-pointer">
                     <input type="checkbox" name="requires_gfe" className="rounded border-input" defaultChecked={aiTemplate?.should_require_gfe} />
-                    <ShieldCheck className="h-4 w-4 text-amber-500" /> Requires GFE
+                    <ShieldCheck className="h-4 w-4 text-warning" /> Requires GFE
                   </label>
                   <label className="flex items-center gap-2 text-sm cursor-pointer">
                     <input type="checkbox" name="requires_md_review" className="rounded border-input" defaultChecked={aiTemplate?.should_require_md_review} />
-                    <FileCheck className="h-4 w-4 text-blue-500" /> Requires MD Review
+                    <FileCheck className="h-4 w-4 text-info" /> Requires MD Review
                   </label>
                 </div>
                 {/* AI Template Recommendation */}
@@ -216,7 +216,7 @@ export default function Treatments() {
                       <div className="flex items-center gap-2">
                         <Sparkles className="h-3.5 w-3.5 text-primary" />
                         <span className="text-xs font-semibold">AI Recommendation</span>
-                        <Badge variant="outline" className="text-[9px]">{aiTemplate.match_confidence} match</Badge>
+                        <Badge variant="outline" className="text-[11px]">{aiTemplate.match_confidence} match</Badge>
                       </div>
                       <p className="text-xs"><strong>Template:</strong> {aiTemplate.recommended_template_name}</p>
                       <p className="text-xs text-muted-foreground">{aiTemplate.match_reason}</p>
@@ -265,15 +265,15 @@ export default function Treatments() {
                         <div className="flex items-center gap-3 mt-3">
                           <label className="flex items-center gap-1.5 text-xs cursor-pointer">
                             <Switch checked={t.requires_gfe} onCheckedChange={(v) => toggleFlag.mutate({ id: t.id, field: "requires_gfe", value: v })} className="scale-75" />
-                            <ShieldCheck className="h-3.5 w-3.5 text-amber-500" /> GFE
+                            <ShieldCheck className="h-3.5 w-3.5 text-warning" /> GFE
                           </label>
                           <label className="flex items-center gap-1.5 text-xs cursor-pointer">
                             <Switch checked={t.requires_md_review} onCheckedChange={(v) => toggleFlag.mutate({ id: t.id, field: "requires_md_review", value: v })} className="scale-75" />
-                            <FileCheck className="h-3.5 w-3.5 text-blue-500" /> MD
+                            <FileCheck className="h-3.5 w-3.5 text-info" /> MD
                           </label>
                           <div className="ml-auto flex items-center gap-1">
                             {t.is_active && (
-                              <Button variant="ghost" size="sm" className="h-6 text-[10px] text-warning" onClick={() => checkDeactivation(t.id, t.name)}>
+                              <Button variant="ghost" size="sm" className="h-6 text-[11px] text-warning" onClick={() => checkDeactivation(t.id, t.name)}>
                                 {aiDeactivationLoading && deactivatingId === t.id ? <Loader2 className="h-3 w-3 animate-spin" /> : "Impact?"}
                               </Button>
                             )}
@@ -287,7 +287,7 @@ export default function Treatments() {
                       <div className="text-right ml-2">
                         {t.price && <span className="text-sm font-semibold">${Number(t.price).toFixed(2)}</span>}
                         {t.is_member_pricing_enabled && t.member_price > 0 && (
-                          <p className="text-[10px] text-primary">Member: ${Number(t.member_price).toFixed(2)}</p>
+                          <p className="text-[11px] text-primary">Member: ${Number(t.member_price).toFixed(2)}</p>
                         )}
                       </div>
                     </div>
@@ -306,7 +306,7 @@ export default function Treatments() {
                 <div className="flex items-center gap-2 mb-2">
                   <AlertTriangle className={`h-4 w-4 ${aiDeactivation.risk_level === "critical" ? "text-destructive" : aiDeactivation.risk_level === "warning" ? "text-warning" : "text-primary"}`} />
                   <span className="text-sm font-semibold">Deactivation Impact Analysis</span>
-                  <Badge variant="outline" className="text-[10px]">{aiDeactivation.risk_level}</Badge>
+                  <Badge variant="outline" className="text-[11px]">{aiDeactivation.risk_level}</Badge>
                   <Button variant="ghost" size="sm" className="ml-auto h-6 text-xs" onClick={() => setAiDeactivation(null)}>Dismiss</Button>
                 </div>
                 <p className="text-xs mb-2">{aiDeactivation.summary}</p>
@@ -338,11 +338,11 @@ export default function Treatments() {
                   {treatments?.map((t: any) => (
                     <TableRow key={t.id}>
                       <TableCell className="font-medium">{t.name}</TableCell>
-                      <TableCell><Badge variant="outline" className="text-[10px]">{t.category || "—"}</Badge></TableCell>
+                      <TableCell><Badge variant="outline" className="text-[11px]">{t.category || "—"}</Badge></TableCell>
                       <TableCell className="font-mono">${Number(t.price || 0).toFixed(2)}</TableCell>
                       <TableCell className="font-mono">{t.is_member_pricing_enabled ? `$${Number(t.member_price || 0).toFixed(2)}` : "—"}</TableCell>
                       <TableCell>
-                        <Badge variant={t.is_member_pricing_enabled ? "default" : "secondary"} className="text-[10px]">
+                        <Badge variant={t.is_member_pricing_enabled ? "default" : "secondary"} className="text-[11px]">
                           {t.is_member_pricing_enabled ? "Enabled" : "Off"}
                         </Badge>
                       </TableCell>
@@ -435,7 +435,7 @@ export default function Treatments() {
                   <div className="flex items-center gap-2">
                     <Sparkles className="h-3.5 w-3.5 text-primary" />
                     <span className="text-xs font-semibold">Revenue Impact</span>
-                    <Badge variant="outline" className="text-[9px]">{aiRevImpact.risk_level}</Badge>
+                    <Badge variant="outline" className="text-[11px]">{aiRevImpact.risk_level}</Badge>
                   </div>
                   <p className="text-xs font-medium">Est. Monthly Impact: {aiRevImpact.estimated_monthly_impact}</p>
                   <p className="text-xs text-muted-foreground">{aiRevImpact.commentary}</p>

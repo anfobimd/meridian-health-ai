@@ -44,7 +44,7 @@ export function InvitationTracker() {
       <div className="flex items-center gap-2 px-1">
         <Link2 className="h-3.5 w-3.5 text-primary" />
         <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Intake Invitations</span>
-        <Badge variant="secondary" className="ml-auto text-[10px] h-5">{invitations.length}</Badge>
+        <Badge variant="secondary" className="ml-auto text-[11px] h-5">{invitations.length}</Badge>
       </div>
       <div className="space-y-1.5 max-h-48 overflow-y-auto">
         {invitations.map((inv: any) => {
@@ -57,11 +57,11 @@ export function InvitationTracker() {
                 <p className="font-medium truncate">
                   {inv.patients?.first_name} {inv.patients?.last_name}
                 </p>
-                <p className="text-[10px] text-muted-foreground">
+                <p className="text-[11px] text-muted-foreground">
                   {inv.focus_areas?.join(", ") || "General"} · {formatDistanceToNow(new Date(inv.sent_at), { addSuffix: true })}
                 </p>
               </div>
-              <Badge variant={cfg.variant} className="text-[10px] h-5 flex-shrink-0">
+              <Badge variant={cfg.variant} className="text-[11px] h-5 flex-shrink-0">
                 {cfg.label}
               </Badge>
             </div>

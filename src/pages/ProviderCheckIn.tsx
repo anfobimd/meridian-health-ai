@@ -9,10 +9,10 @@ import { format } from "date-fns";
 
 const statusConfig: Record<string, { label: string; icon: any; color: string }> = {
   booked: { label: "Scheduled", icon: Clock, color: "bg-muted text-muted-foreground" },
-  confirmed: { label: "Confirmed", icon: CircleDot, color: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200" },
+  confirmed: { label: "Confirmed", icon: CircleDot, color: "bg-info/10 text-info dark:bg-info dark:text-info" },
   checked_in: { label: "Checked In", icon: CheckCircle2, color: "bg-primary/10 text-primary" },
   roomed: { label: "Roomed", icon: DoorOpen, color: "bg-accent text-accent-foreground" },
-  in_progress: { label: "In Progress", icon: CircleDot, color: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200" },
+  in_progress: { label: "In Progress", icon: CircleDot, color: "bg-warning/10 text-warning dark:bg-warning dark:text-warning" },
   completed: { label: "Completed", icon: CheckCircle2, color: "bg-primary/10 text-primary" },
 };
 
@@ -100,7 +100,7 @@ export default function ProviderCheckIn() {
                         {a.treatments?.name && <span>• {a.treatments.name}</span>}
                       </div>
                       {a.checked_in_at && (
-                        <p className="text-[10px] text-muted-foreground mt-0.5">
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
                           Checked in at {format(new Date(a.checked_in_at), "h:mm a")}
                         </p>
                       )}
@@ -109,7 +109,7 @@ export default function ProviderCheckIn() {
                   <div className="flex items-center gap-2">
                     <Badge className={config.color}>{config.label}</Badge>
                     {a.room_id && (
-                      <Badge variant="outline" className="text-[10px]">
+                      <Badge variant="outline" className="text-[11px]">
                         <DoorOpen className="h-3 w-3 mr-1" /> Room
                       </Badge>
                     )}

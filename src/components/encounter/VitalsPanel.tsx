@@ -19,9 +19,9 @@ function Delta({ current, previous, unit, invert }: { current: string; previous:
   const diff = parseFloat(current) - previous;
   if (Math.abs(diff) < 0.01) return null;
   const isUp = diff > 0;
-  const color = invert ? (isUp ? "text-destructive" : "text-green-600") : (isUp ? "text-green-600" : "text-destructive");
+  const color = invert ? (isUp ? "text-destructive" : "text-success") : (isUp ? "text-success" : "text-destructive");
   return (
-    <span className={`text-[10px] flex items-center gap-0.5 ${color}`}>
+    <span className={`text-[11px] flex items-center gap-0.5 ${color}`}>
       {isUp ? <TrendingUp className="h-2.5 w-2.5" /> : <TrendingDown className="h-2.5 w-2.5" />}
       {isUp ? "+" : ""}{diff.toFixed(1)}{unit || ""}
     </span>
@@ -108,8 +108,8 @@ export function VitalsPanel({ encounterId, patientId }: VitalsPanelProps) {
     if (!bmi) return "";
     const val = parseFloat(bmi);
     if (val >= 30) return "text-destructive bg-destructive/10";
-    if (val >= 25) return "text-amber-600 bg-amber-100 dark:bg-amber-900/30";
-    return "text-green-600 bg-green-100 dark:bg-green-900/30";
+    if (val >= 25) return "text-warning bg-warning/10 dark:bg-warning/30";
+    return "text-success bg-success/10 dark:bg-success/30";
   }, [bmi]);
 
   // Weight loss percentage from baseline
@@ -182,7 +182,7 @@ export function VitalsPanel({ encounterId, patientId }: VitalsPanelProps) {
         {/* BP Warning */}
         {bpWarning && (
           <div className={`flex items-start gap-2 text-xs p-2 rounded ${
-            bpWarning.includes("Contraindication") ? "bg-destructive/10 text-destructive" : "bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400"
+            bpWarning.includes("Contraindication") ? "bg-destructive/10 text-destructive" : "bg-warning/10 dark:bg-warning/20 text-warning dark:text-warning"
           }`}>
             <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
             <span>{bpWarning}</span>
@@ -192,7 +192,7 @@ export function VitalsPanel({ encounterId, patientId }: VitalsPanelProps) {
         <div className="grid grid-cols-2 gap-3">
           {/* Blood Pressure */}
           <div className="space-y-1">
-            <Label className="text-[10px] text-muted-foreground flex items-center gap-1">
+            <Label className="text-[11px] text-muted-foreground flex items-center gap-1">
               <Heart className="h-3 w-3" /> Blood Pressure
             </Label>
             <div className="flex items-center gap-1">
@@ -201,23 +201,23 @@ export function VitalsPanel({ encounterId, patientId }: VitalsPanelProps) {
               <Input type="number" placeholder="DIA" value={vitals.bp_diastolic} onChange={e => update("bp_diastolic", e.target.value)} className="h-8 text-xs" />
             </div>
             {priorVitals?.bp_systolic && (
-              <p className="text-[10px] text-muted-foreground">Prior: {priorVitals.bp_systolic}/{priorVitals.bp_diastolic}</p>
+              <p className="text-[11px] text-muted-foreground">Prior: {priorVitals.bp_systolic}/{priorVitals.bp_diastolic}</p>
             )}
           </div>
 
           {/* Heart Rate */}
           <div className="space-y-1">
-            <Label className="text-[10px] text-muted-foreground">Heart Rate (bpm)</Label>
+            <Label className="text-[11px] text-muted-foreground">Heart Rate (bpm)</Label>
             <Input type="number" placeholder="72" value={vitals.heart_rate} onChange={e => update("heart_rate", e.target.value)} className="h-8 text-xs" />
             <div className="flex items-center gap-1">
-              {priorVitals?.heart_rate && <p className="text-[10px] text-muted-foreground">Prior: {priorVitals.heart_rate}</p>}
+              {priorVitals?.heart_rate && <p className="text-[11px] text-muted-foreground">Prior: {priorVitals.heart_rate}</p>}
               <Delta current={vitals.heart_rate} previous={priorVitals?.heart_rate || null} />
             </div>
           </div>
 
           {/* Temperature */}
           <div className="space-y-1">
-            <Label className="text-[10px] text-muted-foreground flex items-center gap-1">
+            <Label className="text-[11px] text-muted-foreground flex items-center gap-1">
               <Thermometer className="h-3 w-3" /> Temp (°F)
             </Label>
             <Input type="number" step="0.1" placeholder="98.6" value={vitals.temperature} onChange={e => update("temperature", e.target.value)} className="h-8 text-xs" />
@@ -225,22 +225,22 @@ export function VitalsPanel({ encounterId, patientId }: VitalsPanelProps) {
 
           {/* O2 Sat */}
           <div className="space-y-1">
-            <Label className="text-[10px] text-muted-foreground">O₂ Sat (%)</Label>
+            <Label className="text-[11px] text-muted-foreground">O₂ Sat (%)</Label>
             <Input type="number" step="0.1" placeholder="98" value={vitals.o2_sat} onChange={e => update("o2_sat", e.target.value)} className="h-8 text-xs" />
           </div>
 
           {/* Weight */}
           <div className="space-y-1">
-            <Label className="text-[10px] text-muted-foreground flex items-center gap-1">
+            <Label className="text-[11px] text-muted-foreground flex items-center gap-1">
               <Weight className="h-3 w-3" /> Weight (lbs)
             </Label>
             <Input type="number" step="0.1" placeholder="150" value={vitals.weight_lbs} onChange={e => update("weight_lbs", e.target.value)} className="h-8 text-xs" />
             <div className="flex items-center gap-1.5">
-              {priorVitals?.weight_lbs && <p className="text-[10px] text-muted-foreground">Prior: {priorVitals.weight_lbs}</p>}
+              {priorVitals?.weight_lbs && <p className="text-[11px] text-muted-foreground">Prior: {priorVitals.weight_lbs}</p>}
               <Delta current={vitals.weight_lbs} previous={priorVitals?.weight_lbs || null} unit=" lbs" invert />
             </div>
             {weightLossPct && (
-              <p className={`text-[10px] font-medium ${parseFloat(weightLossPct) > 0 ? "text-green-600" : "text-amber-600"}`}>
+              <p className={`text-[11px] font-medium ${parseFloat(weightLossPct) > 0 ? "text-success" : "text-warning"}`}>
                 {parseFloat(weightLossPct) > 0 ? "↓" : "↑"} {Math.abs(parseFloat(weightLossPct))}% from baseline
               </p>
             )}
@@ -248,20 +248,20 @@ export function VitalsPanel({ encounterId, patientId }: VitalsPanelProps) {
 
           {/* Height */}
           <div className="space-y-1">
-            <Label className="text-[10px] text-muted-foreground">Height (in)</Label>
+            <Label className="text-[11px] text-muted-foreground">Height (in)</Label>
             <Input type="number" step="0.1" placeholder="67" value={vitals.height_in} onChange={e => update("height_in", e.target.value)} className="h-8 text-xs" />
           </div>
 
           {/* Pain Scale */}
           <div className="space-y-1">
-            <Label className="text-[10px] text-muted-foreground">Pain Scale (0-10)</Label>
+            <Label className="text-[11px] text-muted-foreground">Pain Scale (0-10)</Label>
             <Input type="number" min="0" max="10" placeholder="0" value={vitals.pain_scale} onChange={e => update("pain_scale", e.target.value)} className="h-8 text-xs" />
           </div>
 
           {/* BMI */}
           {bmi && (
             <div className="space-y-1">
-              <Label className="text-[10px] text-muted-foreground">BMI (calc)</Label>
+              <Label className="text-[11px] text-muted-foreground">BMI (calc)</Label>
               <div className="h-8 flex items-center">
                 <Badge variant="secondary" className={`text-xs font-mono ${bmiColor}`}>{bmi}</Badge>
               </div>

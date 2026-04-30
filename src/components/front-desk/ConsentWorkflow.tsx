@@ -125,7 +125,7 @@ export function ConsentWorkflow({ patientId, patientName, appointmentId, returnT
                 <CheckCircle2 className="h-3 w-3 text-success" />
                 <span className="text-xs capitalize">{c.consent_type} Consent</span>
               </div>
-              <span className="text-[10px] text-muted-foreground">
+              <span className="text-[11px] text-muted-foreground">
                 {new Date(c.signed_at).toLocaleDateString()}
               </span>
             </div>
@@ -141,13 +141,13 @@ export function ConsentWorkflow({ patientId, patientName, appointmentId, returnT
               <div className="flex items-center gap-2">
                 <Clock className="h-3 w-3 text-muted-foreground" />
                 <span className="text-xs">{t.name}</span>
-                <Badge variant="outline" className="text-[10px]">v{t.version}</Badge>
+                <Badge variant="outline" className="text-[11px]">v{t.version}</Badge>
               </div>
               <div className="flex gap-1">
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-6 text-[10px] px-2"
+                  className="h-6 text-[11px] px-2"
                   onClick={() => sendViaSms(t.id)}
                 >
                   <Send className="h-2.5 w-2.5 mr-0.5" />SMS
@@ -155,7 +155,7 @@ export function ConsentWorkflow({ patientId, patientName, appointmentId, returnT
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-6 text-[10px] px-2"
+                  className="h-6 text-[11px] px-2"
                   onClick={() => { setSelectedTemplate(t); setSignOpen(true); }}
                 >
                   <PenLine className="h-2.5 w-2.5 mr-0.5" />Sign Now
