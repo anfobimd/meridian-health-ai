@@ -357,9 +357,29 @@ export default function HormoneIntake() {
     }
   };
 
+  // QA #45 — sane physical-measurement bounds. Out-of-range values block Next.
+  const weightError: string | null = weightLbs
+    ? (() => {
+        const v = parseFloat(weightLbs);
+        if (Number.isNaN(v)) return "Enter a number";
+        if (v < 20) return "Weight looks too low (min 20 lbs)";
+        if (v > 700) return "Weight looks too high (max 700 lbs)";
+        return null;
+      })()
+    : null;
+  const heightError: string | null = heightIn
+    ? (() => {
+        const v = parseFloat(heightIn);
+        if (Number.isNaN(v)) return "Enter a number";
+        if (v < 24) return "Height looks too low (min 24 in / 2 ft)";
+        if (v > 96) return "Height looks too high (max 96 in / 8 ft)";
+        return null;
+      })()
+    : null;
+
   const canProceed = () => {
     switch (step) {
-      case 0: return !!selectedPatient && !!sex;
+      case 0: return !!selectedPatient && !!sex && !weightError && !heightError;
       case 1: return focus.length > 0;
       case 2: return true;
       case 3: return true;
@@ -457,11 +477,33 @@ export default function HormoneIntake() {
                 </div>
                 <div className="space-y-2">
                   <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Weight (lbs)</Label>
-                  <Input type="number" placeholder="e.g. 185" value={weightLbs} onChange={e => setWeightLbs(e.target.value)} />
+                  <Input
+                    type="number"
+                    placeholder="e.g. 185"
+                    value={weightLbs}
+                    onChange={e => setWeightLbs(e.target.value)}
+                    min={20}
+                    max={700}
+                    step="0.1"
+                    aria-invalid={!!weightError}
+                    className={weightError ? "border-destructive focus-visible:ring-destructive" : ""}
+                  />
+                  {weightError && <p className="text-[11px] text-destructive">{weightError}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Height (inches)</Label>
-                  <Input type="number" placeholder="e.g. 70" value={heightIn} onChange={e => setHeightIn(e.target.value)} />
+                  <Input
+                    type="number"
+                    placeholder="e.g. 70"
+                    value={heightIn}
+                    onChange={e => setHeightIn(e.target.value)}
+                    min={24}
+                    max={96}
+                    step="0.1"
+                    aria-invalid={!!heightError}
+                    className={heightError ? "border-destructive focus-visible:ring-destructive" : ""}
+                  />
+                  {heightError && <p className="text-[11px] text-destructive">{heightError}</p>}
                 </div>
               </div>
               {sex === "female" && (

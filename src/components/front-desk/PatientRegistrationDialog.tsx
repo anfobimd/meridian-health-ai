@@ -35,6 +35,26 @@ export function PatientRegistrationDialog({ open, onOpenChange }: Props) {
 
   const set = (key: string, val: string) => setForm(f => ({ ...f, [key]: val }));
 
+  // QA #44 — names allow letters, spaces, hyphens, apostrophes, periods only.
+  // 1-50 chars after trim. Empty trimmed = invalid (covers QA #43 required gate).
+  const validateName = (raw: string): string | null => {
+    const v = raw.trim();
+    if (!v) return "Required";
+    if (v.length > 50) return "Must be 50 characters or fewer";
+    if (!/^[a-zA-Z][a-zA-Z\s\-'.]*$/.test(v)) {
+      return "Letters, spaces, hyphens, apostrophes only";
+    }
+    return null;
+  };
+
+  const firstNameError = form.first_name.length > 0 ? validateName(form.first_name) : null;
+  const lastNameError = form.last_name.length > 0 ? validateName(form.last_name) : null;
+  const basicInfoValid =
+    form.first_name.trim().length > 0 &&
+    form.last_name.trim().length > 0 &&
+    !validateName(form.first_name) &&
+    !validateName(form.last_name);
+
   const runAiValidation = async () => {
     setValidating(true);
     try {
@@ -185,11 +205,27 @@ export function PatientRegistrationDialog({ open, onOpenChange }: Props) {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs">First Name *</Label>
-                <Input value={form.first_name} onChange={e => set("first_name", e.target.value)} />
+                <Input
+                  value={form.first_name}
+                  onChange={e => set("first_name", e.target.value)}
+                  aria-invalid={!!firstNameError}
+                  className={firstNameError ? "border-destructive focus-visible:ring-destructive" : ""}
+                  maxLength={50}
+                  required
+                />
+                {firstNameError && <p className="text-[11px] text-destructive">{firstNameError}</p>}
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs">Last Name *</Label>
-                <Input value={form.last_name} onChange={e => set("last_name", e.target.value)} />
+                <Input
+                  value={form.last_name}
+                  onChange={e => set("last_name", e.target.value)}
+                  aria-invalid={!!lastNameError}
+                  className={lastNameError ? "border-destructive focus-visible:ring-destructive" : ""}
+                  maxLength={50}
+                  required
+                />
+                {lastNameError && <p className="text-[11px] text-destructive">{lastNameError}</p>}
               </div>
             </div>
             <div className="space-y-1.5">
@@ -238,7 +274,15 @@ export function PatientRegistrationDialog({ open, onOpenChange }: Props) {
                 <option value="other">Other</option>
               </select>
             </div>
-            <Button className="w-full" variant="outline" onClick={() => setTab("contact")}>Next →</Button>
+            <Button
+              className="w-full"
+              variant="outline"
+              onClick={() => setTab("contact")}
+              disabled={!basicInfoValid}
+              title={basicInfoValid ? "" : "Fill in First Name and Last Name to continue"}
+            >
+              Next →
+            </Button>
           </TabsContent>
 
           <TabsContent value="contact" className="space-y-4 mt-4">
