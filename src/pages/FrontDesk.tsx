@@ -131,21 +131,97 @@ export default function FrontDesk() {
     },
   });
 
+  // Reverts a single mark-as-no-show: restore prior status, decrement counter.
+  // Pulled out so both the toast Undo action and the after-the-fact "Restore"
+  // button on no-show rows share the same code path.
+  const restoreFromNoShow = async (
+    appointmentId: string,
+    targetStatus: string,
+    patientId: string | null | undefined,
+    decrementNoShowCount: boolean,
+  ) => {
+    const updates: {
+      status: string;
+      checked_in_at?: string;
+      completed_at?: string;
+    } = { status: targetStatus };
+    if (targetStatus === "checked_in") updates.checked_in_at = new Date().toISOString();
+    if (targetStatus === "completed") updates.completed_at = new Date().toISOString();
+    // Cast on .update() because `status` is a generated DB enum and we're
+    // passing dynamic values; the values are constrained by RESTORE_TARGETS
+    // which only contains valid appointment_status enum members.
+    const { error } = await supabase
+      .from("appointments")
+      .update(updates as never)
+      .eq("id", appointmentId);
+    if (error) throw error;
+
+    if (decrementNoShowCount && patientId) {
+      // Floor at 0 so we never go negative if there's a race or an old fix-up.
+      const { data: p } = await supabase
+        .from("patients")
+        .select("no_show_count")
+        .eq("id", patientId)
+        .single();
+      const next = Math.max(0, (p?.no_show_count ?? 0) - 1);
+      await supabase.from("patients").update({ no_show_count: next }).eq("id", patientId);
+    }
+  };
+
   const markNoShow = useMutation({
     mutationFn: async (id: string) => {
       const apt = appointments?.find((a: any) => a.id === id);
+      const prevStatus = (apt?.status as string) ?? "booked";
+      const patientId = apt?.patients?.id ?? null;
+
       const { error } = await supabase.from("appointments").update({ status: "no_show" as any }).eq("id", id);
       if (error) throw error;
-      if (apt?.patients?.id) {
+
+      if (patientId) {
         await supabase.from("patients").update({
           no_show_count: (apt.patients.no_show_count || 0) + 1,
-        }).eq("id", apt.patients.id);
+        }).eq("id", patientId);
       }
+
+      return { id, prevStatus, patientId };
+    },
+    onSuccess: ({ id, prevStatus, patientId }) => {
+      queryClient.invalidateQueries({ queryKey: ["frontdesk-today"] });
+      // Toast with an Undo action. Sonner keeps the toast visible for the
+      // configured duration (10s); clicking Undo within that window reverts
+      // both the status and the patient's no_show_count.
+      toast.success("Marked as no-show", {
+        duration: 10_000,
+        action: {
+          label: "Undo",
+          onClick: async () => {
+            try {
+              await restoreFromNoShow(id, prevStatus, patientId, true);
+              queryClient.invalidateQueries({ queryKey: ["frontdesk-today"] });
+              toast.success("No-show undone");
+            } catch (e) {
+              toast.error(`Undo failed: ${e instanceof Error ? e.message : String(e)}`);
+            }
+          },
+        },
+      });
+    },
+  });
+
+  // After-the-fact restore (used by the No-Show filter view, when the toast
+  // is gone). Lets front-desk pick which status the appointment should
+  // actually be in — common case is "patient called, they DID show" so it
+  // becomes 'completed', but we also support 'booked' (mistake, reschedule)
+  // and 'checked_in' (they're here now, late).
+  const restoreNoShow = useMutation({
+    mutationFn: async ({ id, targetStatus, patientId }: { id: string; targetStatus: string; patientId: string | null }) => {
+      await restoreFromNoShow(id, targetStatus, patientId, true);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["frontdesk-today"] });
-      toast.success("Marked as no-show");
+      toast.success("No-show reversed");
     },
+    onError: (e: Error) => toast.error(`Restore failed: ${e.message}`),
   });
 
   const createWalkin = useMutation({
@@ -294,6 +370,13 @@ export default function FrontDesk() {
                   apt={apt}
                   onStatusChange={(id, status) => updateStatus.mutate({ id, status })}
                   onNoShow={(id) => markNoShow.mutate(id)}
+                  onRestore={(id, targetStatus) =>
+                    restoreNoShow.mutate({
+                      id,
+                      targetStatus,
+                      patientId: apt.patients?.id ?? null,
+                    })
+                  }
                 />
               ))
             )}

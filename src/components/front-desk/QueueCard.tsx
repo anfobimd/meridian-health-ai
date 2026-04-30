@@ -4,12 +4,16 @@ import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { CheckInPanel } from "./CheckInPanel";
 import { CheckoutPanel } from "./CheckoutPanel";
 import { getNoShowRisk } from "@/lib/no-show-risk";
 import {
   CheckCircle2, DoorOpen, Play, Flag, Clock, CreditCard, UserCheck,
-  AlertTriangle, Eye,
+  AlertTriangle, Eye, RotateCcw,
 } from "lucide-react";
 
 const nextActionMap: Record<string, { label: string; nextStatus: string; icon: React.ElementType } | undefined> = {
@@ -19,13 +23,26 @@ const nextActionMap: Record<string, { label: string; nextStatus: string; icon: R
   in_progress: { label: "Checkout", nextStatus: "completed", icon: Flag },
 };
 
-export function QueueCard({ apt, onStatusChange, onNoShow }: {
+// Statuses an accidentally-marked no-show might need to be reverted to.
+// "Booked" if it was a misclick before the patient arrived; "Checked In"
+// if they showed up late; "Completed" if the visit happened and the
+// no-show was retroactively wrong.
+const RESTORE_TARGETS: { value: string; label: string; description: string }[] = [
+  { value: "booked",      label: "Scheduled",   description: "Reschedule or move back to today's queue" },
+  { value: "checked_in",  label: "Checked In",  description: "Patient is here now (or arrived late)" },
+  { value: "completed",   label: "Completed",   description: "Visit actually happened" },
+];
+
+export function QueueCard({ apt, onStatusChange, onNoShow, onRestore }: {
   apt: any;
   onStatusChange: (id: string, status: string) => void;
   onNoShow: (id: string) => void;
+  onRestore?: (id: string, targetStatus: string) => void;
 }) {
   const [checkInOpen, setCheckInOpen] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [restoreOpen, setRestoreOpen] = useState(false);
+  const [restoreTarget, setRestoreTarget] = useState<string>("booked");
   const navigate = useNavigate();
 
   const action = nextActionMap[apt.status];
@@ -123,12 +140,84 @@ export function QueueCard({ apt, onStatusChange, onNoShow }: {
                 No-Show
               </Button>
             )}
+            {/* After-the-fact reversal for the No-Show filter view. Only shows
+                when the parent passes onRestore (i.e. from the no-show
+                filter), which keeps the card compact in normal queue columns. */}
+            {apt.status === "no_show" && onRestore && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 text-[11px] flex-1"
+                onClick={() => { setRestoreTarget("booked"); setRestoreOpen(true); }}
+              >
+                <RotateCcw className="h-3 w-3 mr-1" />Restore
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
 
       <CheckInPanel appointment={apt} open={checkInOpen} onOpenChange={setCheckInOpen} />
       <CheckoutPanel appointmentId={apt.id} open={checkoutOpen} onOpenChange={setCheckoutOpen} />
+
+      {/* Restore-from-no-show dialog. Front-desk picks the correct status —
+          most common is "Completed" (visit actually happened) but also
+          supports "Scheduled" (mistake, reschedule) and "Checked In"
+          (patient arrived late). Decrements no_show_count to undo the
+          score impact from the original mark. */}
+      <AlertDialog open={restoreOpen} onOpenChange={setRestoreOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <RotateCcw className="h-5 w-5 text-primary" />
+              Restore from no-show?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This reverses the no-show mark for{" "}
+              <span className="font-medium text-foreground">
+                {apt.patients?.first_name} {apt.patients?.last_name}
+              </span>{" "}
+              and decrements their no-show count. Pick the correct status:
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-2 py-2">
+            {RESTORE_TARGETS.map((opt) => (
+              <label
+                key={opt.value}
+                className={`flex items-start gap-3 rounded-md border p-3 cursor-pointer transition-colors ${
+                  restoreTarget === opt.value
+                    ? "border-primary bg-primary/5"
+                    : "border-border hover:bg-muted/50"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="restore-target"
+                  value={opt.value}
+                  checked={restoreTarget === opt.value}
+                  onChange={(e) => setRestoreTarget(e.target.value)}
+                  className="mt-0.5"
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-sm">{opt.label}</div>
+                  <div className="text-[11px] text-muted-foreground">{opt.description}</div>
+                </div>
+              </label>
+            ))}
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                onRestore?.(apt.id, restoreTarget);
+                setRestoreOpen(false);
+              }}
+            >
+              Restore
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
