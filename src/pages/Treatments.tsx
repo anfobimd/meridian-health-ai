@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Stethoscope, ShieldCheck, FileCheck, Eye, EyeOff, DollarSign, History, Sparkles, Loader2, AlertTriangle, CheckCircle2, ChevronRight } from "lucide-react";
+import { Plus, Stethoscope, ShieldCheck, FileCheck, Eye, EyeOff, DollarSign, History, Sparkles, Loader2, AlertTriangle, CheckCircle2, ChevronRight, Globe } from "lucide-react";
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
 
@@ -60,6 +60,7 @@ export default function Treatments() {
         is_member_pricing_enabled: !!formData.get("member_pricing"),
         requires_gfe: formData.get("requires_gfe") === "on",
         requires_md_review: formData.get("requires_md_review") === "on",
+        bookable_via_self_serve: formData.get("bookable_via_self_serve") === "on",
       };
       const { error } = await supabase.from("treatments").insert(treatment);
       if (error) throw error;
@@ -84,9 +85,8 @@ export default function Treatments() {
   });
 
   const toggleFlag = useMutation({
-    mutationFn: async ({ id, field, value }: { id: string; field: "requires_gfe" | "requires_md_review"; value: boolean }) => {
-      const updateData = field === "requires_gfe" ? { requires_gfe: value } : { requires_md_review: value };
-      const { error } = await supabase.from("treatments").update(updateData).eq("id", id);
+    mutationFn: async ({ id, field, value }: { id: string; field: "requires_gfe" | "requires_md_review" | "bookable_via_self_serve"; value: boolean }) => {
+      const { error } = await supabase.from("treatments").update({ [field]: value }).eq("id", id);
       if (error) throw error;
       await supabase.from("audit_logs").insert({ user_id: user?.id, action: "update", table_name: "treatments", record_id: id, new_values: { [field]: value } });
     },
@@ -203,6 +203,10 @@ export default function Treatments() {
                     <input type="checkbox" name="requires_md_review" className="rounded border-input" defaultChecked={aiTemplate?.should_require_md_review} />
                     <FileCheck className="h-4 w-4 text-info" /> Requires MD Review
                   </label>
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input type="checkbox" name="bookable_via_self_serve" className="rounded border-input" />
+                    <Globe className="h-4 w-4 text-success" /> Bookable online
+                  </label>
                 </div>
                 {/* AI Template Recommendation */}
                 {aiTemplateLoading && (
@@ -270,6 +274,10 @@ export default function Treatments() {
                           <label className="flex items-center gap-1.5 text-xs cursor-pointer">
                             <Switch checked={t.requires_md_review} onCheckedChange={(v) => toggleFlag.mutate({ id: t.id, field: "requires_md_review", value: v })} className="scale-75" />
                             <FileCheck className="h-3.5 w-3.5 text-info" /> MD
+                          </label>
+                          <label className="flex items-center gap-1.5 text-xs cursor-pointer">
+                            <Switch checked={t.bookable_via_self_serve} onCheckedChange={(v) => toggleFlag.mutate({ id: t.id, field: "bookable_via_self_serve", value: v })} className="scale-75" />
+                            <Globe className="h-3.5 w-3.5 text-success" /> Self-serve
                           </label>
                           <div className="ml-auto flex items-center gap-1">
                             {t.is_active && (
