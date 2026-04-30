@@ -157,7 +157,7 @@ export default function Providers() {
                         {p.specialty && <p className="text-sm text-muted-foreground">{p.specialty}</p>}
                         {p.email && <p className="text-xs text-muted-foreground mt-1">{p.email}</p>}
                         <div className="flex gap-1.5 mt-2 flex-wrap">
-                          <Badge variant={p.is_active ? "secondary" : "outline"}>
+                          <Badge variant={p.is_active ? "default" : "outline"} className={p.is_active ? "bg-success text-success-foreground hover:bg-success/90" : ""}>
                             {p.is_active ? "Active" : "Inactive"}
                           </Badge>
                           {getClearancesForProvider(p.id).length > 0 && (
