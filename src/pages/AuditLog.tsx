@@ -42,8 +42,12 @@ const ACTION_COLORS: Record<AuditAction, string> = {
   login: "bg-gray-100 text-muted-foreground",
 };
 
+// Radix's Select requires non-empty string values for items, so we use a
+// sentinel ("all") instead of "" to mean no action-type filter.
+const ACTION_ALL = "all";
+
 export function AuditLog() {
-  const [actionFilter, setActionFilter] = useState<string>("");
+  const [actionFilter, setActionFilter] = useState<string>(ACTION_ALL);
   const [userFilter, setUserFilter] = useState<string>("");
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
@@ -64,7 +68,7 @@ export function AuditLog() {
 
   const filteredLogs = useMemo(() => {
     return logs.filter((log: any) => {
-      if (actionFilter && log.action !== actionFilter) return false;
+      if (actionFilter !== ACTION_ALL && log.action !== actionFilter) return false;
       if (userFilter && !log.user_email?.toLowerCase().includes(userFilter.toLowerCase())) return false;
       if (startDate) {
         const logDate = new Date(log.created_at);
@@ -113,7 +117,7 @@ export function AuditLog() {
                   <SelectValue placeholder="All Actions" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Actions</SelectItem>
+                  <SelectItem value={ACTION_ALL}>All Actions</SelectItem>
                   <SelectItem value="create">Create</SelectItem>
                   <SelectItem value="update">Update</SelectItem>
                   <SelectItem value="delete">Delete</SelectItem>

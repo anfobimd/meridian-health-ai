@@ -44,25 +44,16 @@ export default function ChurnRisk() {
 
   const runScoring = useMutation({
     mutationFn: async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Not authenticated");
-
-      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-      const resp = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/ai-risk-scoring`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session.access_token}`,
-          },
-        }
-      );
-      if (!resp.ok) {
-        const err = await resp.json();
-        throw new Error(err.error || "Scoring failed");
-      }
-      return resp.json();
+      // Use supabase.functions.invoke so the project URL + session token come
+      // from the configured client (avoids relying on VITE_SUPABASE_PROJECT_ID
+      // being present in every deploy environment, which previously produced a
+      // "Failed to fetch" against https://undefined.supabase.co).
+      const { data, error } = await supabase.functions.invoke("ai-risk-scoring", {
+        body: {},
+      });
+      if (error) throw new Error(error.message || "Scoring failed");
+      if (data?.error) throw new Error(data.error);
+      return data as { scored: number; critical: number; high: number; medium: number; low: number };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["churn-scores"] });

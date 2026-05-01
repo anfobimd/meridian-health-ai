@@ -29,6 +29,7 @@ const QUEUE_COLUMNS: { status: QueueStatus; label: string; icon: React.ElementTy
   { status: "roomed", label: "Roomed", icon: DoorOpen, color: "border-t-info" },
   { status: "in_progress", label: "In Progress", icon: Play, color: "border-t-accent" },
   { status: "completed", label: "Completed", icon: CheckCircle2, color: "border-t-success" },
+  { status: "no_show", label: "No-Show", icon: AlertTriangle, color: "border-t-destructive" },
 ];
 
 type StatusFilter = "all" | "checked_in" | "completed" | "no_show";
@@ -362,37 +363,8 @@ export default function FrontDesk() {
       {/* Queue Board */}
       {isLoading ? (
         <div className="flex items-center justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
-      ) : statusFilter === "no_show" ? (
-        <div className="space-y-2">
-          <div className="flex items-center gap-2 px-1">
-            <AlertTriangle className="h-3.5 w-3.5 text-destructive" />
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">No-Show</span>
-            <Badge variant="secondary" className="ml-auto text-[11px] h-5">{stats.noShow}</Badge>
-          </div>
-          <div className="space-y-2 min-h-[120px] rounded-lg border-t-2 border-t-destructive bg-muted/20 p-2">
-            {filtered.filter((a: any) => a.status === "no_show").length === 0 ? (
-              <p className="text-[11px] text-muted-foreground/50 text-center py-6">No patients</p>
-            ) : (
-              filtered.filter((a: any) => a.status === "no_show").map((apt: any) => (
-                <QueueCard
-                  key={apt.id}
-                  apt={apt}
-                  onStatusChange={(id, status) => updateStatus.mutate({ id, status })}
-                  onNoShow={(id) => markNoShow.mutate(id)}
-                  onRestore={(id, targetStatus) =>
-                    restoreNoShow.mutate({
-                      id,
-                      targetStatus,
-                      patientId: apt.patients?.id ?? null,
-                    })
-                  }
-                />
-              ))
-            )}
-          </div>
-        </div>
       ) : (
-        <div className={`grid grid-cols-1 gap-4 ${statusFilter === "all" ? "md:grid-cols-3 lg:grid-cols-5" : ""}`}>
+        <div className={`grid grid-cols-1 gap-4 ${statusFilter === "all" ? "md:grid-cols-3 lg:grid-cols-6" : ""}`}>
           {QUEUE_COLUMNS.filter((col) => statusFilter === "all" || col.status === statusFilter).map((col) => {
             const colApts = filtered.filter((a: any) => a.status === col.status);
             return (
@@ -412,6 +384,13 @@ export default function FrontDesk() {
                       apt={apt}
                       onStatusChange={(id, status) => updateStatus.mutate({ id, status })}
                       onNoShow={(id) => markNoShow.mutate(id)}
+                      onRestore={(id, targetStatus) =>
+                        restoreNoShow.mutate({
+                          id,
+                          targetStatus,
+                          patientId: apt.patients?.id ?? null,
+                        })
+                      }
                     />
                   ))}
                 </div>

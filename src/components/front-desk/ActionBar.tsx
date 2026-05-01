@@ -85,31 +85,42 @@ export function ActionBar() {
         });
       }
 
-      // 3. Unsigned consents for today's patients
+      // 3. Unsigned consents for today's patients — identify the actual
+      // patients missing consents so clicking the alert can deep-link to
+      // the first one's check-in panel (rather than dropping the user on
+      // a context-less /front-desk).
       const { data: todayApts } = await supabase
         .from("appointments")
-        .select("patient_id")
+        .select("patient_id, patients(first_name, last_name)")
         .gte("scheduled_at", start)
         .lt("scheduled_at", end)
         .in("status", ["booked", "checked_in"] as any);
 
       if (todayApts?.length) {
         const patientIds = [...new Set(todayApts.map((a: any) => a.patient_id))];
-        const { count: consentCount } = await supabase
+        const { data: existingConsents } = await supabase
           .from("e_consents")
-          .select("*", { count: "exact", head: true })
+          .select("patient_id")
           .in("patient_id", patientIds);
 
-        const missing = patientIds.length - (consentCount ?? 0);
-        if (missing > 0) {
+        const consentedSet = new Set((existingConsents ?? []).map((c: any) => c.patient_id));
+        const missingApts = todayApts.filter((a: any) => !consentedSet.has(a.patient_id));
+        const missingPatientIds = [...new Set(missingApts.map((a: any) => a.patient_id))];
+
+        if (missingPatientIds.length > 0) {
+          const namePreview = missingApts
+            .slice(0, 3)
+            .map((a: any) => `${a.patients?.first_name ?? ""} ${a.patients?.last_name ?? ""}`.trim())
+            .filter(Boolean)
+            .join(", ");
           items.push({
             id: "missing-consents",
-            title: `${missing} patient${missing > 1 ? "s" : ""} may need consents`,
+            title: `${missingPatientIds.length} patient${missingPatientIds.length > 1 ? "s" : ""} may need consents`,
             urgency: "medium",
             category: "consent",
             action_label: "Check In",
-            route: "/front-desk",
-            detail: "Consent collection during check-in",
+            route: `/front-desk?patientId=${missingPatientIds[0]}`,
+            detail: namePreview || "Consent collection during check-in",
           });
         }
       }
