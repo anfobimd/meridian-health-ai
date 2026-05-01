@@ -107,6 +107,9 @@ export default function PhysicianApproval() {
     },
     onSuccess: (_, { status }) => {
       queryClient.invalidateQueries({ queryKey: ["approval-visits"] });
+      // Also drop the dashboard's pending-approvals count so the Action
+      // Items KPI updates immediately when the user lands back on / (QA #46).
+      queryClient.invalidateQueries({ queryKey: ["dash-pending-approvals"] });
       toast.success(`Recommendation ${status === "approved" ? "approved" : status === "modified" ? "modified & approved" : "rejected"}`);
       setReviewVisitId(null);
     },

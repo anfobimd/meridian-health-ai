@@ -189,7 +189,17 @@ export default function Dashboard() {
     queryKey: ["dash-pending-approvals"],
     ...COUNTERS_OPTS,
     queryFn: async () => {
-      const { data } = await supabase.from("hormone_visits").select("id, patients(first_name, last_name), visit_date").eq("approval_status", "pending").order("visit_date", { ascending: false }).limit(10);
+      // Match the PhysicianApproval queue's filter exactly — it requires an
+      // AI recommendation to even render the visit. Without this match, the
+      // dashboard reported "2 pending approvals" while the queue showed
+      // "No pending recommendations to review" (QA #46 reopened).
+      const { data } = await supabase
+        .from("hormone_visits")
+        .select("id, patients(first_name, last_name), visit_date")
+        .eq("approval_status", "pending")
+        .not("ai_recommendation", "is", null)
+        .order("visit_date", { ascending: false })
+        .limit(10);
       return data ?? [];
     },
   });
