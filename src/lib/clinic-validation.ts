@@ -90,12 +90,32 @@ export function validatePhone(raw: string): string | null {
   return "Phone must be a valid 10-digit US number (e.g. (555) 123-4567)";
 }
 
+// US ZIP — required. 5 digits or ZIP+4 (12345 or 12345-6789).
+export function validateZip(raw: string): string | null {
+  const v = raw.trim();
+  if (!v) return "ZIP code is required";
+  if (!/^\d{5}(-\d{4})?$/.test(v)) {
+    return "ZIP must be 5 digits or 5-digit + 4 (e.g. 90210 or 90210-1234)";
+  }
+  return null;
+}
+
+// Email — optional contact for the clinic itself.
+export function validateClinicEmail(raw: string): string | null {
+  const v = raw.trim();
+  if (!v) return null;
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)) return "Enter a valid email address";
+  return null;
+}
+
 export function validateClinicForm(form: {
   name: string;
   address: string;
   city: string;
   state: string;
+  zip_code: string;
   phone: string;
+  email?: string;
 }): FieldError[] {
   const errors: FieldError[] = [];
   const checks: [string, string | null][] = [
@@ -103,7 +123,9 @@ export function validateClinicForm(form: {
     ["address", validateAddress(form.address)],
     ["city", validateCity(form.city)],
     ["state", validateState(form.state)],
+    ["zip_code", validateZip(form.zip_code)],
     ["phone", validatePhone(form.phone)],
+    ["email", validateClinicEmail(form.email ?? "")],
   ];
   for (const [field, message] of checks) {
     if (message) errors.push({ field, message });

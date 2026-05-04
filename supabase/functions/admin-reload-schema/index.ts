@@ -23,12 +23,27 @@ Deno.serve(async (_req) => {
           ADD COLUMN IF NOT EXISTS admin_email             TEXT,
           ADD COLUMN IF NOT EXISTS admin_invited_at        TIMESTAMPTZ,
           ADD COLUMN IF NOT EXISTS admin_invitation_count  INTEGER NOT NULL DEFAULT 0;
+        ALTER TABLE public.clinics
+          ADD COLUMN IF NOT EXISTS address_line2 TEXT,
+          ADD COLUMN IF NOT EXISTS zip_code      TEXT,
+          ADD COLUMN IF NOT EXISTS country       TEXT NOT NULL DEFAULT 'US',
+          ADD COLUMN IF NOT EXISTS email         TEXT;
         DO $$
         BEGIN
           IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'contracts_admin_email_format') THEN
             ALTER TABLE public.contracts
               ADD CONSTRAINT contracts_admin_email_format
               CHECK (admin_email IS NULL OR admin_email ~* '^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$');
+          END IF;
+          IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'clinics_zip_code_format') THEN
+            ALTER TABLE public.clinics
+              ADD CONSTRAINT clinics_zip_code_format
+              CHECK (zip_code IS NULL OR zip_code ~ '^\\d{5}(-\\d{4})?$');
+          END IF;
+          IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'clinics_email_format') THEN
+            ALTER TABLE public.clinics
+              ADD CONSTRAINT clinics_email_format
+              CHECK (email IS NULL OR email ~* '^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$');
           END IF;
         END $$;
       `);
@@ -52,6 +67,13 @@ Deno.serve(async (_req) => {
             'invitation_email','invitation_sent_at','invitation_count',
             'admin_name','admin_email','admin_invited_at','admin_invitation_count'
           )
+        ORDER BY column_name
+      `;
+      out.clinics_columns = await sql`
+        SELECT column_name, data_type
+        FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='clinics'
+          AND column_name IN ('address_line2','zip_code','country','email')
         ORDER BY column_name
       `;
     } finally {

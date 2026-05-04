@@ -36,7 +36,7 @@ export default function ContractsAdmin() {
     invitation_email: "",
     admin_name: "", admin_email: "",
   });
-  const [clinicForm, setClinicForm] = useState({ name: "", address: "", contract_id: "", phone: "", city: "", state: "", timezone: "America/New_York" });
+  const [clinicForm, setClinicForm] = useState({ name: "", address: "", address_line2: "", contract_id: "", phone: "", city: "", state: "", zip_code: "", country: "US", email: "", timezone: "America/New_York" });
   const [selectedClinicId, setSelectedClinicId] = useState<string | null>(null);
   const [editClinicOpen, setEditClinicOpen] = useState(false);
   const [editClinicId, setEditClinicId] = useState<string | null>(null);
@@ -230,18 +230,22 @@ export default function ContractsAdmin() {
       const { error } = await supabase.from("clinics").insert({
         name: clinicForm.name.trim(),
         address: clinicForm.address.trim(),
+        address_line2: clinicForm.address_line2.trim() || null,
         city: clinicForm.city.trim(),
         state: normalizeState(clinicForm.state),
+        zip_code: clinicForm.zip_code.trim(),
+        country: (clinicForm.country.trim() || "US").toUpperCase(),
+        email: clinicForm.email.trim() || null,
         contract_id: clinicForm.contract_id || null,
         phone: clinicForm.phone.trim() || null,
         timezone: clinicForm.timezone || "America/New_York",
-      });
+      } as any);
       if (error) throw error;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["clinics"] });
       setClinicOpen(false);
-      setClinicForm({ name: "", address: "", contract_id: "", phone: "", city: "", state: "", timezone: "America/New_York" });
+      setClinicForm({ name: "", address: "", address_line2: "", contract_id: "", phone: "", city: "", state: "", zip_code: "", country: "US", email: "", timezone: "America/New_York" });
       setClinicErrors({});
       toast.success("Clinic created");
     },
@@ -260,19 +264,23 @@ export default function ContractsAdmin() {
       const { error } = await supabase.from("clinics").update({
         name: clinicForm.name.trim(),
         address: clinicForm.address.trim(),
+        address_line2: clinicForm.address_line2.trim() || null,
         city: clinicForm.city.trim(),
         state: normalizeState(clinicForm.state),
+        zip_code: clinicForm.zip_code.trim(),
+        country: (clinicForm.country.trim() || "US").toUpperCase(),
+        email: clinicForm.email.trim() || null,
         contract_id: clinicForm.contract_id || null,
         phone: clinicForm.phone.trim() || null,
         timezone: clinicForm.timezone || "America/New_York",
-      }).eq("id", editClinicId);
+      } as any).eq("id", editClinicId);
       if (error) throw error;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["clinics"] });
       setEditClinicOpen(false);
       setEditClinicId(null);
-      setClinicForm({ name: "", address: "", contract_id: "", phone: "", city: "", state: "", timezone: "America/New_York" });
+      setClinicForm({ name: "", address: "", address_line2: "", contract_id: "", phone: "", city: "", state: "", zip_code: "", country: "US", email: "", timezone: "America/New_York" });
       setClinicErrors({});
       toast.success("Clinic updated");
     },
@@ -320,10 +328,14 @@ export default function ContractsAdmin() {
     setClinicForm({
       name: c.name ?? "",
       address: c.address ?? "",
+      address_line2: c.address_line2 ?? "",
       contract_id: c.contract_id ?? "",
       phone: c.phone ?? "",
       city: c.city ?? "",
       state: c.state ?? "",
+      zip_code: c.zip_code ?? "",
+      country: c.country ?? "US",
+      email: c.email ?? "",
       timezone: c.timezone ?? "America/New_York",
     });
     setEditClinicOpen(true);
@@ -542,7 +554,7 @@ export default function ContractsAdmin() {
                   {errorFor("name") && <p className="mt-1 text-xs text-destructive">{errorFor("name")}</p>}
                 </div>
                 <div>
-                  <Label>Address <span className="text-destructive">*</span></Label>
+                  <Label>Address line 1 <span className="text-destructive">*</span></Label>
                   <Input
                     value={clinicForm.address}
                     onChange={e => { setClinicForm(p => ({ ...p, address: e.target.value })); if (clinicErrors.address) setClinicErrors(p => ({ ...p, address: "" })); }}
@@ -552,6 +564,14 @@ export default function ContractsAdmin() {
                     required
                   />
                   {errorFor("address") && <p className="mt-1 text-xs text-destructive">{errorFor("address")}</p>}
+                </div>
+                <div>
+                  <Label>Address line 2</Label>
+                  <Input
+                    value={clinicForm.address_line2}
+                    onChange={e => setClinicForm(p => ({ ...p, address_line2: e.target.value }))}
+                    placeholder="Suite 200, Building B (optional)"
+                  />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -580,17 +600,57 @@ export default function ContractsAdmin() {
                     {errorFor("state") && <p className="mt-1 text-xs text-destructive">{errorFor("state")}</p>}
                   </div>
                 </div>
-                <div>
-                  <Label>Phone</Label>
-                  <Input
-                    value={clinicForm.phone}
-                    onChange={e => { setClinicForm(p => ({ ...p, phone: e.target.value })); if (clinicErrors.phone) setClinicErrors(p => ({ ...p, phone: "" })); }}
-                    placeholder="(555) 123-4567"
-                    inputMode="tel"
-                    aria-invalid={!!errorFor("phone")}
-                    className={errorFor("phone") ? "border-destructive focus-visible:ring-destructive" : ""}
-                  />
-                  {errorFor("phone") && <p className="mt-1 text-xs text-destructive">{errorFor("phone")}</p>}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>ZIP code <span className="text-destructive">*</span></Label>
+                    <Input
+                      value={clinicForm.zip_code}
+                      onChange={e => { setClinicForm(p => ({ ...p, zip_code: e.target.value })); if (clinicErrors.zip_code) setClinicErrors(p => ({ ...p, zip_code: "" })); }}
+                      placeholder="90210 or 90210-1234"
+                      inputMode="numeric"
+                      maxLength={10}
+                      aria-invalid={!!errorFor("zip_code")}
+                      className={errorFor("zip_code") ? "border-destructive focus-visible:ring-destructive" : ""}
+                      required
+                    />
+                    {errorFor("zip_code") && <p className="mt-1 text-xs text-destructive">{errorFor("zip_code")}</p>}
+                  </div>
+                  <div>
+                    <Label>Country</Label>
+                    <Input
+                      value={clinicForm.country}
+                      onChange={e => setClinicForm(p => ({ ...p, country: e.target.value }))}
+                      placeholder="US"
+                      maxLength={2}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Phone</Label>
+                    <Input
+                      value={clinicForm.phone}
+                      onChange={e => { setClinicForm(p => ({ ...p, phone: e.target.value })); if (clinicErrors.phone) setClinicErrors(p => ({ ...p, phone: "" })); }}
+                      placeholder="(555) 123-4567"
+                      inputMode="tel"
+                      aria-invalid={!!errorFor("phone")}
+                      className={errorFor("phone") ? "border-destructive focus-visible:ring-destructive" : ""}
+                    />
+                    {errorFor("phone") && <p className="mt-1 text-xs text-destructive">{errorFor("phone")}</p>}
+                  </div>
+                  <div>
+                    <Label>Email</Label>
+                    <Input
+                      type="email"
+                      value={clinicForm.email}
+                      onChange={e => { setClinicForm(p => ({ ...p, email: e.target.value })); if (clinicErrors.email) setClinicErrors(p => ({ ...p, email: "" })); }}
+                      placeholder="clinic@example.com"
+                      inputMode="email"
+                      aria-invalid={!!errorFor("email")}
+                      className={errorFor("email") ? "border-destructive focus-visible:ring-destructive" : ""}
+                    />
+                    {errorFor("email") && <p className="mt-1 text-xs text-destructive">{errorFor("email")}</p>}
+                  </div>
                 </div>
                 <div><Label>Timezone</Label>
                   <Select value={clinicForm.timezone} onValueChange={v => setClinicForm(p => ({ ...p, timezone: v }))}>
@@ -616,6 +676,7 @@ export default function ContractsAdmin() {
                     !clinicForm.address.trim() ||
                     !clinicForm.city.trim() ||
                     !clinicForm.state.trim() ||
+                    !clinicForm.zip_code.trim() ||
                     addClinic.isPending
                   }
                 >
@@ -1192,7 +1253,7 @@ export default function ContractsAdmin() {
       </Dialog>
 
       {/* Edit Clinic Dialog */}
-      <Dialog open={editClinicOpen} onOpenChange={(o) => { setEditClinicOpen(o); if (!o) { setEditClinicId(null); setClinicForm({ name: "", address: "", contract_id: "", phone: "", city: "", state: "", timezone: "America/New_York" }); setClinicErrors({}); } }}>
+      <Dialog open={editClinicOpen} onOpenChange={(o) => { setEditClinicOpen(o); if (!o) { setEditClinicId(null); setClinicForm({ name: "", address: "", address_line2: "", contract_id: "", phone: "", city: "", state: "", zip_code: "", country: "US", email: "", timezone: "America/New_York" }); setClinicErrors({}); } }}>
         <DialogContent>
           <DialogHeader><DialogTitle>Edit Clinic</DialogTitle></DialogHeader>
           <div className="space-y-3">
@@ -1208,7 +1269,7 @@ export default function ContractsAdmin() {
               {errorFor("name") && <p className="mt-1 text-xs text-destructive">{errorFor("name")}</p>}
             </div>
             <div>
-              <Label>Address <span className="text-destructive">*</span></Label>
+              <Label>Address line 1 <span className="text-destructive">*</span></Label>
               <Input
                 value={clinicForm.address}
                 onChange={e => { setClinicForm(p => ({ ...p, address: e.target.value })); if (clinicErrors.address) setClinicErrors(p => ({ ...p, address: "" })); }}
@@ -1218,6 +1279,14 @@ export default function ContractsAdmin() {
                 required
               />
               {errorFor("address") && <p className="mt-1 text-xs text-destructive">{errorFor("address")}</p>}
+            </div>
+            <div>
+              <Label>Address line 2</Label>
+              <Input
+                value={clinicForm.address_line2}
+                onChange={e => setClinicForm(p => ({ ...p, address_line2: e.target.value }))}
+                placeholder="Suite 200, Building B (optional)"
+              />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -1246,17 +1315,57 @@ export default function ContractsAdmin() {
                 {errorFor("state") && <p className="mt-1 text-xs text-destructive">{errorFor("state")}</p>}
               </div>
             </div>
-            <div>
-              <Label>Phone</Label>
-              <Input
-                value={clinicForm.phone}
-                onChange={e => { setClinicForm(p => ({ ...p, phone: e.target.value })); if (clinicErrors.phone) setClinicErrors(p => ({ ...p, phone: "" })); }}
-                placeholder="(555) 123-4567"
-                inputMode="tel"
-                aria-invalid={!!errorFor("phone")}
-                className={errorFor("phone") ? "border-destructive focus-visible:ring-destructive" : ""}
-              />
-              {errorFor("phone") && <p className="mt-1 text-xs text-destructive">{errorFor("phone")}</p>}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>ZIP code <span className="text-destructive">*</span></Label>
+                <Input
+                  value={clinicForm.zip_code}
+                  onChange={e => { setClinicForm(p => ({ ...p, zip_code: e.target.value })); if (clinicErrors.zip_code) setClinicErrors(p => ({ ...p, zip_code: "" })); }}
+                  placeholder="90210 or 90210-1234"
+                  inputMode="numeric"
+                  maxLength={10}
+                  aria-invalid={!!errorFor("zip_code")}
+                  className={errorFor("zip_code") ? "border-destructive focus-visible:ring-destructive" : ""}
+                  required
+                />
+                {errorFor("zip_code") && <p className="mt-1 text-xs text-destructive">{errorFor("zip_code")}</p>}
+              </div>
+              <div>
+                <Label>Country</Label>
+                <Input
+                  value={clinicForm.country}
+                  onChange={e => setClinicForm(p => ({ ...p, country: e.target.value }))}
+                  placeholder="US"
+                  maxLength={2}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Phone</Label>
+                <Input
+                  value={clinicForm.phone}
+                  onChange={e => { setClinicForm(p => ({ ...p, phone: e.target.value })); if (clinicErrors.phone) setClinicErrors(p => ({ ...p, phone: "" })); }}
+                  placeholder="(555) 123-4567"
+                  inputMode="tel"
+                  aria-invalid={!!errorFor("phone")}
+                  className={errorFor("phone") ? "border-destructive focus-visible:ring-destructive" : ""}
+                />
+                {errorFor("phone") && <p className="mt-1 text-xs text-destructive">{errorFor("phone")}</p>}
+              </div>
+              <div>
+                <Label>Email</Label>
+                <Input
+                  type="email"
+                  value={clinicForm.email}
+                  onChange={e => { setClinicForm(p => ({ ...p, email: e.target.value })); if (clinicErrors.email) setClinicErrors(p => ({ ...p, email: "" })); }}
+                  placeholder="clinic@example.com"
+                  inputMode="email"
+                  aria-invalid={!!errorFor("email")}
+                  className={errorFor("email") ? "border-destructive focus-visible:ring-destructive" : ""}
+                />
+                {errorFor("email") && <p className="mt-1 text-xs text-destructive">{errorFor("email")}</p>}
+              </div>
             </div>
             <div>
               <Label>Timezone</Label>
@@ -1284,6 +1393,7 @@ export default function ContractsAdmin() {
                 !clinicForm.address.trim() ||
                 !clinicForm.city.trim() ||
                 !clinicForm.state.trim() ||
+                !clinicForm.zip_code.trim() ||
                 updateClinic.isPending
               }
             >
