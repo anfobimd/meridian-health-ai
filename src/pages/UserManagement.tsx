@@ -14,11 +14,32 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Loader2, UserPlus, Trash2, Shield, Mail, Users } from "lucide-react";
+import { Loader2, UserPlus, Trash2, Shield, Mail, Users, Send, FileText, Building2 } from "lucide-react";
 import { toast } from "sonner";
-import { format } from "date-fns";
+import { format, differenceInDays } from "date-fns";
 
 type Role = "super_admin" | "admin" | "provider" | "front_desk";
+
+// QA #59 — invitations expire visually after this many days with no acceptance.
+// (Doesn't actually disable the link — that's an onboarding-flow concern.)
+const INVITATION_TTL_DAYS = 30;
+
+type InvitationKind = "contract" | "contract-admin" | "staff";
+type InvitationStatus = "accepted" | "pending" | "expired" | "never_sent";
+
+interface InvitationRow {
+  key: string;
+  kind: InvitationKind;
+  email: string;
+  recipientLabel: string;     // "John Smith" or "—"
+  contextLabel: string;       // e.g. "SoCal Wellness Partners" or "Meridian — La Jolla"
+  sentAt: string | null;
+  count: number;
+  status: InvitationStatus;
+  // Identifiers used by the resend mutation
+  contractId?: string;
+  assignmentId?: string;
+}
 const ROLE_OPTIONS: { value: Role; label: string }[] = [
   { value: "super_admin", label: "Super Admin" },
   { value: "admin", label: "Admin" },
@@ -68,6 +89,58 @@ export default function UserManagement() {
       if (error) throw error;
       return (data?.allowlist ?? []) as AllowlistRow[];
     },
+  });
+
+  // ── Invitations (QA #59) ──
+  // Pulls counter-party invitations, contract-admin invitations, and staff
+  // assignment invitations into one list, then derives a status by checking
+  // the invited email against the existing auth users.
+  const { data: contractInvites } = useQuery({
+    queryKey: ["admin-contract-invites"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("contracts")
+        .select("id, name, invitation_email, invitation_sent_at, invitation_count, admin_email, admin_name, admin_invited_at, admin_invitation_count");
+      return data ?? [];
+    },
+  });
+
+  const { data: staffInvites } = useQuery({
+    queryKey: ["admin-staff-invites"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("provider_clinic_assignments")
+        .select("id, notification_sent_at, notification_count, providers(first_name, last_name, email), clinics(name)")
+        .gt("notification_count", 0);
+      return data ?? [];
+    },
+  });
+
+  const resendInviteMut = useMutation({
+    mutationFn: async (row: InvitationRow) => {
+      if (row.kind === "contract") {
+        const { error } = await supabase.functions.invoke("send-contract-invitation", {
+          body: { contract_id: row.contractId, email: row.email },
+        });
+        if (error) throw error;
+      } else if (row.kind === "contract-admin") {
+        const { error } = await supabase.functions.invoke("send-contract-admin-invitation", {
+          body: { contract_id: row.contractId, email: row.email, name: row.recipientLabel || undefined },
+        });
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.functions.invoke("send-staff-assignment-invitation", {
+          body: { assignment_id: row.assignmentId, email: row.email },
+        });
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      toast.success("Invitation resent");
+      queryClient.invalidateQueries({ queryKey: ["admin-contract-invites"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-staff-invites"] });
+    },
+    onError: (e: Error) => toast.error(e.message || "Resend failed"),
   });
 
   // ── Mutations ──
@@ -138,6 +211,82 @@ export default function UserManagement() {
     return "outline";
   };
 
+  // Build the unified invitation list with derived status.
+  const invitationRows: InvitationRow[] = (() => {
+    const userEmails = new Set((users ?? []).map(u => (u.email || "").toLowerCase()));
+    const statusFor = (email: string, sentAt: string | null): InvitationStatus => {
+      if (email && userEmails.has(email.toLowerCase())) return "accepted";
+      if (!sentAt) return "never_sent";
+      return differenceInDays(new Date(), new Date(sentAt)) > INVITATION_TTL_DAYS ? "expired" : "pending";
+    };
+    const rows: InvitationRow[] = [];
+    for (const c of (contractInvites as any[]) ?? []) {
+      if (c.invitation_email) {
+        rows.push({
+          key: `contract:${c.id}`,
+          kind: "contract",
+          email: c.invitation_email,
+          recipientLabel: "—",
+          contextLabel: c.name,
+          sentAt: c.invitation_sent_at ?? null,
+          count: c.invitation_count ?? 0,
+          status: statusFor(c.invitation_email, c.invitation_sent_at),
+          contractId: c.id,
+        });
+      }
+      if (c.admin_email) {
+        rows.push({
+          key: `contract-admin:${c.id}`,
+          kind: "contract-admin",
+          email: c.admin_email,
+          recipientLabel: c.admin_name ?? "—",
+          contextLabel: c.name,
+          sentAt: c.admin_invited_at ?? null,
+          count: c.admin_invitation_count ?? 0,
+          status: statusFor(c.admin_email, c.admin_invited_at),
+          contractId: c.id,
+        });
+      }
+    }
+    for (const a of (staffInvites as any[]) ?? []) {
+      const email = a.providers?.email ?? "";
+      if (!email) continue;
+      const name = `${a.providers?.first_name ?? ""} ${a.providers?.last_name ?? ""}`.trim() || "—";
+      rows.push({
+        key: `staff:${a.id}`,
+        kind: "staff",
+        email,
+        recipientLabel: name,
+        contextLabel: a.clinics?.name ?? "—",
+        sentAt: a.notification_sent_at ?? null,
+        count: a.notification_count ?? 0,
+        status: statusFor(email, a.notification_sent_at),
+        assignmentId: a.id,
+      });
+    }
+    // Sort: pending first, then expired, then accepted; within each group newest first.
+    const order: Record<InvitationStatus, number> = { pending: 0, expired: 1, never_sent: 2, accepted: 3 };
+    rows.sort((x, y) => {
+      const o = order[x.status] - order[y.status];
+      if (o !== 0) return o;
+      const xTime = x.sentAt ? new Date(x.sentAt).getTime() : 0;
+      const yTime = y.sentAt ? new Date(y.sentAt).getTime() : 0;
+      return yTime - xTime;
+    });
+    return rows;
+  })();
+
+  const invitationStatusBadge = (s: InvitationStatus) => {
+    if (s === "accepted") return <Badge variant="outline" className="text-success border-success/40">Accepted</Badge>;
+    if (s === "pending") return <Badge variant="outline" className="text-warning border-warning/40">Pending</Badge>;
+    if (s === "expired") return <Badge variant="outline" className="text-destructive border-destructive/40">Expired</Badge>;
+    return <Badge variant="outline">Not sent</Badge>;
+  };
+  const invitationKindLabel = (k: InvitationKind) =>
+    k === "contract" ? "Contract" : k === "contract-admin" ? "Contract Admin" : "Staff";
+  const invitationKindIcon = (k: InvitationKind) =>
+    k === "contract" ? <FileText className="h-3.5 w-3.5" /> : k === "contract-admin" ? <Shield className="h-3.5 w-3.5" /> : <Building2 className="h-3.5 w-3.5" />;
+
   return (
     <div className="space-y-6">
 <div className="flex items-center justify-between">
@@ -155,6 +304,7 @@ export default function UserManagement() {
       <Tabs defaultValue="users" className="space-y-4">
         <TabsList>
           <TabsTrigger value="users"><Users className="h-4 w-4 mr-1" /> Users</TabsTrigger>
+          <TabsTrigger value="invitations"><Mail className="h-4 w-4 mr-1" /> Invitations ({invitationRows.length})</TabsTrigger>
           <TabsTrigger value="allowlist"><Shield className="h-4 w-4 mr-1" /> Super Admin Allowlist</TabsTrigger>
         </TabsList>
 
@@ -213,6 +363,77 @@ export default function UserManagement() {
                               ))}
                             </SelectContent>
                           </Select>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ─── INVITATIONS TAB (QA #59) ─── */}
+        <TabsContent value="invitations">
+          <Card>
+            <CardHeader>
+              <CardTitle>Invitations</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Status of every invitation sent — counter-party, contract admin, and clinic staff. "Pending"
+                turns to "Expired" after {INVITATION_TTL_DAYS} days with no acceptance. "Accepted" means the
+                invited email has signed up.
+              </p>
+            </CardHeader>
+            <CardContent>
+              {invitationRows.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  No invitations sent yet. Use the Contracts and Clinics & Staff sections to invite users.
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Recipient</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Context</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Last sent</TableHead>
+                      <TableHead className="text-right">Sent</TableHead>
+                      <TableHead className="text-right">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {invitationRows.map((row) => (
+                      <TableRow key={row.key}>
+                        <TableCell>
+                          <div className="text-sm font-medium">{row.email}</div>
+                          {row.recipientLabel && row.recipientLabel !== "—" && (
+                            <div className="text-xs text-muted-foreground">{row.recipientLabel}</div>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary" className="gap-1 text-xs">
+                            {invitationKindIcon(row.kind)} {invitationKindLabel(row.kind)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-sm">{row.contextLabel}</TableCell>
+                        <TableCell>{invitationStatusBadge(row.status)}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">
+                          {row.sentAt ? format(new Date(row.sentAt), "MMM d, yyyy 'at' h:mm a") : "—"}
+                        </TableCell>
+                        <TableCell className="text-right text-xs text-muted-foreground">{row.count}</TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 text-xs gap-1"
+                            disabled={row.status === "accepted" || resendInviteMut.isPending}
+                            onClick={() => resendInviteMut.mutate(row)}
+                            title={row.status === "accepted" ? "Already accepted — no need to resend" : "Resend invitation"}
+                          >
+                            <Send className="h-3 w-3" />
+                            Resend
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))}

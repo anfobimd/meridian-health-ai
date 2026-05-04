@@ -121,6 +121,7 @@ const navSections: NavSection[] = [
       { to: "/md-coverage", icon: ShieldCheck, label: "MD Coverage" },
       { to: "/master-catalog", icon: BookOpen, label: "Master Catalog" },
       { to: "/benchmarks", icon: BarChart3, label: "Benchmarks" },
+      { to: "/users", icon: UserCog, label: "Users" },
       { to: "/audit-log", icon: ScrollText, label: "Audit Log" },
     ],
   },
