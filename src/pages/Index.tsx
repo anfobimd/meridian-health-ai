@@ -165,7 +165,15 @@ export default function Dashboard() {
 
   // QA #46 — Action-count queries opt out of the global 60s staleTime so the
   // KPI updates the moment the user returns from completing the action.
-  const COUNTERS_OPTS = { staleTime: 0, refetchOnMount: "always" as const };
+  // Also refetches when the window regains focus and on a 30s interval so
+  // the count self-heals even if a mutation in another tab/page doesn't
+  // explicitly invalidate the dashboard cache.
+  const COUNTERS_OPTS = {
+    staleTime: 0,
+    refetchOnMount: "always" as const,
+    refetchOnWindowFocus: true,
+    refetchInterval: 30_000,
+  };
 
   const { data: unsignedNotes } = useQuery({
     queryKey: ["dash-unsigned-notes"],

@@ -244,6 +244,8 @@ export default function MdOversight() {
       toast.success(`Chart ${action === "approve" ? "approved" : action === "correct" ? "correction noted" : "rejected"}`);
       setSelectedReview(null); setMdComment(""); setReviewStartTime(null); setElapsed(0); setConfirmAction(null);
       queryClient.invalidateQueries({ queryKey: ["chart-reviews"] });
+      // QA #46 — keep the dashboard Action Items count in sync.
+      queryClient.invalidateQueries({ queryKey: ["dash-pending-reviews"] });
     },
     onError: (e) => toast.error(e.message),
   });
@@ -266,6 +268,7 @@ export default function MdOversight() {
       toast.success(`${batchSelected.size} charts batch approved`);
       setBatchSelected(new Set());
       queryClient.invalidateQueries({ queryKey: ["chart-reviews"] });
+      queryClient.invalidateQueries({ queryKey: ["dash-pending-reviews"] });
     },
     onError: (e) => toast.error(e.message),
   });
@@ -282,6 +285,7 @@ export default function MdOversight() {
     },
     onSuccess: (_, { status }) => {
       queryClient.invalidateQueries({ queryKey: ["approval-visits"] });
+      queryClient.invalidateQueries({ queryKey: ["dash-pending-approvals"] });
       toast.success(`Recommendation ${status === "approved" ? "approved" : status === "modified" ? "modified & approved" : "rejected"}`);
       setSelectedHormone(null);
     },
@@ -291,7 +295,12 @@ export default function MdOversight() {
   const openChartReview = (review: any) => {
     setSelectedReview(review); setReviewStartTime(Date.now()); setMdComment(""); setElapsed(0);
     supabase.from("chart_review_records").update({ status: "in_review", review_started_at: new Date().toISOString() })
-      .eq("id", review.id).then(() => queryClient.invalidateQueries({ queryKey: ["chart-reviews"] }));
+      .eq("id", review.id).then(() => {
+        queryClient.invalidateQueries({ queryKey: ["chart-reviews"] });
+        // Status flipped from pending_md to in_review removes it from the
+        // dashboard counter source, so refresh that too.
+        queryClient.invalidateQueries({ queryKey: ["dash-pending-reviews"] });
+      });
   };
 
   const openHormoneReview = (visit: any) => {
