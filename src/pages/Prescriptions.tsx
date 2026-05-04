@@ -208,10 +208,13 @@ export function TelehealthRx({ patientId, encounterId, embedded = false }: Teleh
                 ) : (
                   <div className="relative">
                     <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input placeholder="Search formulary..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9" />
-                    {medResults && medResults.length > 0 && (
+                    <Input placeholder="Search formulary or type any medication name…" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9" />
+                    {/* QA #60 — show formulary matches + a manual-entry fallback so a
+                        provider can always write a script, even for medications not
+                        in the catalog yet. */}
+                    {searchTerm.length >= 2 && (
                       <div className="absolute z-10 w-full mt-1 rounded-md border bg-popover shadow-lg max-h-48 overflow-y-auto">
-                        {medResults.map((med: any) => (
+                        {(medResults ?? []).map((med: any) => (
                           <button key={med.id} type="button" className="w-full text-left px-3 py-2 hover:bg-accent text-sm border-b last:border-b-0" onClick={() => selectMedication(med)}>
                             <span className="font-medium">{med.name}</span>
                             {med.generic_name && <span className="text-muted-foreground italic ml-1">({med.generic_name})</span>}
@@ -222,6 +225,19 @@ export function TelehealthRx({ patientId, encounterId, embedded = false }: Teleh
                             </div>
                           </button>
                         ))}
+                        <button
+                          type="button"
+                          className="w-full text-left px-3 py-2 hover:bg-accent text-sm bg-muted/40"
+                          onClick={() => {
+                            setSelectedMedId("");
+                            setSelectedMedName(searchTerm.trim());
+                            setSearchTerm("");
+                          }}
+                        >
+                          <span className="text-xs text-muted-foreground">Not in formulary? </span>
+                          <span className="font-medium">Use “{searchTerm.trim()}”</span>
+                          <span className="text-xs text-muted-foreground"> as a free-text medication</span>
+                        </button>
                       </div>
                     )}
                   </div>
