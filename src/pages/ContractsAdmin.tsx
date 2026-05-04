@@ -31,7 +31,11 @@ export default function ContractsAdmin() {
   const [assignPrimary, setAssignPrimary] = useState(false);
   const [assignNotify, setAssignNotify] = useState(true);
   const [assignNotifyEmailOverride, setAssignNotifyEmailOverride] = useState("");
-  const [form, setForm] = useState({ name: "", start_date: "", end_date: "", notes: "", invitation_email: "" });
+  const [form, setForm] = useState({
+    name: "", start_date: "", end_date: "", notes: "",
+    invitation_email: "",
+    admin_name: "", admin_email: "",
+  });
   const [clinicForm, setClinicForm] = useState({ name: "", address: "", contract_id: "", phone: "", city: "", state: "", timezone: "America/New_York" });
   const [selectedClinicId, setSelectedClinicId] = useState<string | null>(null);
   const [editClinicOpen, setEditClinicOpen] = useState(false);
@@ -91,36 +95,53 @@ export default function ContractsAdmin() {
   const addContract = useMutation({
     mutationFn: async () => {
       const inviteEmail = form.invitation_email.trim();
+      const adminEmail = form.admin_email.trim();
+      const adminName = form.admin_name.trim();
       if (inviteEmail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(inviteEmail)) {
         throw new Error("Invitation email looks invalid");
+      }
+      if (adminEmail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(adminEmail)) {
+        throw new Error("Admin email looks invalid");
       }
       const { data: inserted, error } = await supabase.from("contracts").insert({
         name: form.name,
         start_date: form.start_date || new Date().toISOString().split("T")[0],
         end_date: form.end_date || null,
         notes: form.notes || null,
-        // invitation_email exists in the DB but is missing from generated types — cast to bypass.
         invitation_email: inviteEmail || null,
+        admin_name: adminName || null,
+        admin_email: adminEmail || null,
       } as any).select("id").single();
       if (error) throw error;
 
-      // Auto-send invitation if email was provided.
+      // Auto-send counter-party invitation if email was provided.
       if (inviteEmail && inserted?.id) {
         const { error: invErr } = await supabase.functions.invoke("send-contract-invitation", {
           body: { contract_id: inserted.id, email: inviteEmail },
         });
         if (invErr) {
-          // Contract was created — surface but don't undo.
           throw new Error(`Contract created, but invitation send failed: ${invErr.message}`);
         }
       }
-      return { sent: !!inviteEmail };
+      // Auto-send admin invitation if admin email was provided.
+      if (adminEmail && inserted?.id) {
+        const { error: adminErr } = await supabase.functions.invoke("send-contract-admin-invitation", {
+          body: { contract_id: inserted.id, email: adminEmail, name: adminName || null },
+        });
+        if (adminErr) {
+          throw new Error(`Contract created, but admin invitation send failed: ${adminErr.message}`);
+        }
+      }
+      return { sent: !!inviteEmail, adminSent: !!adminEmail };
     },
-    onSuccess: ({ sent }) => {
+    onSuccess: ({ sent, adminSent }) => {
       qc.invalidateQueries({ queryKey: ["contracts"] });
       setContractOpen(false);
-      setForm({ name: "", start_date: "", end_date: "", notes: "", invitation_email: "" });
-      toast.success(sent ? "Contract created and invitation sent" : "Contract created");
+      setForm({ name: "", start_date: "", end_date: "", notes: "", invitation_email: "", admin_name: "", admin_email: "" });
+      const parts: string[] = ["Contract created"];
+      if (sent) parts.push("invitation sent");
+      if (adminSent) parts.push("admin notified");
+      toast.success(parts.join(" — "));
     },
     onError: (e: Error) => toast.error(e.message || "Failed to create contract"),
   });
@@ -130,16 +151,22 @@ export default function ContractsAdmin() {
       if (!editContractId) throw new Error("No contract selected");
       if (!form.name.trim()) throw new Error("Name is required");
       const inviteEmail = form.invitation_email.trim();
+      const adminEmail = form.admin_email.trim();
+      const adminName = form.admin_name.trim();
       if (inviteEmail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(inviteEmail)) {
         throw new Error("Invitation email looks invalid");
+      }
+      if (adminEmail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(adminEmail)) {
+        throw new Error("Admin email looks invalid");
       }
       const { error } = await supabase.from("contracts").update({
         name: form.name.trim(),
         start_date: form.start_date || new Date().toISOString().split("T")[0],
         end_date: form.end_date || null,
         notes: form.notes || null,
-        // invitation_email exists in the DB but is missing from generated types — cast to bypass.
         invitation_email: inviteEmail || null,
+        admin_name: adminName || null,
+        admin_email: adminEmail || null,
       } as any).eq("id", editContractId);
       if (error) throw error;
     },
@@ -147,7 +174,7 @@ export default function ContractsAdmin() {
       qc.invalidateQueries({ queryKey: ["contracts"] });
       setEditContractOpen(false);
       setEditContractId(null);
-      setForm({ name: "", start_date: "", end_date: "", notes: "", invitation_email: "" });
+      setForm({ name: "", start_date: "", end_date: "", notes: "", invitation_email: "", admin_name: "", admin_email: "" });
       toast.success("Contract updated");
     },
     onError: (e: Error) => toast.error(e.message || "Failed to update contract"),
@@ -161,9 +188,25 @@ export default function ContractsAdmin() {
       end_date: c.end_date ?? "",
       notes: c.notes ?? "",
       invitation_email: c.invitation_email ?? "",
+      admin_name: c.admin_name ?? "",
+      admin_email: c.admin_email ?? "",
     });
     setEditContractOpen(true);
   };
+
+  const sendContractAdminInvitation = useMutation({
+    mutationFn: async ({ contract_id, email, name }: { contract_id: string; email?: string; name?: string }) => {
+      const { error } = await supabase.functions.invoke("send-contract-admin-invitation", {
+        body: { contract_id, ...(email ? { email } : {}), ...(name ? { name } : {}) },
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["contracts"] });
+      toast.success("Admin invitation sent");
+    },
+    onError: (e: Error) => toast.error(e.message || "Failed to send admin invitation"),
+  });
 
   const sendContractInvitation = useMutation({
     mutationFn: async ({ contract_id, email }: { contract_id: string; email?: string }) => {
@@ -454,6 +497,28 @@ export default function ContractsAdmin() {
                   />
                   <p className="text-[11px] text-muted-foreground">If filled, an invitation email with the contract details is sent automatically when you create the contract. You can resend later from the Contracts table.</p>
                 </div>
+                <div className="space-y-1.5 pt-2 border-t">
+                  <Label className="flex items-center gap-1.5">
+                    <UserPlus className="h-3.5 w-3.5 text-muted-foreground" />
+                    Contract Admin <span className="text-xs text-muted-foreground font-normal">(optional)</span>
+                  </Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input
+                      value={form.admin_name}
+                      onChange={e => setForm(p => ({ ...p, admin_name: e.target.value }))}
+                      placeholder="Admin name"
+                      autoComplete="name"
+                    />
+                    <Input
+                      type="email"
+                      value={form.admin_email}
+                      onChange={e => setForm(p => ({ ...p, admin_email: e.target.value }))}
+                      placeholder="admin@example.com"
+                      inputMode="email"
+                    />
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">If filled, the admin receives an assignment notification on create. You can resend later from the Contracts table.</p>
+                </div>
                 <Button onClick={() => addContract.mutate()} disabled={!form.name || addContract.isPending}>
                   {addContract.isPending ? "Creating…" : "Create"}
                 </Button>
@@ -698,7 +763,7 @@ export default function ContractsAdmin() {
                 })}
               </div>
               <Table>
-                <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Start</TableHead><TableHead>End</TableHead><TableHead>Status</TableHead><TableHead>Invitation</TableHead><TableHead>Clinics</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
+                <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Start</TableHead><TableHead>End</TableHead><TableHead>Status</TableHead><TableHead>Invitation</TableHead><TableHead>Admin</TableHead><TableHead>Clinics</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
                 <TableBody>
                   {contracts
                     .filter(c => contractStatusFilter === "all" || effectiveStatus(c) === contractStatusFilter)
@@ -754,6 +819,64 @@ export default function ContractsAdmin() {
                               </div>
                             )}
                           </TableCell>
+                          <TableCell>
+                            {(() => {
+                              const adminEmail = (c as any).admin_email as string | null;
+                              const adminName = (c as any).admin_name as string | null;
+                              const adminCount = (c as any).admin_invitation_count ?? 0;
+                              const adminSentAt = (c as any).admin_invited_at as string | null;
+                              if (!adminEmail && adminCount === 0) {
+                                return (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                      const email = prompt("Add a Contract Admin — email?")?.trim();
+                                      if (!email) return;
+                                      const name = prompt("Admin name (optional):")?.trim() || undefined;
+                                      sendContractAdminInvitation.mutate({ contract_id: c.id, email, name });
+                                    }}
+                                    disabled={sendContractAdminInvitation.isPending}
+                                    title="Assign a Contract Admin and send them an invitation"
+                                  >
+                                    <UserPlus className="h-3.5 w-3.5 mr-1.5" />Add Admin
+                                  </Button>
+                                );
+                              }
+                              return (
+                                <div className="flex flex-col gap-1">
+                                  <div className="text-xs">
+                                    <span className="font-medium">{adminName || adminEmail}</span>
+                                    {adminName && adminEmail ? (
+                                      <span className="text-muted-foreground ml-1">({adminEmail})</span>
+                                    ) : null}
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    {adminCount > 0 && (
+                                      <Badge variant="secondary" className="gap-1" title={adminSentAt ? `Last sent ${format(new Date(adminSentAt), "PPp")}` : ""}>
+                                        <Mail className="h-3 w-3" />
+                                        Sent {adminCount > 1 ? `${adminCount}×` : ""}
+                                      </Badge>
+                                    )}
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-7 px-2 text-xs"
+                                      onClick={() => {
+                                        const email = adminEmail || prompt("Send admin invitation to which email?")?.trim();
+                                        if (!email) return;
+                                        sendContractAdminInvitation.mutate({ contract_id: c.id, email, name: adminName ?? undefined });
+                                      }}
+                                      disabled={sendContractAdminInvitation.isPending}
+                                      title={adminEmail ? `Resend to ${adminEmail}` : "Resend admin invitation"}
+                                    >
+                                      {adminCount === 0 ? "Send" : "Resend"}
+                                    </Button>
+                                  </div>
+                                </div>
+                              );
+                            })()}
+                          </TableCell>
                           <TableCell>{clinics.filter(cl => cl.contract_id === c.id).length}</TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-1.5">
@@ -794,7 +917,7 @@ export default function ContractsAdmin() {
                     })}
                   {contracts.filter(c => contractStatusFilter === "all" || effectiveStatus(c) === contractStatusFilter).length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8">
+                      <TableCell colSpan={8} className="text-center py-8">
                         <div className="flex flex-col items-center gap-3">
                           <p className="text-sm text-muted-foreground">
                             {contracts.length === 0
@@ -964,7 +1087,7 @@ export default function ContractsAdmin() {
       </Tabs>
 
       {/* Edit Contract Dialog (QA #33) */}
-      <Dialog open={editContractOpen} onOpenChange={(o) => { setEditContractOpen(o); if (!o) { setEditContractId(null); setForm({ name: "", start_date: "", end_date: "", notes: "", invitation_email: "" }); } }}>
+      <Dialog open={editContractOpen} onOpenChange={(o) => { setEditContractOpen(o); if (!o) { setEditContractId(null); setForm({ name: "", start_date: "", end_date: "", notes: "", invitation_email: "", admin_name: "", admin_email: "" }); } }}>
         <DialogContent>
           <DialogHeader><DialogTitle>Edit Contract</DialogTitle></DialogHeader>
           <div className="space-y-3">
@@ -1038,6 +1161,28 @@ export default function ContractsAdmin() {
                 inputMode="email"
               />
               <p className="text-[11px] text-muted-foreground">Saved with the contract; use the Resend button on the row to actually send.</p>
+            </div>
+            <div className="space-y-1.5 pt-2 border-t">
+              <Label className="flex items-center gap-1.5">
+                <UserPlus className="h-3.5 w-3.5 text-muted-foreground" />
+                Contract Admin <span className="text-xs text-muted-foreground font-normal">(optional)</span>
+              </Label>
+              <div className="grid grid-cols-2 gap-2">
+                <Input
+                  value={form.admin_name}
+                  onChange={e => setForm(p => ({ ...p, admin_name: e.target.value }))}
+                  placeholder="Admin name"
+                  autoComplete="name"
+                />
+                <Input
+                  type="email"
+                  value={form.admin_email}
+                  onChange={e => setForm(p => ({ ...p, admin_email: e.target.value }))}
+                  placeholder="admin@example.com"
+                  inputMode="email"
+                />
+              </div>
+              <p className="text-[11px] text-muted-foreground">Saved with the contract; use the row action to send or resend the admin notification.</p>
             </div>
             <Button onClick={() => updateContract.mutate()} disabled={!form.name.trim() || updateContract.isPending}>
               {updateContract.isPending ? "Saving…" : "Save Changes"}
