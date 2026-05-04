@@ -266,7 +266,12 @@ export default function Treatments() {
                           {t.category && <Badge variant="outline">{t.category}</Badge>}
                           <span className="text-xs text-muted-foreground">{t.duration_minutes} min</span>
                         </div>
-                        <div className="flex items-center gap-3 mt-3">
+                        {/* QA #62 — flex-wrap with row gap so the Active toggle
+                            stays inside the card on narrow widths instead of
+                            overflowing to the right. The Impact?/Active group
+                            keeps ml-auto so it floats right when there's room
+                            but gracefully wraps to its own line when there isn't. */}
+                        <div className="flex items-center flex-wrap gap-x-3 gap-y-2 mt-3">
                           <label className="flex items-center gap-1.5 text-xs cursor-pointer">
                             <Switch checked={t.requires_gfe} onCheckedChange={(v) => toggleFlag.mutate({ id: t.id, field: "requires_gfe", value: v })} className="scale-75" />
                             <ShieldCheck className="h-3.5 w-3.5 text-warning" /> GFE
@@ -279,7 +284,7 @@ export default function Treatments() {
                             <Switch checked={t.bookable_via_self_serve} onCheckedChange={(v) => toggleFlag.mutate({ id: t.id, field: "bookable_via_self_serve", value: v })} className="scale-75" />
                             <Globe className="h-3.5 w-3.5 text-success" /> Self-serve
                           </label>
-                          <div className="ml-auto flex items-center gap-1">
+                          <div className="ml-auto flex items-center gap-1 shrink-0">
                             {t.is_active && (
                               <Button variant="ghost" size="sm" className="h-6 text-[11px] text-warning" onClick={() => checkDeactivation(t.id, t.name)}>
                                 {aiDeactivationLoading && deactivatingId === t.id ? <Loader2 className="h-3 w-3 animate-spin" /> : "Impact?"}

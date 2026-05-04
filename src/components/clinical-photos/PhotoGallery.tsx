@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
@@ -36,32 +36,47 @@ export function PhotoGallery({ patientId }: PhotoGalleryProps) {
     return true;
   }) ?? [];
 
-  const getUrl = (path: string) => {
-    const { data } = supabase.storage.from("clinical-photos").getPublicUrl(path);
-    return data.publicUrl;
-  };
-
   const getSignedUrl = async (path: string) => {
     const { data } = await supabase.storage.from("clinical-photos").createSignedUrl(path, 3600);
     return data?.signedUrl ?? "";
   };
 
-  // Use signed URLs since bucket is private
+  // Use signed URLs since bucket is private. QA #61 — the previous version
+  // kicked off an async fetch directly during render (no useEffect, no
+  // cleanup), which produced infinite re-fetches AND surfaced a broken-image
+  // icon when the storage object was missing because the <img> had no error
+  // handler. Now: fetch once in useEffect, track load/error states, and fall
+  // back to a placeholder card when the image actually fails.
   const PhotoThumbnail = ({ photo }: { photo: any }) => {
     const [url, setUrl] = useState<string>("");
-    if (!url) {
-      getSignedUrl(photo.storage_path).then(setUrl);
-    }
+    const [errored, setErrored] = useState(false);
+    useEffect(() => {
+      let cancelled = false;
+      setErrored(false);
+      setUrl("");
+      getSignedUrl(photo.storage_path).then((u) => {
+        if (!cancelled) setUrl(u);
+      });
+      return () => { cancelled = true; };
+    }, [photo.storage_path]);
     return (
       <div
         className="relative group cursor-pointer rounded-lg overflow-hidden border bg-muted aspect-square"
         onClick={() => setLightbox(photo)}
       >
-        {url ? (
-          <img src={url} alt={photo.body_area} className="w-full h-full object-cover" />
+        {url && !errored ? (
+          <img
+            src={url}
+            alt={photo.body_area || "clinical photo"}
+            className="w-full h-full object-cover"
+            onError={() => setErrored(true)}
+          />
         ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <Camera className="h-6 w-6 text-muted-foreground animate-pulse" />
+          <div className="w-full h-full flex flex-col items-center justify-center gap-1 text-muted-foreground">
+            <Camera className={`h-6 w-6 ${url ? "" : "animate-pulse"}`} />
+            {errored && (
+              <span className="text-[10px] uppercase tracking-wide">Image unavailable</span>
+            )}
           </div>
         )}
         <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-background/80 to-transparent p-2">
@@ -130,16 +145,29 @@ export function PhotoGallery({ patientId }: PhotoGalleryProps) {
 
 function LightboxDialog({ photo, onClose }: { photo: any; onClose: () => void }) {
   const [url, setUrl] = useState<string>("");
+  const [errored, setErrored] = useState(false);
 
-  if (photo && !url) {
+  useEffect(() => {
+    if (!photo) return;
+    let cancelled = false;
+    setErrored(false);
+    setUrl("");
     supabase.storage.from("clinical-photos").createSignedUrl(photo.storage_path, 3600)
-      .then(({ data }) => setUrl(data?.signedUrl ?? ""));
-  }
+      .then(({ data }) => { if (!cancelled) setUrl(data?.signedUrl ?? ""); });
+    return () => { cancelled = true; };
+  }, [photo]);
 
   return (
     <Dialog open={!!photo} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-2xl p-2">
-        {url && <img src={url} alt="" className="w-full rounded" />}
+        {url && !errored ? (
+          <img src={url} alt="" className="w-full rounded" onError={() => setErrored(true)} />
+        ) : (
+          <div className="w-full aspect-video rounded bg-muted flex flex-col items-center justify-center gap-2 text-muted-foreground">
+            <Camera className={`h-8 w-8 ${url ? "" : "animate-pulse"}`} />
+            {errored && <span className="text-xs">Image unavailable in storage</span>}
+          </div>
+        )}
         {photo && (
           <div className="flex gap-2 p-2">
             <Badge variant="secondary" className="capitalize">{photo.photo_type}</Badge>
