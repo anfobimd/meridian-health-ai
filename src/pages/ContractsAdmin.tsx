@@ -31,6 +31,13 @@ export default function ContractsAdmin() {
   const [assignPrimary, setAssignPrimary] = useState(false);
   const [assignNotify, setAssignNotify] = useState(true);
   const [assignNotifyEmailOverride, setAssignNotifyEmailOverride] = useState("");
+  // QA #57 — "Add Staff" from a clinic row opens an invite-by-email path
+  // (no Provider dropdown). Toolbar "Assign Provider" keeps the original
+  // pick-an-existing-provider flow.
+  const [assignMode, setAssignMode] = useState<"select" | "invite">("select");
+  const [inviteFirstName, setInviteFirstName] = useState("");
+  const [inviteLastName, setInviteLastName] = useState("");
+  const [inviteEmail, setInviteEmail] = useState("");
   const [form, setForm] = useState({
     name: "", start_date: "", end_date: "", notes: "",
     invitation_email: "",
@@ -344,13 +351,40 @@ export default function ContractsAdmin() {
   const addAssignment = useMutation({
     mutationFn: async () => {
       const overrideEmail = assignNotifyEmailOverride.trim();
+      const inviteEmailTrim = inviteEmail.trim();
+      const firstTrim = inviteFirstName.trim();
+      const lastTrim = inviteLastName.trim();
+
+      // Resolve providerId: in invite mode we create a new provider stub from
+      // the entered name+email. The assignment + notification then proceed
+      // exactly like the existing path, so backend behaviour is unchanged.
+      let providerId = assignProviderId;
+      if (assignMode === "invite") {
+        if (!firstTrim || !lastTrim) throw new Error("First and last name are required");
+        if (!inviteEmailTrim || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(inviteEmailTrim)) {
+          throw new Error("A valid email is required for staff invitations");
+        }
+        const { data: newProvider, error: provErr } = await supabase
+          .from("providers")
+          .insert({
+            first_name: firstTrim,
+            last_name: lastTrim,
+            email: inviteEmailTrim,
+            is_active: true,
+          } as any)
+          .select("id")
+          .single();
+        if (provErr) throw provErr;
+        providerId = newProvider.id;
+      }
+
       if (assignNotify && overrideEmail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(overrideEmail)) {
         throw new Error("Notification email looks invalid");
       }
       const { data: inserted, error } = await supabase
         .from("provider_clinic_assignments")
         .insert({
-          provider_id: assignProviderId,
+          provider_id: providerId,
           clinic_id: assignClinicId,
           role_at_clinic: assignRole,
           is_primary: assignPrimary,
@@ -359,26 +393,32 @@ export default function ContractsAdmin() {
         .single();
       if (error) throw error;
 
-      // Optional notification (QA #34).
-      if (assignNotify && inserted?.id) {
+      // Notification: invite mode always notifies the entered email; select
+      // mode honours the existing checkbox + override.
+      const shouldNotify = assignMode === "invite" || assignNotify;
+      const targetEmail = assignMode === "invite" ? inviteEmailTrim : overrideEmail;
+      if (shouldNotify && inserted?.id) {
         const { error: notifyErr } = await supabase.functions.invoke("send-staff-assignment-invitation", {
-          body: { assignment_id: inserted.id, ...(overrideEmail ? { email: overrideEmail } : {}) },
+          body: { assignment_id: inserted.id, ...(targetEmail ? { email: targetEmail } : {}) },
         });
         if (notifyErr) {
-          // Assignment was created — surface but don't roll back.
-          throw new Error(`Provider assigned, but notification failed: ${notifyErr.message}`);
+          throw new Error(`Staff assigned, but notification failed: ${notifyErr.message}`);
         }
       }
-      return { notified: assignNotify };
+      return { notified: shouldNotify, mode: assignMode };
     },
-    onSuccess: ({ notified }) => {
+    onSuccess: ({ notified, mode }) => {
       qc.invalidateQueries({ queryKey: ["provider-clinic-assignments"] });
+      qc.invalidateQueries({ queryKey: ["providers"] });
       setAssignOpen(false);
       setAssignProviderId(""); setAssignClinicId(""); setAssignRole("provider"); setAssignPrimary(false);
       setAssignNotify(true); setAssignNotifyEmailOverride("");
-      toast.success(notified ? "Provider assigned and notified" : "Provider assigned to clinic");
+      setInviteFirstName(""); setInviteLastName(""); setInviteEmail("");
+      setAssignMode("select");
+      const noun = mode === "invite" ? "Staff invited" : "Provider assigned";
+      toast.success(notified ? `${noun} and notified` : `${noun}`);
     },
-    onError: (e: any) => toast.error(e.message?.includes("duplicate") ? "Provider already assigned to this clinic" : e.message),
+    onError: (e: any) => toast.error(e.message?.includes("duplicate") ? "Already assigned to this clinic" : e.message),
   });
 
   const sendAssignmentInvitation = useMutation({
@@ -665,7 +705,13 @@ export default function ContractsAdmin() {
                   <Select value={clinicForm.contract_id} onValueChange={v => setClinicForm(p => ({ ...p, contract_id: v }))}>
                     <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
                     <SelectContent>
-                      {contracts.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                      {/* QA #56 — only assignable contracts are selectable. Expired
+                          contracts are filtered out entirely from the New Clinic
+                          form (they were never selected before, so there's no
+                          existing assignment to preserve). */}
+                      {contracts
+                        .filter(c => effectiveStatus(c) !== "expired")
+                        .map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -685,29 +731,76 @@ export default function ContractsAdmin() {
               </div>
             </DialogContent>
           </Dialog>
-          <Dialog open={assignOpen} onOpenChange={(o) => { setAssignOpen(o); if (!o) { setAssignNotify(true); setAssignNotifyEmailOverride(""); } }}>
-            <DialogTrigger asChild><Button size="sm" variant="outline"><UserPlus className="h-4 w-4 mr-1" />Assign Provider</Button></DialogTrigger>
+          <Dialog
+            open={assignOpen}
+            onOpenChange={(o) => {
+              setAssignOpen(o);
+              if (!o) {
+                setAssignNotify(true);
+                setAssignNotifyEmailOverride("");
+                setAssignMode("select");
+                setInviteFirstName(""); setInviteLastName(""); setInviteEmail("");
+              }
+            }}
+          >
+            <DialogTrigger asChild>
+              <Button size="sm" variant="outline" onClick={() => setAssignMode("select")}>
+                <UserPlus className="h-4 w-4 mr-1" />Assign Provider
+              </Button>
+            </DialogTrigger>
             <DialogContent>
-              <DialogHeader><DialogTitle>Assign Provider to Clinic</DialogTitle></DialogHeader>
+              <DialogHeader>
+                <DialogTitle>{assignMode === "invite" ? "Add Staff to Clinic" : "Assign Provider to Clinic"}</DialogTitle>
+              </DialogHeader>
               <div className="space-y-3">
-                <div>
-                  <Label>Provider</Label>
-                  <Select value={assignProviderId} onValueChange={setAssignProviderId}>
-                    <SelectTrigger><SelectValue placeholder="Select provider" /></SelectTrigger>
-                    <SelectContent>
-                      {providers.map(p => <SelectItem key={p.id} value={p.id}>{p.last_name}, {p.first_name}{p.credentials ? ` (${p.credentials})` : ""}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Clinic</Label>
-                  <Select value={assignClinicId} onValueChange={setAssignClinicId}>
-                    <SelectTrigger><SelectValue placeholder="Select clinic" /></SelectTrigger>
-                    <SelectContent>
-                      {clinics.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
+                {assignMode === "select" ? (
+                  <>
+                    <div>
+                      <Label>Provider</Label>
+                      <Select value={assignProviderId} onValueChange={setAssignProviderId}>
+                        <SelectTrigger><SelectValue placeholder="Select provider" /></SelectTrigger>
+                        <SelectContent>
+                          {providers.map(p => <SelectItem key={p.id} value={p.id}>{p.last_name}, {p.first_name}{p.credentials ? ` (${p.credentials})` : ""}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Clinic</Label>
+                      <Select value={assignClinicId} onValueChange={setAssignClinicId}>
+                        <SelectTrigger><SelectValue placeholder="Select clinic" /></SelectTrigger>
+                        <SelectContent>
+                          {clinics.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {/* Invite-by-email path — Provider dropdown intentionally
+                        omitted (QA #57). Clinic is implicit from the row that
+                        opened this dialog and is shown read-only below. */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label>First name <span className="text-destructive">*</span></Label>
+                        <Input value={inviteFirstName} onChange={e => setInviteFirstName(e.target.value)} autoComplete="given-name" />
+                      </div>
+                      <div>
+                        <Label>Last name <span className="text-destructive">*</span></Label>
+                        <Input value={inviteLastName} onChange={e => setInviteLastName(e.target.value)} autoComplete="family-name" />
+                      </div>
+                    </div>
+                    <div>
+                      <Label>Email <span className="text-destructive">*</span></Label>
+                      <Input type="email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} placeholder="staff@example.com" inputMode="email" />
+                    </div>
+                    <div>
+                      <Label>Clinic</Label>
+                      <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm">
+                        {clinics.find(c => c.id === assignClinicId)?.name ?? "—"}
+                      </div>
+                    </div>
+                  </>
+                )}
                 <div>
                   <Label>Role at Clinic</Label>
                   <Select value={assignRole} onValueChange={setAssignRole}>
@@ -721,59 +814,74 @@ export default function ContractsAdmin() {
                 </div>
                 <label className="flex items-center gap-2 text-sm">
                   <input type="checkbox" checked={assignPrimary} onChange={e => setAssignPrimary(e.target.checked)} className="rounded" />
-                  Primary clinic for this provider
+                  Primary clinic for this {assignMode === "invite" ? "staff member" : "provider"}
                 </label>
-                {/* QA #34 — optional staff notification email */}
-                {(() => {
-                  const selectedProvider = providers.find(p => p.id === assignProviderId);
-                  const providerEmail = selectedProvider?.email ?? null;
-                  const willSendTo = assignNotifyEmailOverride.trim() || providerEmail || "";
-                  return (
-                    <div className="rounded-md border bg-muted/30 p-3 space-y-2">
-                      <label className="flex items-center gap-2 text-sm font-medium">
-                        <input
-                          type="checkbox"
-                          checked={assignNotify}
-                          onChange={e => setAssignNotify(e.target.checked)}
-                          className="rounded"
-                        />
-                        <Mail className="h-3.5 w-3.5 text-muted-foreground" />
-                        Send email notification to provider
-                      </label>
-                      {assignNotify && (
-                        <div className="pl-6 space-y-1.5">
-                          <Input
-                            type="email"
-                            value={assignNotifyEmailOverride}
-                            onChange={e => setAssignNotifyEmailOverride(e.target.value)}
-                            placeholder={providerEmail || "provider@example.com"}
-                            inputMode="email"
-                            className="h-8 text-xs"
+                {assignMode === "select" ? (
+                  /* QA #34 — optional notification when picking an existing provider. */
+                  (() => {
+                    const selectedProvider = providers.find(p => p.id === assignProviderId);
+                    const providerEmail = selectedProvider?.email ?? null;
+                    const willSendTo = assignNotifyEmailOverride.trim() || providerEmail || "";
+                    return (
+                      <div className="rounded-md border bg-muted/30 p-3 space-y-2">
+                        <label className="flex items-center gap-2 text-sm font-medium">
+                          <input
+                            type="checkbox"
+                            checked={assignNotify}
+                            onChange={e => setAssignNotify(e.target.checked)}
+                            className="rounded"
                           />
-                          <p className="text-[11px] text-muted-foreground">
-                            {assignNotifyEmailOverride.trim()
-                              ? `Will send to ${willSendTo} (overrides provider's email on file)`
-                              : providerEmail
-                                ? `Will send to ${providerEmail} (provider's email on file)`
-                                : "Provider has no email on file — enter one above or uncheck to skip notification"}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
+                          <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                          Send email notification to provider
+                        </label>
+                        {assignNotify && (
+                          <div className="pl-6 space-y-1.5">
+                            <Input
+                              type="email"
+                              value={assignNotifyEmailOverride}
+                              onChange={e => setAssignNotifyEmailOverride(e.target.value)}
+                              placeholder={providerEmail || "provider@example.com"}
+                              inputMode="email"
+                              className="h-8 text-xs"
+                            />
+                            <p className="text-[11px] text-muted-foreground">
+                              {assignNotifyEmailOverride.trim()
+                                ? `Will send to ${willSendTo} (overrides provider's email on file)`
+                                : providerEmail
+                                  ? `Will send to ${providerEmail} (provider's email on file)`
+                                  : "Provider has no email on file — enter one above or uncheck to skip notification"}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()
+                ) : (
+                  <div className="rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground flex items-center gap-2">
+                    <Mail className="h-3.5 w-3.5" />
+                    An invitation email will be sent to {inviteEmail.trim() || "the address above"} on assign.
+                  </div>
+                )}
                 <Button
                   onClick={() => addAssignment.mutate()}
                   disabled={
-                    !assignProviderId ||
-                    !assignClinicId ||
                     addAssignment.isPending ||
-                    (assignNotify
-                      && !assignNotifyEmailOverride.trim()
-                      && !providers.find(p => p.id === assignProviderId)?.email)
+                    !assignClinicId ||
+                    (assignMode === "select"
+                      ? (!assignProviderId
+                          || (assignNotify
+                              && !assignNotifyEmailOverride.trim()
+                              && !providers.find(p => p.id === assignProviderId)?.email))
+                      : (!inviteFirstName.trim()
+                          || !inviteLastName.trim()
+                          || !inviteEmail.trim()))
                   }
                 >
-                  {addAssignment.isPending ? "Assigning…" : (assignNotify ? "Assign & Notify" : "Assign")}
+                  {addAssignment.isPending
+                    ? (assignMode === "invite" ? "Inviting…" : "Assigning…")
+                    : assignMode === "invite"
+                      ? "Add Staff & Invite"
+                      : (assignNotify ? "Assign & Notify" : "Assign")}
                 </Button>
               </div>
             </DialogContent>
@@ -1022,7 +1130,15 @@ export default function ContractsAdmin() {
                       </div>
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
-                      <Button size="sm" variant="outline" onClick={() => { setAssignClinicId(c.id); setAssignOpen(true); }}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setAssignClinicId(c.id);
+                          setAssignMode("invite");
+                          setAssignOpen(true);
+                        }}
+                      >
                         <UserPlus className="h-3 w-3 mr-1" />Add Staff
                       </Button>
                       <Button size="sm" variant="ghost" onClick={() => openEditClinic(c)} title="Edit clinic" aria-label="Edit clinic">
@@ -1382,7 +1498,19 @@ export default function ContractsAdmin() {
                 <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none__">None</SelectItem>
-                  {contracts.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                  {/* QA #56 — keep the currently-selected contract visible
+                      (even if expired) so users see their existing assignment,
+                      but mark it as expired and filter all other expireds out. */}
+                  {contracts
+                    .filter(c => effectiveStatus(c) !== "expired" || c.id === clinicForm.contract_id)
+                    .map(c => {
+                      const expired = effectiveStatus(c) === "expired";
+                      return (
+                        <SelectItem key={c.id} value={c.id} disabled={expired}>
+                          {c.name}{expired ? " (expired)" : ""}
+                        </SelectItem>
+                      );
+                    })}
                 </SelectContent>
               </Select>
             </div>

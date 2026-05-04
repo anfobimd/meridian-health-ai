@@ -53,8 +53,29 @@ function fmtDate(d: string | null): string {
   return new Date(d).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
 }
 
+function appUrl(): string {
+  return (Deno.env.get("APP_URL") || "https://glow-meridian-health.lovable.app").replace(/\/+$/, "");
+}
+
+// QA #58 — Contract Admin invitation now includes a Get Started CTA so the
+// admin can click through into the app instead of needing a second message.
+function ctaButton(href: string, label: string): string {
+  return `
+    <div style="margin: 28px 0; text-align: center;">
+      <a href="${href}"
+         style="display: inline-block; background: #0ea5a4; color: #ffffff; text-decoration: none;
+                padding: 12px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">
+        ${label}
+      </a>
+      <p style="margin-top: 12px; color: #6b7280; font-size: 11px;">
+        Or copy this link: <span style="color:#374151;">${href}</span>
+      </p>
+    </div>
+  `;
+}
+
 function renderAdminHtml(
-  c: { name: string; start_date: string; end_date: string | null; notes: string | null },
+  c: { id: string; name: string; start_date: string; end_date: string | null; notes: string | null },
   adminName: string | null,
   count: number,
 ): string {
@@ -62,6 +83,10 @@ function renderAdminHtml(
     ? "You've been assigned as Contract Admin"
     : "Reminder: Contract Admin assignment";
   const greeting = adminName ? `Hi ${adminName},` : "Hello,";
+  const cta = ctaButton(
+    `${appUrl()}/auth?invite=contract-admin&contract=${encodeURIComponent(c.id)}`,
+    "Get Started",
+  );
   return `
     <div style="font-family: -apple-system, system-ui, sans-serif; max-width: 560px; margin: 0 auto; color: #1f2937;">
       <h2 style="color: #111827; margin-bottom: 8px;">${heading}</h2>
@@ -73,7 +98,8 @@ function renderAdminHtml(
         <tr><td style="padding: 8px 12px; background: #f9fafb; font-weight: 600;">End date</td><td style="padding: 8px 12px; background: #f9fafb;">${fmtDate(c.end_date)}</td></tr>
         ${c.notes ? `<tr><td style="padding: 8px 12px; font-weight: 600; vertical-align: top;">Notes</td><td style="padding: 8px 12px; white-space: pre-wrap;">${c.notes}</td></tr>` : ""}
       </table>
-      <p>As Contract Admin you are the point of contact for staffing, scheduling, and compliance under this contract. A representative from Meridian will follow up with onboarding details and access credentials shortly.</p>
+      ${cta}
+      <p>As Contract Admin you are the point of contact for staffing, scheduling, and compliance under this contract.</p>
       <p style="color: #6b7280; font-size: 12px; margin-top: 32px;">This message was sent from the Meridian Wellness EHR. If you received it in error, please disregard or reply to let us know.</p>
     </div>
   `;
@@ -130,7 +156,7 @@ Deno.serve(async (req) => {
 
     const count = (contract as any).admin_invitation_count ?? 0;
     const html = renderAdminHtml(
-      { name: contract.name, start_date: contract.start_date, end_date: contract.end_date, notes: contract.notes },
+      { id: contract.id, name: contract.name, start_date: contract.start_date, end_date: contract.end_date, notes: contract.notes },
       name,
       count,
     );

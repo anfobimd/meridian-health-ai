@@ -61,8 +61,32 @@ function fmtDate(d: string | null): string {
   return date.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
 }
 
-function renderInvitationHtml(c: { name: string; start_date: string; end_date: string | null; notes: string | null }, count: number): string {
+function appUrl(): string {
+  return (Deno.env.get("APP_URL") || "https://glow-meridian-health.lovable.app").replace(/\/+$/, "");
+}
+
+// QA #58 — clear CTA so the recipient has a click-through into the app.
+function ctaButton(href: string, label: string): string {
+  return `
+    <div style="margin: 28px 0; text-align: center;">
+      <a href="${href}"
+         style="display: inline-block; background: #0ea5a4; color: #ffffff; text-decoration: none;
+                padding: 12px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">
+        ${label}
+      </a>
+      <p style="margin-top: 12px; color: #6b7280; font-size: 11px;">
+        Or copy this link: <span style="color:#374151;">${href}</span>
+      </p>
+    </div>
+  `;
+}
+
+function renderInvitationHtml(c: { id: string; name: string; start_date: string; end_date: string | null; notes: string | null }, count: number): string {
   const heading = count === 0 ? "You're invited to a contract with Meridian" : "Reminder: contract invitation from Meridian";
+  const cta = ctaButton(
+    `${appUrl()}/auth?invite=contract&contract=${encodeURIComponent(c.id)}`,
+    "Accept Invitation",
+  );
   return `
     <div style="font-family: -apple-system, system-ui, sans-serif; max-width: 560px; margin: 0 auto; color: #1f2937;">
       <h2 style="color: #111827; margin-bottom: 8px;">${heading}</h2>
@@ -73,7 +97,8 @@ function renderInvitationHtml(c: { name: string; start_date: string; end_date: s
         <tr><td style="padding: 8px 12px; background: #f9fafb; font-weight: 600;">End date</td><td style="padding: 8px 12px; background: #f9fafb;">${fmtDate(c.end_date)}</td></tr>
         ${c.notes ? `<tr><td style="padding: 8px 12px; font-weight: 600; vertical-align: top;">Notes</td><td style="padding: 8px 12px; white-space: pre-wrap;">${c.notes}</td></tr>` : ""}
       </table>
-      <p style="margin-top: 24px;">Please reply to this email to confirm receipt or to discuss the terms. A representative from Meridian will follow up with the next steps.</p>
+      ${cta}
+      <p style="margin-top: 24px;">If you'd prefer to discuss the terms first, just reply to this email — a representative from Meridian will follow up.</p>
       <p style="color: #6b7280; font-size: 12px; margin-top: 32px;">This message was sent from the Meridian Wellness EHR. If you received it in error, you can disregard.</p>
     </div>
   `;
@@ -127,7 +152,7 @@ Deno.serve(async (req) => {
     }
 
     const html = renderInvitationHtml(
-      { name: contract.name, start_date: contract.start_date, end_date: contract.end_date, notes: contract.notes },
+      { id: contract.id, name: contract.name, start_date: contract.start_date, end_date: contract.end_date, notes: contract.notes },
       contract.invitation_count ?? 0,
     );
     const subject = (contract.invitation_count ?? 0) === 0
