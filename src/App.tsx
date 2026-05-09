@@ -78,6 +78,8 @@ const MultiProviderCalendar = lazy(() => import("./pages/MultiProviderCalendar")
 const PatientInbox = lazy(() => import("./pages/PatientInbox"));
 const Prescriptions = lazy(() => import("./pages/Prescriptions"));
 const TelehealthVisit = lazy(() => import("./pages/TelehealthVisit"));
+const PublicMarketplace = lazy(() => import("./pages/PublicMarketplace"));
+const PublicBooking = lazy(() => import("./pages/PublicBooking"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 // Centralized error surface: any mutation or query that throws — and doesn't
@@ -201,6 +203,8 @@ const App = () => (
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/intake" element={<RemoteIntake />} />
               <Route path="/portal" element={<PatientPortal />} />
+              <Route path="/marketplace-public" element={<PublicMarketplace />} />
+              <Route path="/book/:slug" element={<PublicBooking />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>

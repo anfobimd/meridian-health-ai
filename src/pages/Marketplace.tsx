@@ -15,6 +15,9 @@ import {
   Trash2, CheckCircle,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useBooking } from "@/hooks/useBooking";
+import { getAvailableSlots } from "@/lib/scheduling";
+import { format } from "date-fns";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MODALITY_OPTIONS = ["injectables", "weight_loss", "laser"];
@@ -32,6 +35,15 @@ export default function Marketplace() {
   const [matchResults, setMatchResults] = useState<any>(null);
   const [matchLoading, setMatchLoading] = useState(false);
   const [generatingBio, setGeneratingBio] = useState(false);
+
+  // ── New booking-flow state ──
+  const [selectedPatientId, setSelectedPatientId] = useState<string>("");
+  const [bookingProvider, setBookingProvider] = useState<{ id: string; name: string; slug: string } | null>(null);
+  const [bookingTreatmentId, setBookingTreatmentId] = useState<string>("");
+  const [bookingDate, setBookingDate] = useState<string>("");
+  const [availableSlots, setAvailableSlots] = useState<{ start: Date; end: Date }[]>([]);
+  const [slotsLoading, setSlotsLoading] = useState(false);
+  const { createBooking: createBookingViaEngine } = useBooking();
 
   // Queries
   const { data: config } = useQuery({
@@ -169,33 +181,6 @@ export default function Marketplace() {
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["provider-availability"] }); },
   });
 
-  const createBooking = useMutation({
-    mutationFn: async (booking: { patient_id: string; provider_id: string; treatment_id: string; ai_match_reasoning?: string }) => {
-      // Create appointment first
-      const { data: apt, error: aptErr } = await supabase.from("appointments").insert({
-        patient_id: booking.patient_id,
-        provider_id: booking.provider_id,
-        treatment_id: booking.treatment_id,
-        scheduled_at: new Date().toISOString(),
-        status: "booked" as const,
-      }).select("id").single();
-      if (aptErr) throw aptErr;
-      // Create marketplace booking
-      const { error } = await supabase.from("marketplace_bookings").insert({
-        ...booking,
-        appointment_id: apt.id,
-        status: "confirmed",
-      });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["marketplace-bookings"] });
-      queryClient.invalidateQueries({ queryKey: ["appointments"] });
-      setMatchResults(null);
-      toast.success("Booking created");
-    },
-  });
-
   const generateBio = async (provider: any) => {
     setGeneratingBio(true);
     try {
@@ -226,17 +211,70 @@ export default function Marketplace() {
 
   const findProviders = async (treatmentId: string, date: string) => {
     if (!treatmentId) return;
+    if (!selectedPatientId) {
+      toast.error("Select a patient first");
+      return;
+    }
     setMatchLoading(true);
+    setBookingTreatmentId(treatmentId);
+    setBookingDate(date);
     try {
       const { data, error } = await supabase.functions.invoke("ai-smart-schedule", {
         body: { mode: "marketplace_match", treatment_id: treatmentId, preferred_date: date },
       });
       if (error) throw error;
-      setMatchResults(data);
+      setMatchResults({ ...data, patient_id: selectedPatientId, treatment_id: treatmentId });
     } catch {
       toast.error("Failed to find matches");
     } finally {
       setMatchLoading(false);
+    }
+  };
+
+  const slugifyName = (s: string) => s.toLowerCase().replace(/[^a-z0-9-\s]/g, "").trim().replace(/\s+/g, "-");
+
+  const loadSlotsForProvider = async (providerId: string, providerName: string) => {
+    if (!bookingTreatmentId || !bookingDate) {
+      toast.error("Treatment and date are required");
+      return;
+    }
+    const treatment = treatmentsList?.find((t) => t.id === bookingTreatmentId);
+    if (!treatment) {
+      toast.error("Treatment not found");
+      return;
+    }
+    setSlotsLoading(true);
+    try {
+      const slots = await getAvailableSlots(providerId, new Date(bookingDate), treatment.duration_minutes || 30);
+      setBookingProvider({ id: providerId, name: providerName, slug: slugifyName(providerName) });
+      setAvailableSlots(slots);
+      if (slots.length === 0) toast.warning("No available slots for that date");
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to load slots");
+    } finally {
+      setSlotsLoading(false);
+    }
+  };
+
+  const confirmBooking = async (slot: { start: Date; end: Date }) => {
+    if (!bookingProvider || !selectedPatientId || !bookingTreatmentId) return;
+    try {
+      await createBookingViaEngine.mutateAsync({
+        // booking-engine v11 accepts staff path: provider_id + patient_id directly
+        slug: bookingProvider.slug,
+        provider_id: bookingProvider.id,
+        patient_id: selectedPatientId,
+        treatment_id: bookingTreatmentId,
+        scheduled_start: slot.start.toISOString(),
+        client_source: "spa_acquired",
+      });
+      setMatchResults(null);
+      setBookingProvider(null);
+      setAvailableSlots([]);
+      setBookingTreatmentId("");
+      setBookingDate("");
+    } catch {
+      // useBooking already toasts the error
     }
   };
 
@@ -310,10 +348,40 @@ export default function Marketplace() {
           </div>
         </TabsContent>
 
-        {/* Booking & Matching Tab */}
+        {/* Booking & Matching Tab — multi-step flow with patient selection + slot picker */}
         <TabsContent value="booking" className="space-y-4">
+          {/* Step 1 — Pick patient */}
           <Card>
-            <CardHeader><CardTitle className="text-base flex items-center gap-2"><Brain className="h-4 w-4 text-primary" />Find a Provider</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Users className="h-4 w-4 text-primary" />
+                Step 1 — Select Patient
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <select
+                value={selectedPatientId}
+                onChange={(e) => setSelectedPatientId(e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              >
+                <option value="">— Select a patient —</option>
+                {patients?.map((p: any) => (
+                  <option key={p.id} value={p.id}>
+                    {p.last_name}, {p.first_name}
+                  </option>
+                ))}
+              </select>
+            </CardContent>
+          </Card>
+
+          {/* Step 2 — Find providers */}
+          <Card className={!selectedPatientId ? "opacity-50 pointer-events-none" : ""}>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Brain className="h-4 w-4 text-primary" />
+                Step 2 — Find a Provider
+              </CardTitle>
+            </CardHeader>
             <CardContent>
               <form onSubmit={(e) => {
                 e.preventDefault();
@@ -328,11 +396,11 @@ export default function Marketplace() {
                   </select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Preferred Date</Label>
-                  <Input name="preferred_date" type="date" />
+                  <Label>Preferred Date *</Label>
+                  <Input name="preferred_date" type="date" required min={format(new Date(), "yyyy-MM-dd")} />
                 </div>
                 <div className="flex items-end">
-                  <Button type="submit" disabled={matchLoading} className="w-full">
+                  <Button type="submit" disabled={matchLoading || !selectedPatientId} className="w-full">
                     {matchLoading ? <><Loader2 className="h-4 w-4 animate-spin mr-1" />Matching...</> : <><Search className="h-4 w-4 mr-1" />Find Matches</>}
                   </Button>
                 </div>
@@ -340,39 +408,75 @@ export default function Marketplace() {
             </CardContent>
           </Card>
 
-          {matchResults?.matches && (
-            <div className="space-y-3">
-              <h3 className="text-sm font-medium">AI-Ranked Matches</h3>
-              {matchResults.matches.map((m: any, i: number) => (
-                <Card key={i}>
-                  <CardContent className="p-4 flex items-center justify-between">
-                    <div className="space-y-1">
+          {/* Step 3 — Pick a provider from AI ranking */}
+          {matchResults?.matches && !bookingProvider && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Step 3 — Choose Provider</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {matchResults.matches.map((m: any, i: number) => (
+                  <div key={i} className="flex items-center justify-between border rounded-md p-3">
+                    <div className="space-y-1 min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <Badge variant="outline" className="text-xs">#{i + 1}</Badge>
-                        <p className="font-medium">{m.provider_name}</p>
+                        <p className="font-medium truncate">{m.provider_name}</p>
                         {m.score && <Badge className="text-xs">{m.score}% match</Badge>}
                       </div>
                       <p className="text-xs text-muted-foreground">{m.reasoning}</p>
                     </div>
-                    <Button size="sm" onClick={() => {
-                      const fd = document.querySelector<HTMLFormElement>("[data-booking-form]");
-                      if (m.provider_id) {
-                        createBooking.mutate({
-                          patient_id: matchResults.patient_id || patients?.[0]?.id || "",
-                          provider_id: m.provider_id,
-                          treatment_id: matchResults.treatment_id,
-                          ai_match_reasoning: m.reasoning,
-                        });
-                      }
-                    }}>
-                      Book
+                    <Button
+                      size="sm"
+                      disabled={!m.provider_id}
+                      onClick={() => loadSlotsForProvider(m.provider_id, m.provider_name)}
+                    >
+                      View Slots
                     </Button>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
           )}
 
+          {/* Step 4 — Pick a slot */}
+          {bookingProvider && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center justify-between">
+                  <span>Step 4 — Select Time with {bookingProvider.name}</span>
+                  <Button variant="ghost" size="sm" onClick={() => { setBookingProvider(null); setAvailableSlots([]); }}>
+                    Back
+                  </Button>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {slotsLoading ? (
+                  <div className="flex items-center justify-center py-6"><Loader2 className="h-5 w-5 animate-spin" /></div>
+                ) : availableSlots.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    No available slots for that date. Try a different date or provider.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
+                    {availableSlots.map((slot, i) => (
+                      <Button
+                        key={i}
+                        variant="outline"
+                        size="sm"
+                        disabled={createBookingViaEngine.isPending}
+                        onClick={() => confirmBooking(slot)}
+                        className="text-xs"
+                      >
+                        {format(slot.start, "h:mm a")}
+                      </Button>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Recent Bookings */}
           <Card>
             <CardHeader><CardTitle className="text-base">Recent Bookings</CardTitle></CardHeader>
             <CardContent>

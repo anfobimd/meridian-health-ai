@@ -15,28 +15,37 @@ import {
   Briefcase, Sparkles, Loader2, Clock, DollarSign, TrendingUp,
   Brain, User, CheckCircle, XCircle, Plus, Trash2, Star, Inbox,
 } from "lucide-react";
+import { useAuth } from "@/contexts/RBACContext";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const SKILL_OPTIONS = ["Botox", "Dysport", "Juvederm", "Restylane", "Sculptra", "PRP", "Kybella", "GLP-1", "Semaglutide", "Tirzepatide", "B12 Injections", "CO2 Laser", "IPL", "RF Microneedling", "Laser Hair Removal"];
 const CERT_LEVELS = ["beginner", "intermediate", "expert"];
 
-// Simulated current provider ID — in production this comes from auth
-const CURRENT_PROVIDER_ID = null; // Will use first provider as fallback
+// Provider record is now resolved via the authenticated user (matches the
+// pattern used in ProviderProfile.tsx). If the logged-in user has no
+// matching provider row, the page renders an empty-state below.
 
 export default function ProviderMarketplace() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [coachingOpen, setCoachingOpen] = useState(false);
   const [generatingBio, setGeneratingBio] = useState(false);
   const [editBio, setEditBio] = useState("");
 
-  // ── Fetch current provider (first active as demo) ──
+  // ── Fetch provider record for the currently logged-in user ──
   const { data: currentProvider, isLoading: providerLoading } = useQuery({
-    queryKey: ["current-provider-mp"],
+    queryKey: ["current-provider-mp", user?.id],
     queryFn: async () => {
-      const { data } = await supabase.from("providers").select("*").eq("is_active", true).order("last_name").limit(1).maybeSingle();
+      if (!user?.id) return null;
+      const { data } = await supabase
+        .from("providers")
+        .select("*")
+        .eq("user_id", user.id)
+        .maybeSingle();
       if (data) setEditBio(data.marketplace_bio || "");
       return data;
     },
+    enabled: !!user?.id,
   });
 
   const providerId = currentProvider?.id;
@@ -213,6 +222,20 @@ export default function ProviderMarketplace() {
   const pendingBookings = bookings?.filter((b: any) => b.status === "pending") ?? [];
 
   if (providerLoading) return <div className="space-y-4 p-4">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-24 w-full" />)}</div>;
+
+  if (!currentProvider) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center space-y-3">
+        <Briefcase className="h-12 w-12 text-muted-foreground/40" />
+        <h2 className="text-lg font-semibold">Provider profile not found</h2>
+        <p className="text-sm text-muted-foreground max-w-md">
+          This page is for providers managing their marketplace listing.
+          Your account isn't linked to a provider record. Contact your clinic
+          administrator if you believe this is a mistake.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

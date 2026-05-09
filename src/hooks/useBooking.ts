@@ -15,13 +15,18 @@ import { toast } from "sonner";
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export interface BookingRequest {
-  slug: string;
+  // Provider — supply slug OR provider_id
+  slug?: string;
+  provider_id?: string;
+  // Treatment + scheduling
   treatment_id: string;
   scheduled_start: string; // ISO8601
-  first_name: string;
-  last_name: string;
-  date_of_birth: string; // YYYY-MM-DD
-  email: string;
+  // Identity — supply patient_id (staff path) OR first/last/email (public path)
+  patient_id?: string;
+  first_name?: string;
+  last_name?: string;
+  date_of_birth?: string; // YYYY-MM-DD
+  email?: string;
   phone?: string;
   client_source?: "spa_acquired" | "provider_acquired";
   notes?: string;
