@@ -1,6 +1,7 @@
 import { useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import {
@@ -22,15 +23,23 @@ interface InvoiceSummary {
   invoice_count: number;
 }
 
+// Maps the panel's simple method toggle to the DB payment_method enum.
+const METHOD_MAP: Record<string, string> = { card: "credit_card", cash: "cash" };
+
 export function PaymentPanel({
+  appointmentId,
+  patientId,
   invoiceSummary,
   paymentSuggestions,
   onPaymentComplete,
 }: {
+  appointmentId: string;
+  patientId: string | null;
   invoiceSummary: InvoiceSummary;
   paymentSuggestions: PaymentSuggestion[];
   onPaymentComplete: () => void;
 }) {
+  const queryClient = useQueryClient();
   const [selectedMethod, setSelectedMethod] = useState<string>("card");
   const [appliedCredits, setAppliedCredits] = useState<Set<string>>(new Set());
   const [processing, setProcessing] = useState(false);
@@ -58,14 +67,69 @@ export function PaymentPanel({
       adjustedBalance = adjustedBalance * (1 - (s.discount_percent || 10) / 100);
     }
   }
+  adjustedBalance = +Math.max(0, adjustedBalance).toFixed(2);
 
   const handleCollect = async () => {
+    if (!patientId) {
+      toast.error("No patient on file for this payment");
+      return;
+    }
     setProcessing(true);
-    // In production: call payment processing edge function
-    await new Promise(r => setTimeout(r, 800));
-    setProcessing(false);
-    toast.success(adjustedBalance > 0 ? `$${adjustedBalance.toFixed(2)} collected` : "Package credit applied");
-    onPaymentComplete();
+    try {
+      // Find the open (unpaid) invoice for this visit. CheckoutPanel creates it
+      // just before this panel becomes reachable.
+      const { data: inv, error: invErr } = await supabase
+        .from("invoices")
+        .select("id, total, amount_paid")
+        .eq("appointment_id", appointmentId)
+        .neq("status", "paid")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (invErr) throw invErr;
+      if (!inv) {
+        toast.error("No open invoice to collect against");
+        return;
+      }
+
+      // Record the cash/card payment. When a package credit fully covers the
+      // visit, adjustedBalance is 0 and we skip the $0 payment row but still
+      // settle the invoice below.
+      if (adjustedBalance > 0) {
+        const { error: payErr } = await supabase.from("payments").insert({
+          invoice_id: inv.id,
+          patient_id: patientId,
+          amount: adjustedBalance,
+          method: (METHOD_MAP[selectedMethod] ?? "other") as any,
+          notes: appliedCredits.size > 0 ? "Credits/discounts applied at checkout" : null,
+        });
+        if (payErr) throw payErr;
+      }
+
+      // Settle the invoice. The panel collects the full (post-credit) balance in
+      // one step, so the visit is paid in full at checkout. NOTE: credit and
+      // discount accounting is simplified for alpha — we clear the balance and
+      // record the cash actually collected, rather than itemizing each credit as
+      // a separate ledger adjustment. Revisit if partial payments are needed.
+      const { error: updErr } = await supabase
+        .from("invoices")
+        .update({
+          amount_paid: Number(inv.total),
+          balance_due: 0,
+          status: "paid",
+        })
+        .eq("id", inv.id);
+      if (updErr) throw updErr;
+
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["frontdesk-today"] });
+      toast.success(adjustedBalance > 0 ? `$${adjustedBalance.toFixed(2)} collected` : "Credit applied — invoice settled");
+      onPaymentComplete();
+    } catch (e: any) {
+      toast.error(e.message || "Failed to record payment");
+    } finally {
+      setProcessing(false);
+    }
   };
 
   return (
