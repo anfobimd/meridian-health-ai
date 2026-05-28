@@ -14,6 +14,7 @@ import {
   AlertTriangle, Lock, Sparkles, Copy, Globe, Bell, Clock, Save, Eye, EyeOff,
 } from "lucide-react";
 import { UserManagement } from "@/components/settings/UserManagement";
+import { useClinicId } from "@/components/admin/ClinicSwitcher";
 
 const MAX_ATTEMPTS = 3;
 const LOCKOUT_SECONDS = 60;
