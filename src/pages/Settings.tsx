@@ -590,14 +590,12 @@ function PlatformSettings() {
   const [notifIntake, setNotifIntake] = useState(true);
   const [notifMdApproval, setNotifMdApproval] = useState(true);
   const [policy, setPolicy] = useState({ minLen: 10, requireUpper: true, requireNumber: true, requireSymbol: false });
+  const clinicId = useClinicId();
 
   useEffect(() => {
     (async () => {
       setLoading(true);
-      // .limit(1).maybeSingle() instead of .maybeSingle() so >1 row doesn't
-      // blank the form (which then goes down the INSERT path and creates
-      // duplicates — QA #8). `as any` cast because clinic_settings is not
-      // yet in the generated Supabase types.
+      // Tenant-wide non-timezone settings (session timeout, notifications, password policy).
       const { data } = await (supabase as any)
         .from("clinic_settings")
         .select("*")
@@ -606,7 +604,6 @@ function PlatformSettings() {
         .maybeSingle();
       if (data) {
         setSettingsId(data.id);
-        setDefaultTz(data.default_timezone || "America/Los_Angeles");
         setTimeoutMin(data.session_timeout_minutes || 60);
         setNotifNewAppt(data.notify_on_new_appointment ?? true);
         setNotifIntake(data.notify_on_intake_submitted ?? true);
@@ -618,34 +615,55 @@ function PlatformSettings() {
           requireSymbol: !!data.password_require_symbol,
         });
       }
+      // Per-clinic timezone — source of truth for slot computation. Read the
+      // currently active clinic's value (picked via the sidebar ClinicSwitcher).
+      if (clinicId) {
+        const { data: clinic } = await supabase
+          .from("clinics")
+          .select("timezone")
+          .eq("id", clinicId)
+          .maybeSingle();
+        if (clinic?.timezone) setDefaultTz(clinic.timezone);
+      }
       setLoading(false);
     })();
-  }, []);
+  }, [clinicId]);
 
   const save = async () => {
+    if (!clinicId) {
+      toast({ title: "No clinic selected", description: "Pick a clinic from the switcher in the sidebar before saving.", variant: "destructive" });
+      return;
+    }
     setSaving(true);
-    // Hard watchdog: if Supabase hangs (the spinner-forever case Faz hit in
-    // QA #8), release the button and show a clear error instead.
     const watchdog = setTimeout(() => {
       setSaving(false);
       toast({
         title: "Save is taking longer than expected",
-        description: "Check your network and try again. If it persists, refresh the page.",
+        description: "Check your network and try again.",
         variant: "destructive",
       });
     }, 8000);
     try {
+      // Per-clinic timezone — the authoritative source for clinic-local times.
+      const tzResp = await supabase
+        .from("clinics")
+        .update({ timezone: defaultTz, updated_at: new Date().toISOString() })
+        .eq("id", clinicId)
+        .select("id")
+        .maybeSingle();
+      if (tzResp.error) throw tzResp.error;
+      if (!tzResp.data) {
+        throw new Error("Timezone save returned no row — you may not have permission to update this clinic.");
+      }
+
+      // Tenant-wide non-timezone settings.
       const payload = {
-        default_timezone: defaultTz,
         session_timeout_minutes: timeoutMin,
         notify_on_new_appointment: notifNewAppt,
         notify_on_intake_submitted: notifIntake,
         notify_on_md_approval_due: notifMdApproval,
         updated_at: new Date().toISOString(),
       };
-      // .select().single() forces the driver to return the affected row, so
-      // any RLS rejection surfaces as an error rather than silently matching
-      // zero rows (which the earlier code treated as success).
       let resp;
       if (settingsId) {
         resp = await (supabase as any)
@@ -663,9 +681,6 @@ function PlatformSettings() {
       }
       clearTimeout(watchdog);
       if (resp.error) throw resp.error;
-      if (!resp.data) {
-        throw new Error("Save completed but no row was returned — you may lack permission to update settings.");
-      }
       if (!settingsId && resp.data?.id) setSettingsId(resp.data.id);
       toast({ title: "Settings saved" });
     } catch (err: any) {
