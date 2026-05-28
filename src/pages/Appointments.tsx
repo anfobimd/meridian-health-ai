@@ -461,9 +461,9 @@ export default function Appointments() {
                 </div>
 
                 {bookVisitType === "telehealth" && (
-                  <div className="space-y-2">
-                    <Label>Video Room URL <span className="text-muted-foreground text-[11px]">(optional — auto-generated if blank)</span></Label>
-                    <Input value={bookVideoUrl} onChange={(e) => setBookVideoUrl(e.target.value)} placeholder="https://meet.example.com/room-id" />
+                  <div className="rounded-md border bg-info/5 border-info/30 px-3 py-2.5 text-[11px] text-info flex items-center gap-2">
+                    <Video className="h-3.5 w-3.5 shrink-0" />
+                    <span>A secure video room will be reserved automatically when this appointment is saved. The patient's Join button will work immediately after scheduling.</span>
                   </div>
                 )}
                 <div className="space-y-2">
