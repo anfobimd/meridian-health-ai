@@ -225,12 +225,47 @@ export default function Appointments() {
         room_id: bookRoomId || null,
         device_id: bookDeviceId || null,
         visit_type: bookVisitType,
-        video_room_url: bookVisitType === "telehealth" ? (bookVideoUrl || null) : null,
+        // Set server-side by the daily-video function for telehealth visits; stays null for in-person/phone.
+        video_room_url: null,
         intake_form_id: intakeFormId,
         clinic_id: bookClinicId || null,
       };
-      const { error } = await supabase.from("appointments").insert(apt);
+      const { data: insertedApt, error } = await supabase
+        .from("appointments")
+        .insert(apt)
+        .select("id")
+        .single();
       if (error) throw error;
+
+      // TH-01: for telehealth visits, reserve the Daily.co room immediately so the
+      // patient's portal Join button works from the moment of booking. If room
+      // reservation fails, delete the appointment so we never persist a telehealth
+      // visit without a working room.
+      if (bookVisitType === "telehealth" && insertedApt?.id) {
+        const apptEnd = addMinutes(selectedSlot.start, duration);
+        // Room is valid until 15 minutes after the scheduled end.
+        const expiresAt = addMinutes(apptEnd, 15);
+        const expiresInMinutes = Math.max(5, Math.ceil((expiresAt.getTime() - Date.now()) / 60000));
+
+        const { data: roomData, error: roomErr } = await supabase.functions.invoke("daily-video", {
+          body: {
+            action: "create_room",
+            appointment_id: insertedApt.id,
+            patient_id: bookPatientId,
+            max_participants: 4,
+            expires_in_minutes: expiresInMinutes,
+          },
+        });
+
+        if (roomErr || !roomData?.room_url) {
+          await supabase.from("appointments").delete().eq("id", insertedApt.id);
+          throw new Error(
+            roomData?.error
+              || roomErr?.message
+              || "Couldn't reserve the telehealth video room. Please try again, or schedule this visit as in-person."
+          );
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["appointments"] });
