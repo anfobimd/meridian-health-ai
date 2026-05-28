@@ -39,7 +39,13 @@ Deno.serve(async (req) => {
       phone,
       client_source,
       notes,
+      visit_type: rawVisitType,
     } = body;
+
+    const visit_type: "in_person" | "telehealth" | "phone" =
+      rawVisitType === "telehealth" || rawVisitType === "phone"
+        ? rawVisitType
+        : "in_person";
 
     // ── Validate required fields ──────────────────────────────────────────
     if (!slug || !treatment_id || !scheduled_start || !first_name || !last_name) {
@@ -66,6 +72,21 @@ Deno.serve(async (req) => {
         JSON.stringify({ error: `Provider "${slug}" not found or inactive` }),
         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
+    }
+
+    // ── Resolve clinic for provider (prefer primary) ──────────────────────
+    let clinic_id: string | null = null;
+    try {
+      const { data: assignments } = await admin
+        .from("provider_clinic_assignments")
+        .select("clinic_id, is_primary")
+        .eq("provider_id", provider.id);
+      if (assignments && assignments.length > 0) {
+        const primary = assignments.find((a: any) => a.is_primary) || assignments[0];
+        clinic_id = primary.clinic_id;
+      }
+    } catch (e) {
+      console.error("clinic resolution failed (non-fatal):", e);
     }
 
     // ── Check provider has active membership ────────────────────────────────
@@ -181,11 +202,44 @@ Deno.serve(async (req) => {
         scheduled_at: startTime.toISOString(),
         duration_minutes: treatment.duration_minutes || 30,
         notes: notes || null,
+        visit_type,
+        clinic_id,
       })
       .select("id, scheduled_at, duration_minutes")
       .single();
 
     if (apptErr) throw apptErr;
+
+    // ── Telehealth: provision Daily.co room + video_sessions row ───────────
+    let video_room_url: string | null = null;
+    if (visit_type === "telehealth") {
+      try {
+        const durationMin = treatment.duration_minutes || 30;
+        // Room expires ~30 min after the visit ends, with a small pre-buffer
+        const expiresInMinutes = Math.max(durationMin + 30, 60);
+        const dailyRes = await fetch(`${supabaseUrl}/functions/v1/daily-video`, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${serviceKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            action: "create_room",
+            appointment_id: appointment.id,
+            patient_id,
+            expires_in_minutes: expiresInMinutes,
+          }),
+        });
+        const dailyData = await dailyRes.json();
+        if (!dailyRes.ok) {
+          console.error("daily-video create_room failed:", dailyData);
+        } else {
+          video_room_url = dailyData.room_url || null;
+        }
+      } catch (e) {
+        console.error("daily-video invocation failed (non-fatal):", e);
+      }
+    }
 
     // ── Create marketplace_booking ────────────────────────────────────────
     let marketplace_appt_id: string | null = null;
