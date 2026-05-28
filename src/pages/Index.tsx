@@ -341,14 +341,14 @@ export default function Dashboard() {
     }
   };
 
-  // Auto-load briefing on mount when data is ready
+  // Auto-load briefing on mount only when the user has it toggled on.
   const dataReady = todayApts !== undefined && monthRevenue !== undefined;
   useEffect(() => {
-    if (dataReady && !aiBriefing && !briefingLoading) {
+    if (dataReady && showBriefing && !aiBriefing && !briefingLoading) {
       loadBriefing();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dataReady]);
+  }, [dataReady, showBriefing]);
 
   const todayTotal = todayApts?.length ?? 0;
   const todayCompleted = todayApts?.filter((a: any) => a.status === "completed").length ?? 0;
