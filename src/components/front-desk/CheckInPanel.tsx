@@ -15,7 +15,7 @@ import { ConsentWorkflow } from "./ConsentWorkflow";
 import { InsurancePanel } from "./InsurancePanel";
 import {
   CheckCircle2, Loader2, DoorOpen, AlertTriangle, FileCheck, Sparkles, ShieldAlert,
-  Package, Heart,
+  Package, Heart, Cpu,
 } from "lucide-react";
 
 export function CheckInPanel({ appointment, open, onOpenChange, defaultTab, returnTo }: {
@@ -27,6 +27,7 @@ export function CheckInPanel({ appointment, open, onOpenChange, defaultTab, retu
 }) {
   const queryClient = useQueryClient();
   const [roomId, setRoomId] = useState(appointment?.room_id || "");
+  const [deviceId, setDeviceId] = useState(appointment?.device_id || "");
   const [notes, setNotes] = useState("");
   const [showBrief, setShowBrief] = useState(true); // Auto-show AI brief
   const [checking, setChecking] = useState(false);
@@ -41,6 +42,14 @@ export function CheckInPanel({ appointment, open, onOpenChange, defaultTab, retu
     queryKey: ["rooms-list"],
     queryFn: async () => {
       const { data } = await supabase.from("rooms").select("id, name").eq("is_active", true).order("name");
+      return data ?? [];
+    },
+  });
+
+  const { data: devices } = useQuery({
+    queryKey: ["devices-list"],
+    queryFn: async () => {
+      const { data } = await supabase.from("devices").select("id, name, device_type, room_id").order("name");
       return data ?? [];
     },
   });
@@ -109,6 +118,7 @@ export function CheckInPanel({ appointment, open, onOpenChange, defaultTab, retu
         checked_in_at: new Date().toISOString(),
       };
       if (roomId) updates.room_id = roomId;
+      if (deviceId) updates.device_id = deviceId;
       if (notes) updates.notes = [appointment?.notes, notes].filter(Boolean).join(" | ");
 
       const { error } = await supabase.from("appointments").update(updates).eq("id", appointment.id);
@@ -208,6 +218,23 @@ export function CheckInPanel({ appointment, open, onOpenChange, defaultTab, retu
                 <option value="">— No Room —</option>
                 {rooms?.map((r) => (
                   <option key={r.id} value={r.id}>{r.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Device Assignment */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                <Cpu className="h-3 w-3" />Device <span className="font-normal normal-case tracking-normal text-muted-foreground/70">(optional)</span>
+              </Label>
+              <select
+                value={deviceId}
+                onChange={(e) => setDeviceId(e.target.value)}
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm"
+              >
+                <option value="">— No Device —</option>
+                {devices?.filter((d) => !roomId || !d.room_id || d.room_id === roomId).map((d) => (
+                  <option key={d.id} value={d.id}>{d.name}{d.device_type ? ` · ${d.device_type}` : ""}</option>
                 ))}
               </select>
             </div>
