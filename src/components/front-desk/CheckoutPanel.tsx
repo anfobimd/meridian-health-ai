@@ -442,6 +442,8 @@ export function CheckoutPanel({ appointmentId, open, onOpenChange }: {
             {(invoiceSummary.balance_due > 0 || paymentSuggestions.length > 0) && (
               <>
                 <PaymentPanel
+                  appointmentId={appointmentId}
+                  patientId={patientId}
                   invoiceSummary={invoiceSummary}
                   paymentSuggestions={paymentSuggestions}
                   onPaymentComplete={() => setPaymentDone(true)}
