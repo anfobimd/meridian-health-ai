@@ -90,7 +90,23 @@ export default function Treatments() {
       if (error) throw error;
       await supabase.from("audit_logs").insert({ user_id: user?.id, action: "update", table_name: "treatments", record_id: id, new_values: { [field]: value } });
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["treatments"] }),
+    onSuccess: (_data, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["treatments"] });
+      const labels: Record<typeof vars.field, string> = {
+        requires_gfe: "GFE requirement",
+        requires_md_review: "MD review requirement",
+        bookable_via_self_serve: "Self-serve booking",
+      };
+      toast.success(`${labels[vars.field]} ${vars.value ? "enabled" : "disabled"}`);
+    },
+    onError: (_err, vars) => {
+      const labels: Record<typeof vars.field, string> = {
+        requires_gfe: "GFE requirement",
+        requires_md_review: "MD review requirement",
+        bookable_via_self_serve: "Self-serve booking",
+      };
+      toast.error(`Failed to update ${labels[vars.field]}`);
+    },
   });
 
   const updatePrice = useMutation({
