@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Loader2, ArrowLeft, CheckCircle2 } from "lucide-react";
+import { Loader2, ArrowLeft, CheckCircle2, MapPin, Video } from "lucide-react";
 import { format, addDays } from "date-fns";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://oqjupcgtxsbyelaigrxn.supabase.co";
@@ -32,6 +32,7 @@ export default function PublicBooking() {
   const { createBooking } = useBooking();
 
   const [selectedTreatment, setSelectedTreatment] = useState<string>("");
+  const [visitType, setVisitType] = useState<"in_person" | "telehealth">("in_person");
   const [selectedDate, setSelectedDate] = useState<string>(
     format(addDays(new Date(), 1), "yyyy-MM-dd"),
   );
@@ -86,6 +87,7 @@ export default function PublicBooking() {
         email: contact.email,
         phone: contact.phone,
         client_source: "spa_acquired",
+        visit_type: visitType,
       });
       setConfirmation({ code: result.confirmation_code, date: result.scheduled_start });
     } catch {
@@ -177,6 +179,35 @@ export default function PublicBooking() {
       </Card>
 
       <form onSubmit={onSubmit} className="space-y-4">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Visit type</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                type="button"
+                variant={visitType === "in_person" ? "default" : "outline"}
+                onClick={() => { setVisitType("in_person"); setSelectedSlot(null); }}
+                className="h-auto py-3 flex flex-col items-center gap-1"
+              >
+                <MapPin className="h-4 w-4" />
+                <span className="text-sm font-medium">In-person</span>
+                <span className="text-[11px] opacity-80">Visit the clinic</span>
+              </Button>
+              <Button
+                type="button"
+                variant={visitType === "telehealth" ? "default" : "outline"}
+                onClick={() => { setVisitType("telehealth"); setSelectedSlot(null); }}
+                className="h-auto py-3 flex flex-col items-center gap-1"
+              >
+                <Video className="h-4 w-4" />
+                <span className="text-sm font-medium">Telehealth</span>
+                <span className="text-[11px] opacity-80">Video call</span>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
         <Card>
           <CardHeader>
             <CardTitle className="text-base">1. Select Treatment</CardTitle>

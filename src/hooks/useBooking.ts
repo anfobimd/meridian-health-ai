@@ -30,6 +30,7 @@ export interface BookingRequest {
   phone?: string;
   client_source?: "spa_acquired" | "provider_acquired";
   notes?: string;
+  visit_type?: "in_person" | "telehealth" | "phone";
 }
 
 export interface BookingResponse {
