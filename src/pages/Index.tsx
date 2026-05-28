@@ -386,69 +386,85 @@ export default function Dashboard() {
           sub={<p className="text-[11px] text-muted-foreground">Requires attention</p>} />
       </div>
 
-      {/* AI Briefing — Auto-loaded */}
-      <Card className="border-primary/20 bg-gradient-to-r from-primary/5 via-transparent to-transparent">
-        <CardContent className="p-5">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Sparkles className="h-4 w-4 text-primary" />
+      {/* AI Briefing — opt-in. Persists choice in localStorage. */}
+      {showBriefing ? (
+        <Card className="border-primary/20 bg-gradient-to-r from-primary/5 via-transparent to-transparent">
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Sparkles className="h-4 w-4 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold">AI Clinic Briefing</p>
+                  <p className="text-[11px] text-muted-foreground">Auto-generated from live clinic data</p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm font-semibold">AI Clinic Briefing</p>
-                <p className="text-[11px] text-muted-foreground">Auto-generated from live clinic data</p>
+              <div className="flex items-center gap-1">
+                <Button size="sm" variant="ghost" onClick={loadBriefing} disabled={briefingLoading} className="text-xs">
+                  {briefingLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "↻ Refresh"}
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => toggleBriefing(false)} className="text-xs">
+                  Hide
+                </Button>
               </div>
             </div>
-            <Button size="sm" variant="ghost" onClick={loadBriefing} disabled={briefingLoading} className="text-xs">
-              {briefingLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "↻ Refresh"}
-            </Button>
+            {briefingLoading && !aiBriefing ? (
+              <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Analyzing clinic data…
+              </div>
+            ) : aiBriefing ? (
+              <div className="space-y-3">
+                <p className="text-sm leading-relaxed">{aiBriefing.narrative}</p>
+                {aiBriefing.priorities?.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Top Priorities</p>
+                    {aiBriefing.priorities.map((p: string, i: number) => (
+                      <div key={i} className="flex items-start gap-2">
+                        <Target className="h-3 w-3 text-primary mt-0.5 shrink-0" />
+                        <p className="text-xs">{p}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {aiBriefing.alerts?.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {aiBriefing.alerts.map((a: string, i: number) => (
+                      <Badge key={i} variant="outline" className="text-[11px] border-warning/30 text-warning">
+                        <AlertCircle className="h-2.5 w-2.5 mr-1" />{a}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+                {aiBriefing.provider_flags?.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Provider Alerts</p>
+                    {aiBriefing.provider_flags.map((pf: any, i: number) => (
+                      <div key={i} className="flex items-center justify-between p-2 rounded bg-warning/5 border border-warning/20 text-xs">
+                        <span className="font-medium">{pf.name}: <span className="text-muted-foreground">{pf.issue}</span></span>
+                        <span className="text-primary text-[11px]">{pf.action}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">Briefing will load automatically…</p>
+            )}
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="flex items-center justify-between rounded-md border border-dashed border-border px-4 py-2.5">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Sparkles className="h-3.5 w-3.5" />
+            <span>AI Clinic Briefing is hidden</span>
           </div>
-          {briefingLoading && !aiBriefing ? (
-            <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Analyzing clinic data…
-            </div>
-          ) : aiBriefing ? (
-            <div className="space-y-3">
-              <p className="text-sm leading-relaxed">{aiBriefing.narrative}</p>
-              {aiBriefing.priorities?.length > 0 && (
-                <div className="space-y-1.5">
-                  <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Top Priorities</p>
-                  {aiBriefing.priorities.map((p: string, i: number) => (
-                    <div key={i} className="flex items-start gap-2">
-                      <Target className="h-3 w-3 text-primary mt-0.5 shrink-0" />
-                      <p className="text-xs">{p}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {aiBriefing.alerts?.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mt-2">
-                  {aiBriefing.alerts.map((a: string, i: number) => (
-                    <Badge key={i} variant="outline" className="text-[11px] border-warning/30 text-warning">
-                      <AlertCircle className="h-2.5 w-2.5 mr-1" />{a}
-                    </Badge>
-                  ))}
-                </div>
-              )}
-              {/* Provider flags */}
-              {aiBriefing.provider_flags?.length > 0 && (
-                <div className="mt-2 space-y-1">
-                  <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Provider Alerts</p>
-                  {aiBriefing.provider_flags.map((pf: any, i: number) => (
-                    <div key={i} className="flex items-center justify-between p-2 rounded bg-warning/5 border border-warning/20 text-xs">
-                      <span className="font-medium">{pf.name}: <span className="text-muted-foreground">{pf.issue}</span></span>
-                      <span className="text-primary text-[11px]">{pf.action}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ) : (
-            <p className="text-xs text-muted-foreground">Briefing will load automatically…</p>
-          )}
-        </CardContent>
-      </Card>
+          <Button size="sm" variant="ghost" className="text-xs h-7" onClick={() => toggleBriefing(true)}>
+            Show
+          </Button>
+        </div>
+      )}
 
       {/* Revenue Forecast + Compliance Alerts */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
