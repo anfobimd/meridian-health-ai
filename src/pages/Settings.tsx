@@ -710,24 +710,32 @@ function PlatformSettings() {
         <CardDescription>Clinic-wide defaults for timezone, sessions, and notifications.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Default timezone */}
+        {/* Per-clinic timezone — applies to everyone in this clinic. */}
         <div className="space-y-1.5">
           <Label htmlFor="ps-tz" className="flex items-center gap-1.5">
-            <Globe className="h-3.5 w-3.5" /> Default timezone
+            <Globe className="h-3.5 w-3.5" /> Clinic timezone
           </Label>
-          <select
-            id="ps-tz"
-            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-            value={defaultTz}
-            onChange={(e) => setDefaultTz(e.target.value)}
-          >
-            {TIMEZONES.map((tz) => (
-              <option key={tz} value={tz}>{tz}</option>
-            ))}
-          </select>
-          <p className="text-xs text-muted-foreground">
-            Used for displaying dates and times across the EHR for users without a personal timezone set.
-          </p>
+          {clinicId ? (
+            <>
+              <select
+                id="ps-tz"
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                value={defaultTz}
+                onChange={(e) => setDefaultTz(e.target.value)}
+              >
+                {TIMEZONES.map((tz) => (
+                  <option key={tz} value={tz}>{tz}</option>
+                ))}
+              </select>
+              <p className="text-xs text-muted-foreground">
+                Source of truth for this clinic — booking slot computation, scheduled times, and clinic-local displays all read from here. Applies to every user in this clinic.
+              </p>
+            </>
+          ) : (
+            <p className="text-xs text-muted-foreground rounded-md border border-dashed px-3 py-2">
+              Pick a clinic from the switcher in the sidebar to set its timezone.
+            </p>
+          )}
         </div>
 
         {/* Session timeout */}
