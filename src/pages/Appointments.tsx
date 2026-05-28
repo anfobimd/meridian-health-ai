@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Calendar, Sparkles, Loader2, DoorOpen, Cpu, AlertTriangle, Brain, Clock, Check, XCircle, Ban, ShieldAlert, Timer, UserCheck, Video, Phone } from "lucide-react";
+import { Plus, Calendar, Sparkles, Loader2, DoorOpen, Cpu, AlertTriangle, Brain, Clock, Check, XCircle, Ban, ShieldAlert, Timer, UserCheck, Video, Phone, CalendarClock } from "lucide-react";
 import { toast } from "sonner";
 import { format, parseISO, addMinutes } from "date-fns";
 import { Calendar as CalendarWidget } from "@/components/ui/calendar";
@@ -59,6 +59,14 @@ export default function Appointments() {
   const [bookVisitType, setBookVisitType] = useState("in_person");
   const [bookVideoUrl, setBookVideoUrl] = useState("");
   const [bookClinicId, setBookClinicId] = useState("");
+
+  // Reschedule (Must #7) — independent state from the new-booking flow.
+  const [rescheduleApt, setRescheduleApt] = useState<any>(null);
+  const [reschedDate, setReschedDate] = useState<Date | undefined>(undefined);
+  const [reschedProviderId, setReschedProviderId] = useState<string>("");
+  const [reschedSlots, setReschedSlots] = useState<TimeSlot[]>([]);
+  const [reschedSlot, setReschedSlot] = useState<TimeSlot | null>(null);
+  const [reschedLoading, setReschedLoading] = useState(false);
 
   // AI scheduling intelligence state
   const [noShowRisk, setNoShowRisk] = useState<any>(null);
@@ -300,6 +308,28 @@ export default function Appointments() {
   useEffect(() => {
     if (bookProviderId && bookDate && bookTreatmentId) loadSlots();
   }, [bookProviderId, bookDate, bookTreatmentId]);
+
+  // Load slots whenever the reschedule date/provider changes.
+  useEffect(() => {
+    if (!rescheduleApt || !reschedDate || !reschedProviderId) {
+      setReschedSlots([]);
+      setReschedSlot(null);
+      return;
+    }
+    (async () => {
+      setReschedLoading(true);
+      setReschedSlot(null);
+      try {
+        const duration = rescheduleApt.duration_minutes || 30;
+        const slots = await getAvailableSlots(reschedProviderId, reschedDate, duration);
+        setReschedSlots(slots);
+      } catch {
+        toast.error("Failed to load available slots");
+      } finally {
+        setReschedLoading(false);
+      }
+    })();
+  }, [rescheduleApt, reschedDate, reschedProviderId]);
 
   const updateStatus = useMutation({
     mutationFn: async ({ id, status, room_id, device_id, provider_id }: { id: string; status: string; room_id?: string; device_id?: string; provider_id?: string }) => {
