@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Calendar, Sparkles, Loader2, DoorOpen, Cpu, AlertTriangle, Brain, Clock, Check, XCircle, Ban, ShieldAlert, Timer, UserCheck, Video, Phone } from "lucide-react";
+import { Plus, Calendar, Sparkles, Loader2, DoorOpen, Cpu, AlertTriangle, Brain, Clock, Check, XCircle, Ban, ShieldAlert, Timer, UserCheck, Video, Phone, CalendarClock } from "lucide-react";
 import { toast } from "sonner";
 import { format, parseISO, addMinutes } from "date-fns";
 import { Calendar as CalendarWidget } from "@/components/ui/calendar";
@@ -59,6 +59,14 @@ export default function Appointments() {
   const [bookVisitType, setBookVisitType] = useState("in_person");
   const [bookVideoUrl, setBookVideoUrl] = useState("");
   const [bookClinicId, setBookClinicId] = useState("");
+
+  // Reschedule (Must #7) — independent state from the new-booking flow.
+  const [rescheduleApt, setRescheduleApt] = useState<any>(null);
+  const [reschedDate, setReschedDate] = useState<Date | undefined>(undefined);
+  const [reschedProviderId, setReschedProviderId] = useState<string>("");
+  const [reschedSlots, setReschedSlots] = useState<TimeSlot[]>([]);
+  const [reschedSlot, setReschedSlot] = useState<TimeSlot | null>(null);
+  const [reschedLoading, setReschedLoading] = useState(false);
 
   // AI scheduling intelligence state
   const [noShowRisk, setNoShowRisk] = useState<any>(null);
@@ -301,6 +309,28 @@ export default function Appointments() {
     if (bookProviderId && bookDate && bookTreatmentId) loadSlots();
   }, [bookProviderId, bookDate, bookTreatmentId]);
 
+  // Load slots whenever the reschedule date/provider changes.
+  useEffect(() => {
+    if (!rescheduleApt || !reschedDate || !reschedProviderId) {
+      setReschedSlots([]);
+      setReschedSlot(null);
+      return;
+    }
+    (async () => {
+      setReschedLoading(true);
+      setReschedSlot(null);
+      try {
+        const duration = rescheduleApt.duration_minutes || 30;
+        const slots = await getAvailableSlots(reschedProviderId, reschedDate, duration);
+        setReschedSlots(slots);
+      } catch {
+        toast.error("Failed to load available slots");
+      } finally {
+        setReschedLoading(false);
+      }
+    })();
+  }, [rescheduleApt, reschedDate, reschedProviderId]);
+
   const updateStatus = useMutation({
     mutationFn: async ({ id, status, room_id, device_id, provider_id }: { id: string; status: string; room_id?: string; device_id?: string; provider_id?: string }) => {
       const updates: any = { status };
@@ -352,6 +382,72 @@ export default function Appointments() {
       queryClient.invalidateQueries({ queryKey: ["appointments"] });
       if (!waitlistMatches) { setCancelDialogOpen(false); setCancelReason(""); }
       toast.success("Appointment cancelled");
+    },
+  });
+
+  const rescheduleAppointment = useMutation({
+    mutationFn: async () => {
+      if (!rescheduleApt || !reschedSlot) throw new Error("Pick a date and time slot first.");
+      const duration = rescheduleApt.duration_minutes || 30;
+      const newStart = reschedSlot.start;
+      const newEnd = addMinutes(newStart, duration);
+
+      // Conflict check — exclude self so we don't flag the appointment as conflicting with its own current slot.
+      const result = await checkConflicts(
+        reschedProviderId || null,
+        rescheduleApt.room_id || null,
+        rescheduleApt.device_id || null,
+        newStart,
+        newEnd,
+      );
+      const otherConflicts = (result.conflicts || []).filter((c: any) => c.appointmentId !== rescheduleApt.id);
+      if (otherConflicts.length > 0) {
+        throw new Error("Conflict detected: " + otherConflicts.map((c: any) => c.label).join("; "));
+      }
+
+      const { error } = await supabase
+        .from("appointments")
+        .update({
+          scheduled_at: newStart.toISOString(),
+          provider_id: reschedProviderId || null,
+        })
+        .eq("id", rescheduleApt.id);
+      if (error) throw error;
+
+      // For telehealth, refresh the Daily.co room so its expiry matches the new schedule.
+      // Best-effort: don't fail the reschedule if room refresh has issues.
+      if (rescheduleApt.visit_type === "telehealth") {
+        const expiresAt = addMinutes(newEnd, 15);
+        const expiresInMinutes = Math.max(5, Math.ceil((expiresAt.getTime() - Date.now()) / 60000));
+        try {
+          await supabase.functions.invoke("daily-video", {
+            body: { action: "end_session", appointment_id: rescheduleApt.id },
+          });
+        } catch { /* old room may not exist — fine */ }
+        const { error: roomErr } = await supabase.functions.invoke("daily-video", {
+          body: {
+            action: "create_room",
+            appointment_id: rescheduleApt.id,
+            patient_id: rescheduleApt.patient_id,
+            max_participants: 4,
+            expires_in_minutes: expiresInMinutes,
+          },
+        });
+        if (roomErr) {
+          toast.warning("Rescheduled, but the video room couldn't be refreshed. The patient's Join button may not work — re-open the visit from the Telehealth page to re-create the room.");
+        }
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["appointments"] });
+      setRescheduleApt(null);
+      setReschedDate(undefined);
+      setReschedSlot(null);
+      setReschedProviderId("");
+      toast.success("Appointment rescheduled");
+    },
+    onError: (err: any) => {
+      toast.error(err?.message || "Failed to reschedule appointment");
     },
   });
 
@@ -818,6 +914,94 @@ export default function Appointments() {
         </DialogContent>
       </Dialog>
 
+      {/* Reschedule dialog (Must #7) */}
+      <Dialog open={!!rescheduleApt} onOpenChange={(o) => { if (!o) { setRescheduleApt(null); setReschedDate(undefined); setReschedSlot(null); setReschedSlots([]); setReschedProviderId(""); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Reschedule Appointment</DialogTitle>
+          </DialogHeader>
+          {rescheduleApt && (
+            <div className="space-y-4">
+              {/* Current appointment context */}
+              <div className="rounded-md bg-muted/40 p-3 text-xs space-y-1">
+                <div><span className="text-muted-foreground">Patient:</span> <span className="font-medium">{rescheduleApt.patients?.first_name} {rescheduleApt.patients?.last_name}</span></div>
+                <div><span className="text-muted-foreground">Treatment:</span> <span className="font-medium">{rescheduleApt.treatments?.name || "—"}</span></div>
+                <div><span className="text-muted-foreground">Currently scheduled:</span> <span className="font-medium">{format(parseISO(rescheduleApt.scheduled_at), "EEE, MMM d 'at' p")}</span></div>
+                {rescheduleApt.visit_type === "telehealth" && (
+                  <div className="flex items-center gap-1 text-info pt-1">
+                    <Video className="h-3 w-3" /> Telehealth — video room will be refreshed automatically.
+                  </div>
+                )}
+              </div>
+
+              {/* Provider selector — default to current provider */}
+              <div className="space-y-1.5">
+                <Label className="text-xs">Provider</Label>
+                <Select value={reschedProviderId} onValueChange={setReschedProviderId}>
+                  <SelectTrigger><SelectValue placeholder="Select provider" /></SelectTrigger>
+                  <SelectContent>
+                    {providersList?.map((p: any) => (
+                      <SelectItem key={p.id} value={p.id}>{p.first_name} {p.last_name}{p.credentials ? `, ${p.credentials}` : ""}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Date picker */}
+              <div className="space-y-1.5">
+                <Label className="text-xs">New date</Label>
+                <Input
+                  type="date"
+                  value={reschedDate ? format(reschedDate, "yyyy-MM-dd") : ""}
+                  min={format(new Date(), "yyyy-MM-dd")}
+                  onChange={(e) => setReschedDate(e.target.value ? new Date(e.target.value + "T00:00:00") : undefined)}
+                />
+              </div>
+
+              {/* Slot picker */}
+              {reschedDate && reschedProviderId && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Available times</Label>
+                  {reschedLoading ? (
+                    <div className="text-xs text-muted-foreground py-2">Loading slots…</div>
+                  ) : reschedSlots.length === 0 ? (
+                    <div className="text-xs text-muted-foreground py-2">No slots available on this date for this provider.</div>
+                  ) : (
+                    <div className="grid grid-cols-3 gap-1.5 max-h-40 overflow-y-auto">
+                      {reschedSlots.map((s, i) => (
+                        <Button
+                          key={i}
+                          size="sm"
+                          variant={reschedSlot?.start.getTime() === s.start.getTime() ? "default" : "outline"}
+                          className="text-xs h-8"
+                          onClick={() => setReschedSlot(s)}
+                        >
+                          {format(s.start, "p")}
+                        </Button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Confirm */}
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="outline" onClick={() => setRescheduleApt(null)} disabled={rescheduleAppointment.isPending}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => rescheduleAppointment.mutate()}
+                  disabled={!reschedSlot || rescheduleAppointment.isPending}
+                >
+                  {rescheduleAppointment.isPending ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : null}
+                  Confirm Reschedule
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Re-engagement SMS draft after no-show */}
       <Dialog open={!!reEngageDraft} onOpenChange={() => setReEngageDraft("")}>
         <DialogContent>
@@ -898,6 +1082,15 @@ export default function Appointments() {
                   )}
                   {!["cancelled", "no_show", "completed"].includes(apt.status) && (
                     <>
+                      <Button size="sm" variant="ghost" className="text-xs" onClick={() => {
+                        setRescheduleApt(apt);
+                        setReschedProviderId(apt.provider_id || "");
+                        setReschedDate(undefined);
+                        setReschedSlot(null);
+                        setReschedSlots([]);
+                      }}>
+                        <CalendarClock className="h-3 w-3 mr-1" />Reschedule
+                      </Button>
                       <Button size="sm" variant="ghost" className="text-xs text-destructive" onClick={() => { setSelectedApt(apt); setCancelDialogOpen(true); setCancelReason(""); }}>
                         <XCircle className="h-3 w-3 mr-1" />Cancel
                       </Button>
