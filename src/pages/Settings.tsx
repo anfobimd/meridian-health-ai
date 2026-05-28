@@ -681,6 +681,7 @@ function PlatformSettings() {
       }
       clearTimeout(watchdog);
       if (resp.error) throw resp.error;
+      if (!resp.data) throw new Error("Save completed but no row was returned — you may lack permission to update settings.");
       if (!settingsId && resp.data?.id) setSettingsId(resp.data.id);
       toast({ title: "Settings saved" });
     } catch (err: any) {
