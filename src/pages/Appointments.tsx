@@ -225,12 +225,47 @@ export default function Appointments() {
         room_id: bookRoomId || null,
         device_id: bookDeviceId || null,
         visit_type: bookVisitType,
-        video_room_url: bookVisitType === "telehealth" ? (bookVideoUrl || null) : null,
+        // Set server-side by the daily-video function for telehealth visits; stays null for in-person/phone.
+        video_room_url: null,
         intake_form_id: intakeFormId,
         clinic_id: bookClinicId || null,
       };
-      const { error } = await supabase.from("appointments").insert(apt);
+      const { data: insertedApt, error } = await supabase
+        .from("appointments")
+        .insert(apt)
+        .select("id")
+        .single();
       if (error) throw error;
+
+      // TH-01: for telehealth visits, reserve the Daily.co room immediately so the
+      // patient's portal Join button works from the moment of booking. If room
+      // reservation fails, delete the appointment so we never persist a telehealth
+      // visit without a working room.
+      if (bookVisitType === "telehealth" && insertedApt?.id) {
+        const apptEnd = addMinutes(selectedSlot.start, duration);
+        // Room is valid until 15 minutes after the scheduled end.
+        const expiresAt = addMinutes(apptEnd, 15);
+        const expiresInMinutes = Math.max(5, Math.ceil((expiresAt.getTime() - Date.now()) / 60000));
+
+        const { data: roomData, error: roomErr } = await supabase.functions.invoke("daily-video", {
+          body: {
+            action: "create_room",
+            appointment_id: insertedApt.id,
+            patient_id: bookPatientId,
+            max_participants: 4,
+            expires_in_minutes: expiresInMinutes,
+          },
+        });
+
+        if (roomErr || !roomData?.room_url) {
+          await supabase.from("appointments").delete().eq("id", insertedApt.id);
+          throw new Error(
+            roomData?.error
+              || roomErr?.message
+              || "Couldn't reserve the telehealth video room. Please try again, or schedule this visit as in-person."
+          );
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["appointments"] });
@@ -461,9 +496,9 @@ export default function Appointments() {
                 </div>
 
                 {bookVisitType === "telehealth" && (
-                  <div className="space-y-2">
-                    <Label>Video Room URL <span className="text-muted-foreground text-[11px]">(optional — auto-generated if blank)</span></Label>
-                    <Input value={bookVideoUrl} onChange={(e) => setBookVideoUrl(e.target.value)} placeholder="https://meet.example.com/room-id" />
+                  <div className="rounded-md border bg-info/5 border-info/30 px-3 py-2.5 text-[11px] text-info flex items-center gap-2">
+                    <Video className="h-3.5 w-3.5 shrink-0" />
+                    <span>A secure video room will be reserved automatically when this appointment is saved. The patient's Join button will work immediately after scheduling.</span>
                   </div>
                 )}
                 <div className="space-y-2">
