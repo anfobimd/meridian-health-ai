@@ -6,7 +6,7 @@ import {
   CreditCard, TrendingUp, Calculator, MonitorCheck, Briefcase, Search, LogOut, CalendarClock, TrendingDown,
   Settings, UserCircle, CalendarOff, MessageSquare, ClipboardCheck, Mail, Clock, ListChecks,
   Building2, BarChart3, Zap, BookOpen, Bell, CalendarDays, Inbox, Video, ScrollText, Target, Camera,
-  FileWarning,
+  FileWarning, ChevronDown, MoreHorizontal,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/RBACContext";
@@ -20,6 +20,10 @@ type NavItem = {
   label: string;
   roles?: string[];
   badgeKey?: string;
+  /** When true, this item is hidden under the collapsible "More" section
+   *  instead of the always-visible primary nav. Flip to false to promote an
+   *  item back into the prominent alpha navigation. */
+  defer?: boolean;
 };
 
 type NavSection = {
@@ -36,7 +40,8 @@ const navSections: NavSection[] = [
       { to: "/provider-day", icon: Briefcase, label: "My Day", roles: ["provider"] },
       { to: "/outstanding-charts", icon: FileWarning, label: "Outstanding Charts", roles: ["admin", "provider"] },
       { to: "/front-desk", icon: MonitorCheck, label: "Front Desk", roles: ["admin", "front_desk"] },
-      { to: "/check-in", icon: ClipboardCheck, label: "Check-In", roles: ["admin", "front_desk"] },
+      // Read-only provider day view; the actual check-in action lives in Front Desk.
+      { to: "/check-in", icon: ClipboardCheck, label: "My Roster", roles: ["admin", "front_desk"] },
     ],
   },
   {
@@ -44,16 +49,16 @@ const navSections: NavSection[] = [
     items: [
       { to: "/appointments", icon: Calendar, label: "Appointments" },
       { to: "/calendar-grid", icon: CalendarDays, label: "Calendar Grid", roles: ["admin"] },
-      { to: "/waitlist", icon: ListChecks, label: "Waitlist", roles: ["admin"] },
+      { to: "/waitlist", icon: ListChecks, label: "Waitlist", roles: ["admin"], defer: true },
     ],
   },
   {
     label: "PATIENTS",
     items: [
       { to: "/patients", icon: Users, label: "Patients" },
-      { to: "/messages", icon: Mail, label: "Messages", badgeKey: "unread_messages" },
-      { to: "/patient-inbox", icon: Inbox, label: "Patient Inbox", roles: ["admin", "front_desk"] },
-      { to: "/notifications", icon: Bell, label: "Notifications" },
+      { to: "/messages", icon: Mail, label: "Messages", badgeKey: "unread_messages", defer: true },
+      { to: "/patient-inbox", icon: Inbox, label: "Patient Inbox", roles: ["admin", "front_desk"], defer: true },
+      { to: "/notifications", icon: Bell, label: "Notifications", defer: true },
     ],
   },
   {
@@ -62,14 +67,14 @@ const navSections: NavSection[] = [
     items: [
       { to: "/clinical-notes", icon: ClipboardList, label: "Clinical Notes" },
       { to: "/encounters", icon: FileText, label: "Encounters" },
-      { to: "/prescriptions", icon: Pill, label: "Prescriptions", roles: ["admin", "provider"] },
-      { to: "/hormone-visits", icon: FlaskConical, label: "Hormone Labs", roles: ["admin", "provider"] },
-      { to: "/hormone-intake", icon: ClipboardPlus, label: "Hormone Intake", roles: ["admin", "provider"] },
-      { to: "/physician-approval", icon: ShieldCheck, label: "Approvals", roles: ["admin", "provider"] },
-      { to: "/intake-clearance", icon: Inbox, label: "Intake Clearance", roles: ["admin", "provider"] },
-      { to: "/protocols", icon: Pill, label: "Protocols", roles: ["admin", "provider"] },
-      { to: "/md-feedback", icon: MessageSquare, label: "MD Feedback", roles: ["provider"], badgeKey: "md_corrections" },
       { to: "/clinical-photos", icon: Camera, label: "Clinical Photos" },
+      { to: "/prescriptions", icon: Pill, label: "Prescriptions", roles: ["admin", "provider"], defer: true },
+      { to: "/hormone-visits", icon: FlaskConical, label: "Hormone Labs", roles: ["admin", "provider"], defer: true },
+      { to: "/hormone-intake", icon: ClipboardPlus, label: "Hormone Intake", roles: ["admin", "provider"], defer: true },
+      { to: "/physician-approval", icon: ShieldCheck, label: "Approvals", roles: ["admin", "provider"], defer: true },
+      { to: "/intake-clearance", icon: Inbox, label: "Intake Clearance", roles: ["admin", "provider"], defer: true },
+      { to: "/protocols", icon: Pill, label: "Protocols", roles: ["admin", "provider"], defer: true },
+      { to: "/md-feedback", icon: MessageSquare, label: "MD Feedback", roles: ["provider"], badgeKey: "md_corrections", defer: true },
     ],
   },
   {
@@ -77,10 +82,10 @@ const navSections: NavSection[] = [
     roles: ["admin"],
     items: [
       { to: "/treatments", icon: Stethoscope, label: "Treatments" },
-      { to: "/medications", icon: Pill, label: "Medications" },
-      { to: "/packages", icon: Package, label: "Packages" },
-      { to: "/membership-billing", icon: CreditCard, label: "Memberships" },
       { to: "/templates", icon: FileText, label: "Templates" },
+      { to: "/medications", icon: Pill, label: "Medications", defer: true },
+      { to: "/packages", icon: Package, label: "Packages", defer: true },
+      { to: "/membership-billing", icon: CreditCard, label: "Memberships", defer: true },
     ],
   },
   {
@@ -91,7 +96,7 @@ const navSections: NavSection[] = [
       { to: "/clinic-hours", icon: Clock, label: "Clinic Hours" },
       { to: "/rooms-devices", icon: DoorOpen, label: "Rooms & Devices" },
       { to: "/providers", icon: UserCog, label: "Providers" },
-      { to: "/automation-rules", icon: Zap, label: "Automations" },
+      { to: "/automation-rules", icon: Zap, label: "Automations", defer: true },
     ],
   },
   {
@@ -100,7 +105,7 @@ const navSections: NavSection[] = [
     items: [
       { to: "/md-oversight", icon: ShieldCheck, label: "Chart Review" },
       { to: "/md-oversight/dashboard", icon: Activity, label: "MD Status" },
-      { to: "/churn-risk", icon: TrendingDown, label: "Churn Risk" },
+      { to: "/churn-risk", icon: TrendingDown, label: "Churn Risk", defer: true },
     ],
   },
   {
@@ -108,31 +113,31 @@ const navSections: NavSection[] = [
     roles: ["admin"],
     items: [
       { to: "/billing", icon: DollarSign, label: "Billing" },
-      { to: "/earnings", icon: TrendingUp, label: "Earnings" },
-      { to: "/proforma", icon: Calculator, label: "Proforma" },
-      { to: "/reports", icon: BarChart3, label: "Reports" },
+      { to: "/earnings", icon: TrendingUp, label: "Earnings", defer: true },
+      { to: "/proforma", icon: Calculator, label: "Proforma", defer: true },
+      { to: "/reports", icon: BarChart3, label: "Reports", defer: true },
     ],
   },
   {
     label: "PLATFORM",
     roles: ["admin"],
     items: [
-      { to: "/contracts", icon: Building2, label: "Contracts" },
-      { to: "/md-coverage", icon: ShieldCheck, label: "MD Coverage" },
       { to: "/master-catalog", icon: BookOpen, label: "Master Catalog" },
-      { to: "/benchmarks", icon: BarChart3, label: "Benchmarks" },
-      { to: "/users", icon: UserCog, label: "Users" },
-      { to: "/audit-log", icon: ScrollText, label: "Audit Log" },
+      { to: "/contracts", icon: Building2, label: "Contracts", defer: true },
+      { to: "/md-coverage", icon: ShieldCheck, label: "MD Coverage", defer: true },
+      { to: "/benchmarks", icon: BarChart3, label: "Benchmarks", defer: true },
+      { to: "/users", icon: UserCog, label: "Users", defer: true },
+      { to: "/audit-log", icon: ScrollText, label: "Audit Log", defer: true },
     ],
   },
   {
     label: "ME",
     items: [
       { to: "/my-profile", icon: UserCircle, label: "My Profile" },
-      { to: "/my-performance", icon: BarChart3, label: "Performance", roles: ["provider"] },
-      { to: "/performance-goals", icon: Target, label: "Goals", roles: ["provider"] },
       { to: "/time-off", icon: CalendarOff, label: "Time Off" },
       { to: "/settings", icon: Settings, label: "Settings" },
+      { to: "/my-performance", icon: BarChart3, label: "Performance", roles: ["provider"], defer: true },
+      { to: "/performance-goals", icon: Target, label: "Goals", roles: ["provider"], defer: true },
     ],
   },
 ];
@@ -160,6 +165,24 @@ export function AppSidebar() {
 
   const visibleSections = filterNav(navSections, role);
   const isAdminLike = role && ["admin", "super_admin", "clinic_owner"].includes(role);
+  const [showMore, setShowMore] = useState(false);
+
+  // Split each role-filtered section into the always-visible alpha nav
+  // (items without `defer`) and the collapsible "More" overflow (deferred
+  // items). Sections that end up empty on either side are dropped.
+  const primarySections = visibleSections
+    .map((s) => ({ ...s, items: s.items.filter((i) => !i.defer) }))
+    .filter((s) => s.items.length > 0);
+  const moreSections = visibleSections
+    .map((s) => ({ ...s, items: s.items.filter((i) => i.defer) }))
+    .filter((s) => s.items.length > 0);
+  const moreCount = moreSections.reduce((n, s) => n + s.items.length, 0);
+  // Sum any unread/correction badges that live on deferred items, so the
+  // signal isn't lost while "More" is collapsed.
+  const moreBadgeCount = moreSections.reduce(
+    (n, s) => n + s.items.reduce((m, i) => m + (i.badgeKey ? badges[i.badgeKey] || 0 : 0), 0),
+    0,
+  );
 
   useEffect(() => {
     if (!user) return;
@@ -274,37 +297,73 @@ export function AppSidebar() {
       </button>
 
       <div className="flex-1 overflow-y-auto px-2 py-3">
-        {visibleSections.map((section) => (
-          <div key={section.label}>
-            <p className="px-3 pt-4 pb-1 text-[11px] font-bold tracking-[0.14em] uppercase text-sidebar-foreground/25">{section.label}</p>
-            {section.items.map((item) => {
-              const isActive = item.to === "/" ? location.pathname === "/" : location.pathname.startsWith(item.to);
-              const badgeCount = item.badgeKey ? badges[item.badgeKey] || 0 : 0;
-              return (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  onMouseEnter={() => prefetchRoute(item.to)}
-                  onFocus={() => prefetchRoute(item.to)}
-                  className={cn(
-                    "flex items-center gap-2.5 rounded-md px-3 py-2 text-[12.5px] font-normal transition-colors mb-0.5",
-                    isActive
-                      ? "bg-primary/10 text-sidebar-primary font-medium"
-                      : "text-sidebar-foreground/50 hover:bg-white/5 hover:text-sidebar-foreground/85"
+        {(() => {
+          const renderItem = (item: NavItem) => {
+            const isActive = item.to === "/" ? location.pathname === "/" : location.pathname.startsWith(item.to);
+            const badgeCount = item.badgeKey ? badges[item.badgeKey] || 0 : 0;
+            return (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                onMouseEnter={() => prefetchRoute(item.to)}
+                onFocus={() => prefetchRoute(item.to)}
+                className={cn(
+                  "flex items-center gap-2.5 rounded-md px-3 py-2 text-[12.5px] font-normal transition-colors mb-0.5",
+                  isActive
+                    ? "bg-primary/10 text-sidebar-primary font-medium"
+                    : "text-sidebar-foreground/65 hover:bg-white/5 hover:text-sidebar-foreground"
+                )}
+              >
+                <item.icon className="h-[14px] w-[14px] flex-shrink-0" />
+                <span className="flex-1">{item.label}</span>
+                {badgeCount > 0 && (
+                  <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-destructive text-[11px] font-semibold text-destructive-foreground px-1">
+                    {badgeCount > 9 ? "9+" : badgeCount}
+                  </span>
+                )}
+              </NavLink>
+            );
+          };
+
+          const renderSection = (section: NavSection) => (
+            <div key={section.label}>
+              <p className="px-3 pt-4 pb-1 text-[11px] font-bold tracking-[0.14em] uppercase text-sidebar-foreground/40">{section.label}</p>
+              {section.items.map(renderItem)}
+            </div>
+          );
+
+          return (
+            <>
+              {primarySections.map(renderSection)}
+
+              {moreCount > 0 && (
+                <div className="mt-4 pt-2 border-t border-sidebar-border">
+                  <button
+                    onClick={() => setShowMore((v) => !v)}
+                    aria-expanded={showMore}
+                    aria-controls="sidebar-more"
+                    className="w-full flex items-center gap-2.5 rounded-md px-3 py-2 text-[12.5px] text-sidebar-foreground/50 hover:bg-white/5 hover:text-sidebar-foreground/85 transition-colors"
+                  >
+                    <MoreHorizontal className="h-[14px] w-[14px] flex-shrink-0" />
+                    <span className="flex-1 text-left">More</span>
+                    {moreBadgeCount > 0 && !showMore && (
+                      <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-destructive text-[11px] font-semibold text-destructive-foreground px-1">
+                        {moreBadgeCount > 9 ? "9+" : moreBadgeCount}
+                      </span>
+                    )}
+                    <span className="text-[11px] text-sidebar-foreground/30 tabular-nums">{moreCount}</span>
+                    <ChevronDown className={cn("h-3.5 w-3.5 flex-shrink-0 transition-transform", showMore && "rotate-180")} />
+                  </button>
+                  {showMore && (
+                    <div id="sidebar-more" className="mt-1">
+                      {moreSections.map(renderSection)}
+                    </div>
                   )}
-                >
-                  <item.icon className="h-[14px] w-[14px] flex-shrink-0" />
-                  <span className="flex-1">{item.label}</span>
-                  {badgeCount > 0 && (
-                    <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-destructive text-[11px] font-semibold text-destructive-foreground px-1">
-                      {badgeCount > 9 ? "9+" : badgeCount}
-                    </span>
-                  )}
-                </NavLink>
-              );
-            })}
-          </div>
-        ))}
+                </div>
+              )}
+            </>
+          );
+        })()}
       </div>
 
       <div className="px-3 py-3 border-t border-sidebar-border space-y-2">
