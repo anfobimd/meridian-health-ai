@@ -70,6 +70,20 @@ export default function ProviderSchedule() {
     },
   });
 
+  const { data: primaryClinic } = useQuery({
+    queryKey: ["provider-primary-clinic", selectedProviderId],
+    enabled: !!selectedProviderId,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("provider_clinic_assignments")
+        .select("clinics:clinic_id(id, name, timezone)")
+        .eq("provider_id", selectedProviderId)
+        .eq("is_primary", true)
+        .maybeSingle();
+      return (data as any)?.clinics ?? null;
+    },
+  });
+
   const upsertAvailability = useMutation({
     mutationFn: async (formData: FormData) => {
       const payload = {
@@ -132,6 +146,18 @@ export default function ProviderSchedule() {
     onError: () => toast.error("Failed to add override"),
   });
 
+  const deleteOverride = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("provider_availability_overrides").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["provider-overrides", selectedProviderId] });
+      toast.success("Override removed");
+    },
+    onError: () => toast.error("Failed to remove override"),
+  });
+
   const openEditSlot = (day: number, slot?: any) => {
     setEditDay(day);
     setEditingSlot(slot ?? null);
@@ -160,6 +186,25 @@ export default function ProviderSchedule() {
           </SelectContent>
         </Select>
       </div>
+
+      {selectedProviderId && (
+        <div className="rounded-md border bg-muted/30 px-3 py-2 text-xs flex items-center gap-2">
+          {primaryClinic ? (
+            <>
+              <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="text-muted-foreground">All times below are interpreted in this provider's primary clinic timezone —</span>
+              <span className="font-medium">{primaryClinic.name}</span>
+              <Badge variant="outline" className="text-[10px] py-0">{primaryClinic.timezone}</Badge>
+            </>
+          ) : (
+            <>
+              <CalendarOff className="h-3.5 w-3.5 text-destructive" />
+              <span className="text-destructive font-medium">No primary clinic assigned —</span>
+              <span className="text-muted-foreground">booking will fail for this provider until an admin assigns them to a clinic in User Management.</span>
+            </>
+          )}
+        </div>
+      )}
 
       {!selectedProviderId ? (
         <Card>
@@ -235,8 +280,8 @@ export default function ProviderSchedule() {
               <div className="space-y-2">
                 {overrides!.map((o) => (
                   <Card key={o.id}>
-                    <CardContent className="p-3 flex items-center justify-between">
-                      <div>
+                    <CardContent className="p-3 flex items-center justify-between gap-2">
+                      <div className="min-w-0">
                         <p className="text-sm font-medium">{format(parseISO(o.override_date), "EEE, MMM d yyyy")}</p>
                         <p className="text-xs text-muted-foreground">
                           {o.is_available
@@ -245,9 +290,21 @@ export default function ProviderSchedule() {
                           {o.reason && ` — ${o.reason}`}
                         </p>
                       </div>
-                      <Badge variant={o.is_available ? "secondary" : "destructive"}>
-                        {o.is_available ? "Modified" : "PTO"}
-                      </Badge>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Badge variant={o.is_available ? "secondary" : "destructive"}>
+                          {o.is_available ? "Modified" : "PTO"}
+                        </Badge>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          aria-label="Remove override"
+                          onClick={() => deleteOverride.mutate(o.id)}
+                          disabled={deleteOverride.isPending}
+                        >
+                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                        </Button>
+                      </div>
                     </CardContent>
                   </Card>
                 ))}
