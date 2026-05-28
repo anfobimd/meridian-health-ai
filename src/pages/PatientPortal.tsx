@@ -379,6 +379,56 @@ function TelehealthTab({ patientId }: { patientId: string }) {
     },
   });
 
+  const { data: patient } = useQuery({
+    queryKey: ["portal-patient-name", patientId],
+    enabled: !!patientId,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("patients")
+        .select("first_name")
+        .eq("id", patientId)
+        .maybeSingle();
+      return data ?? null;
+    },
+  });
+
+  const handleJoin = async (apt: any) => {
+    if (!apt.video_room_url) {
+      toast.error("Your video room isn't ready yet. Please contact your clinic.");
+      return;
+    }
+    // Daily.co rooms are private — patients need a meeting token to enter.
+    // Mint one server-side so the JWT carries the patient's name and the
+    // correct expiry, then open the room URL with ?t=<token>.
+    let roomName: string;
+    try {
+      roomName = new URL(apt.video_room_url).pathname.replace(/^\//, "");
+    } catch {
+      toast.error("The video room link looks malformed. Please contact your clinic.");
+      return;
+    }
+    const { data, error } = await supabase.functions.invoke("daily-video", {
+      body: {
+        action: "get_join_token",
+        room_name: roomName,
+        participant_name: patient?.first_name || "Patient",
+      },
+    });
+    if (error || !(data as any)?.token || !(data as any)?.room_url) {
+      toast.error(
+        (data as any)?.error
+          || error?.message
+          || "Couldn't issue a video access token. Please try again or contact your clinic."
+      );
+      return;
+    }
+    window.open(
+      `${(data as any).room_url}?t=${(data as any).token}`,
+      "_blank",
+      "noopener,noreferrer",
+    );
+  };
+
   const upcoming = telehealthApts?.filter(a => new Date(a.scheduled_at) >= new Date(Date.now() - 15 * 60 * 1000) && !["cancelled", "completed", "no_show"].includes(a.status)) ?? [];
   const past = telehealthApts?.filter(a => new Date(a.scheduled_at) < new Date(Date.now() - 15 * 60 * 1000) || a.status === "completed") ?? [];
 
@@ -415,7 +465,7 @@ function TelehealthTab({ patientId }: { patientId: string }) {
                     </div>
                     <div className="flex items-center gap-2">
                       {canJoin(apt) ? (
-                        <Button size="sm" className="gap-1" onClick={() => apt.video_room_url ? window.open(apt.video_room_url, "_blank") : null} disabled={!apt.video_room_url}>
+                        <Button size="sm" className="gap-1" onClick={() => handleJoin(apt)} disabled={!apt.video_room_url}>
                           <Video className="h-3.5 w-3.5" /> Join Video
                         </Button>
                       ) : (
