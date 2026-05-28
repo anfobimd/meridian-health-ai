@@ -914,6 +914,94 @@ export default function Appointments() {
         </DialogContent>
       </Dialog>
 
+      {/* Reschedule dialog (Must #7) */}
+      <Dialog open={!!rescheduleApt} onOpenChange={(o) => { if (!o) { setRescheduleApt(null); setReschedDate(undefined); setReschedSlot(null); setReschedSlots([]); setReschedProviderId(""); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Reschedule Appointment</DialogTitle>
+          </DialogHeader>
+          {rescheduleApt && (
+            <div className="space-y-4">
+              {/* Current appointment context */}
+              <div className="rounded-md bg-muted/40 p-3 text-xs space-y-1">
+                <div><span className="text-muted-foreground">Patient:</span> <span className="font-medium">{rescheduleApt.patients?.first_name} {rescheduleApt.patients?.last_name}</span></div>
+                <div><span className="text-muted-foreground">Treatment:</span> <span className="font-medium">{rescheduleApt.treatments?.name || "—"}</span></div>
+                <div><span className="text-muted-foreground">Currently scheduled:</span> <span className="font-medium">{format(parseISO(rescheduleApt.scheduled_at), "EEE, MMM d 'at' p")}</span></div>
+                {rescheduleApt.visit_type === "telehealth" && (
+                  <div className="flex items-center gap-1 text-info pt-1">
+                    <Video className="h-3 w-3" /> Telehealth — video room will be refreshed automatically.
+                  </div>
+                )}
+              </div>
+
+              {/* Provider selector — default to current provider */}
+              <div className="space-y-1.5">
+                <Label className="text-xs">Provider</Label>
+                <Select value={reschedProviderId} onValueChange={setReschedProviderId}>
+                  <SelectTrigger><SelectValue placeholder="Select provider" /></SelectTrigger>
+                  <SelectContent>
+                    {providersList?.map((p: any) => (
+                      <SelectItem key={p.id} value={p.id}>{p.first_name} {p.last_name}{p.credentials ? `, ${p.credentials}` : ""}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Date picker */}
+              <div className="space-y-1.5">
+                <Label className="text-xs">New date</Label>
+                <Input
+                  type="date"
+                  value={reschedDate ? format(reschedDate, "yyyy-MM-dd") : ""}
+                  min={format(new Date(), "yyyy-MM-dd")}
+                  onChange={(e) => setReschedDate(e.target.value ? new Date(e.target.value + "T00:00:00") : undefined)}
+                />
+              </div>
+
+              {/* Slot picker */}
+              {reschedDate && reschedProviderId && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Available times</Label>
+                  {reschedLoading ? (
+                    <div className="text-xs text-muted-foreground py-2">Loading slots…</div>
+                  ) : reschedSlots.length === 0 ? (
+                    <div className="text-xs text-muted-foreground py-2">No slots available on this date for this provider.</div>
+                  ) : (
+                    <div className="grid grid-cols-3 gap-1.5 max-h-40 overflow-y-auto">
+                      {reschedSlots.map((s, i) => (
+                        <Button
+                          key={i}
+                          size="sm"
+                          variant={reschedSlot?.start.getTime() === s.start.getTime() ? "default" : "outline"}
+                          className="text-xs h-8"
+                          onClick={() => setReschedSlot(s)}
+                        >
+                          {format(s.start, "p")}
+                        </Button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Confirm */}
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="outline" onClick={() => setRescheduleApt(null)} disabled={rescheduleAppointment.isPending}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => rescheduleAppointment.mutate()}
+                  disabled={!reschedSlot || rescheduleAppointment.isPending}
+                >
+                  {rescheduleAppointment.isPending ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : null}
+                  Confirm Reschedule
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Re-engagement SMS draft after no-show */}
       <Dialog open={!!reEngageDraft} onOpenChange={() => setReEngageDraft("")}>
         <DialogContent>
