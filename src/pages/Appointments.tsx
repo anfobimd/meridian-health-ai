@@ -385,6 +385,72 @@ export default function Appointments() {
     },
   });
 
+  const rescheduleAppointment = useMutation({
+    mutationFn: async () => {
+      if (!rescheduleApt || !reschedSlot) throw new Error("Pick a date and time slot first.");
+      const duration = rescheduleApt.duration_minutes || 30;
+      const newStart = reschedSlot.start;
+      const newEnd = addMinutes(newStart, duration);
+
+      // Conflict check — exclude self so we don't flag the appointment as conflicting with its own current slot.
+      const result = await checkConflicts(
+        reschedProviderId || null,
+        rescheduleApt.room_id || null,
+        rescheduleApt.device_id || null,
+        newStart,
+        newEnd,
+      );
+      const otherConflicts = (result.conflicts || []).filter((c: any) => c.appointmentId !== rescheduleApt.id);
+      if (otherConflicts.length > 0) {
+        throw new Error("Conflict detected: " + otherConflicts.map((c: any) => c.label).join("; "));
+      }
+
+      const { error } = await supabase
+        .from("appointments")
+        .update({
+          scheduled_at: newStart.toISOString(),
+          provider_id: reschedProviderId || null,
+        })
+        .eq("id", rescheduleApt.id);
+      if (error) throw error;
+
+      // For telehealth, refresh the Daily.co room so its expiry matches the new schedule.
+      // Best-effort: don't fail the reschedule if room refresh has issues.
+      if (rescheduleApt.visit_type === "telehealth") {
+        const expiresAt = addMinutes(newEnd, 15);
+        const expiresInMinutes = Math.max(5, Math.ceil((expiresAt.getTime() - Date.now()) / 60000));
+        try {
+          await supabase.functions.invoke("daily-video", {
+            body: { action: "end_session", appointment_id: rescheduleApt.id },
+          });
+        } catch { /* old room may not exist — fine */ }
+        const { error: roomErr } = await supabase.functions.invoke("daily-video", {
+          body: {
+            action: "create_room",
+            appointment_id: rescheduleApt.id,
+            patient_id: rescheduleApt.patient_id,
+            max_participants: 4,
+            expires_in_minutes: expiresInMinutes,
+          },
+        });
+        if (roomErr) {
+          toast.warning("Rescheduled, but the video room couldn't be refreshed. The patient's Join button may not work — re-open the visit from the Telehealth page to re-create the room.");
+        }
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["appointments"] });
+      setRescheduleApt(null);
+      setReschedDate(undefined);
+      setReschedSlot(null);
+      setReschedProviderId("");
+      toast.success("Appointment rescheduled");
+    },
+    onError: (err: any) => {
+      toast.error(err?.message || "Failed to reschedule appointment");
+    },
+  });
+
   const markNoShow = useMutation({
     mutationFn: async (apt: any) => {
       const { error } = await supabase.from("appointments").update({
