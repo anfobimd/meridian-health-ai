@@ -105,6 +105,13 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [aiBriefing, setAiBriefing] = useState<any>(null);
   const [briefingLoading, setBriefingLoading] = useState(false);
+  const [showBriefing, setShowBriefing] = useState<boolean>(() =>
+    typeof window !== "undefined" && localStorage.getItem("meridian.showAiBriefing") === "true"
+  );
+  const toggleBriefing = (next: boolean) => {
+    setShowBriefing(next);
+    try { localStorage.setItem("meridian.showAiBriefing", String(next)); } catch {}
+  };
   const [actionItems, setActionItems] = useState<any>(null);
   const [actionsLoading, setActionsLoading] = useState(false);
   const [revForecast, setRevForecast] = useState<any>(null);
