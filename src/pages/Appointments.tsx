@@ -994,6 +994,15 @@ export default function Appointments() {
                   )}
                   {!["cancelled", "no_show", "completed"].includes(apt.status) && (
                     <>
+                      <Button size="sm" variant="ghost" className="text-xs" onClick={() => {
+                        setRescheduleApt(apt);
+                        setReschedProviderId(apt.provider_id || "");
+                        setReschedDate(undefined);
+                        setReschedSlot(null);
+                        setReschedSlots([]);
+                      }}>
+                        <CalendarClock className="h-3 w-3 mr-1" />Reschedule
+                      </Button>
                       <Button size="sm" variant="ghost" className="text-xs text-destructive" onClick={() => { setSelectedApt(apt); setCancelDialogOpen(true); setCancelReason(""); }}>
                         <XCircle className="h-3 w-3 mr-1" />Cancel
                       </Button>
