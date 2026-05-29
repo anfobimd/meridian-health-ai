@@ -77,6 +77,51 @@ export default function PublicBooking() {
   const treatments = treatmentsQ.data?.treatments || [];
   const slots = slotsQ.data?.slots || [];
 
+  const onClaim = async () => {
+    if (!confirmation) return;
+    if (claimPassword.length < 8) {
+      setClaimError("Password must be at least 8 characters.");
+      return;
+    }
+    setClaimState("submitting");
+    setClaimError(null);
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/public-claim-account`, {
+        method: "POST",
+        headers: {
+          apikey: SUPABASE_ANON,
+          Authorization: `Bearer ${SUPABASE_ANON}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          appointment_id: confirmation.appointment_id,
+          email: contact.email,
+          password: claimPassword,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setClaimError(data?.error || "Account creation failed.");
+        setClaimState("idle");
+        return;
+      }
+      const { error: signInErr } = await supabase.auth.signInWithPassword({
+        email: contact.email,
+        password: claimPassword,
+      });
+      if (signInErr) {
+        setClaimError("Account created but sign-in failed. Please use the sign-in page directly.");
+        setClaimState("idle");
+        return;
+      }
+      setClaimState("done");
+      setTimeout(() => navigate("/portal"), 1200);
+    } catch (e: any) {
+      setClaimError(e?.message || "Network error. Please try again.");
+      setClaimState("idle");
+    }
+  };
+
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedSlot || !selectedTreatment || !slug) return;
@@ -93,7 +138,11 @@ export default function PublicBooking() {
         client_source: "spa_acquired",
         visit_type: visitType,
       });
-      setConfirmation({ code: result.confirmation_code, date: result.scheduled_start });
+      setConfirmation({
+        code: result.confirmation_code,
+        date: result.scheduled_start,
+        appointment_id: result.appointment_id,
+      });
     } catch {
       // useBooking handles the toast
     }
@@ -138,6 +187,74 @@ export default function PublicBooking() {
             <p className="font-mono font-bold">{confirmation.code}</p>
           </CardContent>
         </Card>
+        {/* Claim portal account */}
+        {claimState === "done" ? (
+          <Card className="text-left border-primary/40 bg-primary/5">
+            <CardContent className="pt-4 flex items-center gap-2 text-sm">
+              <CheckCircle2 className="h-4 w-4 text-primary" />
+              <span>Account created — taking you to your portal...</span>
+            </CardContent>
+          </Card>
+        ) : claimState === "skipped" ? null : (
+          <Card className="text-left">
+            <CardContent className="pt-4 space-y-3">
+              <div className="flex items-start gap-2">
+                <KeyRound className="h-4 w-4 mt-0.5 text-primary" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium">Manage this booking yourself</p>
+                  <p className="text-xs text-muted-foreground">
+                    Create a portal account to reschedule, cancel, or add this visit to your calendar.
+                  </p>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="claim-password" className="text-xs">
+                  Password (8+ characters)
+                </Label>
+                <Input
+                  id="claim-password"
+                  type="password"
+                  value={claimPassword}
+                  onChange={(e) => {
+                    setClaimPassword(e.target.value);
+                    setClaimError(null);
+                  }}
+                  disabled={claimState === "submitting"}
+                  placeholder="Choose a password"
+                />
+                {claimError && (
+                  <p className="text-xs text-destructive">{claimError}</p>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={onClaim}
+                  disabled={claimState === "submitting" || claimPassword.length < 8}
+                  className="flex-1"
+                >
+                  {claimState === "submitting" ? (
+                    <>
+                      <Loader2 className="h-3 w-3 animate-spin mr-1" /> Creating account...
+                    </>
+                  ) : (
+                    "Create portal account"
+                  )}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setClaimState("skipped")}
+                  disabled={claimState === "submitting"}
+                >
+                  Skip
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
         <p className="text-xs text-muted-foreground">
           Check your email for an intake form to complete before your visit.
         </p>
