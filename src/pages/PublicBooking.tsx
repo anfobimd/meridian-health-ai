@@ -8,8 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Loader2, ArrowLeft, CheckCircle2, MapPin, Video } from "lucide-react";
+import { Loader2, ArrowLeft, CheckCircle2, MapPin, Video, KeyRound } from "lucide-react";
 import { format, addDays } from "date-fns";
+import { supabase } from "@/integrations/supabase/client";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://oqjupcgtxsbyelaigrxn.supabase.co";
 const SUPABASE_ANON =
@@ -44,7 +45,10 @@ export default function PublicBooking() {
     phone: "",
     date_of_birth: "",
   });
-  const [confirmation, setConfirmation] = useState<{ code: string; date: string } | null>(null);
+  const [confirmation, setConfirmation] = useState<{ code: string; date: string; appointment_id: string } | null>(null);
+  const [claimPassword, setClaimPassword] = useState("");
+  const [claimState, setClaimState] = useState<"idle" | "submitting" | "done" | "skipped">("idle");
+  const [claimError, setClaimError] = useState<string | null>(null);
 
   const providerQ = useQuery({
     queryKey: ["public-provider", slug],
