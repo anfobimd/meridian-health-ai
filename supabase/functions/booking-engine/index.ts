@@ -2,8 +2,20 @@
 //
 // Marketplace booking engine — validates slot, creates patient (or finds
 // existing), inserts appointment + marketplace_booking rows, optionally
-// creates a Stripe PaymentIntent for the deposit, and fires an intake
-// invite if the treatment requires one.
+// creates a Stripe PaymentIntent for the deposit, fires an intake invite,
+// and for telehealth visits provisions a Daily.co room atomically.
+//
+// Two valid call shapes:
+//   PUBLIC (anon):  slug + treatment_id + scheduled_start + first_name + last_name + email
+//   STAFF (auth):   (slug OR provider_id) + treatment_id + scheduled_start + patient_id
+//
+// Optional fields (both shapes):
+//   visit_type    — 'in_person' (default) | 'telehealth' | 'phone'
+//                    If 'telehealth', a Daily.co room is reserved on success.
+//                    On room failure the appointment is rolled back so we
+//                    never leave a telehealth visit without a usable room.
+//   notes         — free-text
+//   phone, date_of_birth — patient demographics for new patients
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
@@ -15,6 +27,11 @@ const corsHeaders = {
 
 function slugify(first: string, last: string): string {
   return `${first}-${last}`.toLowerCase().replace(/[^a-z0-9-]/g, "");
+}
+
+// Proper interval-overlap predicate: two ranges overlap iff aStart < bEnd && aEnd > bStart.
+function overlaps(aStart: Date, aEnd: Date, bStart: Date, bEnd: Date): boolean {
+  return aStart.getTime() < bEnd.getTime() && aEnd.getTime() > bStart.getTime();
 }
 
 Deno.serve(async (req) => {
@@ -39,57 +56,56 @@ Deno.serve(async (req) => {
       phone,
       client_source,
       notes,
-      visit_type: rawVisitType,
+      visit_type, // NEW — optional, defaults to 'in_person'
     } = body;
 
-    const visit_type: "in_person" | "telehealth" | "phone" =
-      rawVisitType === "telehealth" || rawVisitType === "phone"
-        ? rawVisitType
-        : "in_person";
+    const resolvedVisitType = (visit_type === "telehealth" || visit_type === "phone") ? visit_type : "in_person";
 
-    // ── Validate required fields ──────────────────────────────────────────
-    if (!slug || !treatment_id || !scheduled_start || !first_name || !last_name) {
+    // ── Validate required fields ───────────────────────────────────────────
+    const hasIdentity = !!body.patient_id || (!!first_name && !!last_name);
+    const hasProvider = !!slug || !!body.provider_id;
+
+    if (!hasProvider || !treatment_id || !scheduled_start || !hasIdentity) {
       return new Response(
-        JSON.stringify({ error: "slug, treatment_id, scheduled_start, first_name, and last_name are required" }),
+        JSON.stringify({
+          error:
+            "Required: (slug OR provider_id) + treatment_id + scheduled_start + (patient_id OR first_name+last_name)",
+        }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    // ── Resolve provider by slug ──────────────────────────────────────────
-    const { data: providers, error: provErr } = await admin
-      .from("providers")
-      .select("id, first_name, last_name, is_active")
-      .eq("is_active", true);
+    // ── Resolve provider by slug or by id ─────────────────────────────────────
+    let provider: { id: string; first_name: string; last_name: string } | null = null;
 
-    if (provErr) throw provErr;
-
-    const provider = (providers || []).find(
-      (p: any) => slugify(p.first_name, p.last_name) === slug,
-    );
+    if (body.provider_id) {
+      const { data, error: provErr } = await admin
+        .from("providers")
+        .select("id, first_name, last_name, is_active")
+        .eq("id", body.provider_id)
+        .eq("is_active", true)
+        .maybeSingle();
+      if (provErr) throw provErr;
+      provider = data;
+    } else {
+      const { data: providers, error: provErr } = await admin
+        .from("providers")
+        .select("id, first_name, last_name, is_active")
+        .eq("is_active", true);
+      if (provErr) throw provErr;
+      provider = (providers || []).find(
+        (p: any) => slugify(p.first_name, p.last_name) === slug,
+      ) || null;
+    }
 
     if (!provider) {
       return new Response(
-        JSON.stringify({ error: `Provider "${slug}" not found or inactive` }),
+        JSON.stringify({ error: "Provider not found or inactive" }),
         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    // ── Resolve clinic for provider (prefer primary) ──────────────────────
-    let clinic_id: string | null = null;
-    try {
-      const { data: assignments } = await admin
-        .from("provider_clinic_assignments")
-        .select("clinic_id, is_primary")
-        .eq("provider_id", provider.id);
-      if (assignments && assignments.length > 0) {
-        const primary = assignments.find((a: any) => a.is_primary) || assignments[0];
-        clinic_id = primary.clinic_id;
-      }
-    } catch (e) {
-      console.error("clinic resolution failed (non-fatal):", e);
-    }
-
-    // ── Check provider has active membership ────────────────────────────────
+    // ── Check provider has active membership ─────────────────────────────────────
     const { data: membership } = await admin
       .from("provider_memberships")
       .select("id, tier")
@@ -105,7 +121,16 @@ Deno.serve(async (req) => {
       );
     }
 
-    // ── Resolve treatment ─────────────────────────────────────────────
+    // ── Resolve clinic_id from provider's primary clinic assignment ──────────────
+    const { data: assignment } = await admin
+      .from("provider_clinic_assignments")
+      .select("clinic_id")
+      .eq("provider_id", provider.id)
+      .eq("is_primary", true)
+      .maybeSingle();
+    const clinicId: string | null = assignment?.clinic_id ?? null;
+
+    // ── Resolve treatment ────────────────────────────────────────────────
     const { data: treatment, error: txErr } = await admin
       .from("treatments")
       .select("id, name, duration_minutes, price, is_active")
@@ -126,30 +151,57 @@ Deno.serve(async (req) => {
       );
     }
 
-    // ── Check slot availability ─────────────────────────────────────────
+    const durationMin = treatment.duration_minutes || 30;
+
+    // ── Slot conflict check ─ proper interval overlap. ───────────────────────────
+    //
+    // Previous version only caught conflicts where another appt STARTED inside
+    // our window. Now we look back far enough to catch any appt whose interval
+    // overlaps ours, then filter in JS. Look-back window is 4 hours — generous
+    // enough for any realistic single visit duration.
     const startTime = new Date(scheduled_start);
-    const endTime = new Date(startTime.getTime() + (treatment.duration_minutes || 30) * 60000);
+    const endTime = new Date(startTime.getTime() + durationMin * 60000);
+    const lookbackStart = new Date(startTime.getTime() - 4 * 3600 * 1000);
 
-    const { data: conflicts } = await admin
+    const { data: candidates } = await admin
       .from("appointments")
-      .select("id")
+      .select("id, scheduled_at, duration_minutes")
       .eq("provider_id", provider.id)
-      .in("status", ["booked", "checked_in"])
-      .gte("scheduled_at", startTime.toISOString())
-      .lt("scheduled_at", endTime.toISOString())
-      .limit(1);
+      .in("status", ["booked", "checked_in", "in_progress", "roomed"])
+      .gte("scheduled_at", lookbackStart.toISOString())
+      .lt("scheduled_at", endTime.toISOString());
 
-    if (conflicts && conflicts.length > 0) {
+    const hasOverlap = (candidates || []).some((apt: any) => {
+      const aptStart = new Date(apt.scheduled_at);
+      const aptEnd = new Date(aptStart.getTime() + (apt.duration_minutes || 30) * 60000);
+      return overlaps(startTime, endTime, aptStart, aptEnd);
+    });
+
+    if (hasOverlap) {
       return new Response(
         JSON.stringify({ error: "That time slot is no longer available. Please choose another time." }),
         { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    // ── Find or create patient ──────────────────────────────────────────
+    // ── Resolve patient: provided patient_id, or find/create by email ──────────────────
     let patient_id: string;
 
-    if (email) {
+    if (body.patient_id) {
+      const { data: existing, error: ptErr } = await admin
+        .from("patients")
+        .select("id")
+        .eq("id", body.patient_id)
+        .maybeSingle();
+      if (ptErr) throw ptErr;
+      if (!existing) {
+        return new Response(
+          JSON.stringify({ error: "Provided patient_id does not match any patient record" }),
+          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      patient_id = existing.id;
+    } else if (email) {
       const { data: existing } = await admin
         .from("patients")
         .select("id")
@@ -189,7 +241,7 @@ Deno.serve(async (req) => {
       patient_id = newPt.id;
     }
 
-    // ── Create appointment ────────────────────────────────────────────
+    // ── Create appointment (includes visit_type + clinic_id) ───────────────────────
     const confirmationCode = `MRD-${Date.now().toString(36).toUpperCase()}`;
 
     const { data: appointment, error: apptErr } = await admin
@@ -200,48 +252,50 @@ Deno.serve(async (req) => {
         treatment_id: treatment.id,
         status: "booked",
         scheduled_at: startTime.toISOString(),
-        duration_minutes: treatment.duration_minutes || 30,
+        duration_minutes: durationMin,
         notes: notes || null,
-        visit_type,
-        clinic_id,
+        visit_type: resolvedVisitType,
+        clinic_id: clinicId,
+        video_room_url: null, // populated below for telehealth
       })
       .select("id, scheduled_at, duration_minutes")
       .single();
 
     if (apptErr) throw apptErr;
 
-    // ── Telehealth: provision Daily.co room + video_sessions row ───────────
-    let video_room_url: string | null = null;
-    if (visit_type === "telehealth") {
-      try {
-        const durationMin = treatment.duration_minutes || 30;
-        // Room expires ~30 min after the visit ends, with a small pre-buffer
-        const expiresInMinutes = Math.max(durationMin + 30, 60);
-        const dailyRes = await fetch(`${supabaseUrl}/functions/v1/daily-video`, {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${serviceKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            action: "create_room",
-            appointment_id: appointment.id,
-            patient_id,
-            expires_in_minutes: expiresInMinutes,
-          }),
-        });
-        const dailyData = await dailyRes.json();
-        if (!dailyRes.ok) {
-          console.error("daily-video create_room failed:", dailyData);
-        } else {
-          video_room_url = dailyData.room_url || null;
-        }
-      } catch (e) {
-        console.error("daily-video invocation failed (non-fatal):", e);
+    // ── Telehealth: reserve Daily.co room atomically. Roll back on failure. ─────────
+    let videoRoomUrl: string | null = null;
+    if (resolvedVisitType === "telehealth") {
+      const apptEndTime = new Date(startTime.getTime() + durationMin * 60000);
+      const expiresAt = new Date(apptEndTime.getTime() + 15 * 60000); // 15-min grace after end
+      const expiresInMinutes = Math.max(5, Math.ceil((expiresAt.getTime() - Date.now()) / 60000));
+
+      const { data: roomData, error: roomErr } = await admin.functions.invoke("daily-video", {
+        body: {
+          action: "create_room",
+          appointment_id: appointment.id,
+          patient_id,
+          max_participants: 4,
+          expires_in_minutes: expiresInMinutes,
+        },
+      });
+
+      if (roomErr || !(roomData as any)?.room_url) {
+        // Roll back: delete the appointment we just inserted so we never persist
+        // a telehealth visit without a usable room.
+        await admin.from("appointments").delete().eq("id", appointment.id);
+        const msg = (roomData as any)?.error || roomErr?.message ||
+          "Couldn't reserve the telehealth video room. Please try again or book as in-person.";
+        return new Response(
+          JSON.stringify({ error: msg }),
+          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
       }
+      videoRoomUrl = (roomData as any).room_url;
+      // daily-video.create_room also writes appointments.video_room_url server-side.
     }
 
-    // ── Create marketplace_booking ────────────────────────────────────────
+    // ── Create marketplace_booking (non-fatal) ───────────────────────────────────
     let marketplace_appt_id: string | null = null;
     try {
       const { data: mkb } = await admin
@@ -262,14 +316,12 @@ Deno.serve(async (req) => {
       console.error("marketplace_bookings insert failed (non-fatal):", e);
     }
 
-    // ── Pricing / Stripe deposit ────────────────────────────────────────
+    // ── Pricing / Stripe deposit ────────────────────────────────────────────
     const serviceAmount = Number(treatment.price) || 0;
     const depositPct = 0.2; // 20 % deposit
     const depositAmount = Math.round(serviceAmount * depositPct * 100) / 100;
     const balanceAmount = Math.round((serviceAmount - depositAmount) * 100) / 100;
 
-    // Stripe integration — only create PaymentIntent when STRIPE_SECRET_KEY
-    // is configured and a deposit is due.
     let stripeClientSecret: string | null = null;
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
 
@@ -284,7 +336,7 @@ Deno.serve(async (req) => {
               "Content-Type": "application/x-www-form-urlencoded",
             },
             body: new URLSearchParams({
-              amount: String(Math.round(depositAmount * 100)), // cents
+              amount: String(Math.round(depositAmount * 100)),
               currency: "usd",
               "metadata[appointment_id]": appointment.id,
               "metadata[patient_id]": patient_id,
@@ -303,27 +355,27 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ── Determine if intake is required ───────────────────────────────────
-    const intakeRequired = true; // all marketplace bookings require intake
+    const intakeRequired = true;
 
-    // ── Log to communication timeline ─────────────────────────────────────
+    // ── Log to communication timeline ─────────────────────────────────────────
     try {
       await admin.from("patient_communication_log").insert({
         patient_id,
         direction: "outbound",
         channel: "portal",
         subject: "Booking Confirmed",
-        body: `Appointment ${confirmationCode} confirmed for ${treatment.name} with ${provider.first_name} ${provider.last_name} on ${startTime.toLocaleDateString()}.`,
+        body: `Appointment ${confirmationCode} confirmed for ${treatment.name} with ${provider.first_name} ${provider.last_name} on ${startTime.toLocaleDateString()}.${resolvedVisitType === "telehealth" ? " Telehealth visit — join link will be in your portal." : ""}`,
         is_read: true,
       });
     } catch (e) {
       console.error("Comm log error (non-fatal):", e);
     }
 
-    // ── Return response matching BookingResponse type ─────────────────────────
     const scheduledEnd = new Date(
-      startTime.getTime() + (treatment.duration_minutes || 30) * 60000,
+      startTime.getTime() + durationMin * 60000,
     );
+
+    const resolvedSlug = slug || slugify(provider.first_name, provider.last_name);
 
     return new Response(
       JSON.stringify({
@@ -335,12 +387,12 @@ Deno.serve(async (req) => {
         provider: {
           id: provider.id,
           name: `${provider.first_name} ${provider.last_name}`,
-          slug,
+          slug: resolvedSlug,
         },
         treatment: {
           id: treatment.id,
           name: treatment.name,
-          duration_minutes: treatment.duration_minutes,
+          duration_minutes: durationMin,
         },
         patient_id,
         service_amount: serviceAmount,
@@ -350,6 +402,9 @@ Deno.serve(async (req) => {
         stripe_client_secret: stripeClientSecret,
         intake_required: intakeRequired,
         intake_treatment_id: treatment.id,
+        visit_type: resolvedVisitType,
+        video_room_url: videoRoomUrl,
+        clinic_id: clinicId,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );

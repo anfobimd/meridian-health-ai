@@ -4,7 +4,7 @@
 // Actions:
 //   "create_room"      — create Daily.co room, store in video_sessions, return URL + token
 //   "get_join_token"   — generate time-limited patient join token (no login required)
-//   "end_session"      — end active room, mark session complete
+//   "end_session"      — end active room(s); accepts either room_name (single) or appointment_id (all active for that appt)
 //   "list_sessions"    — list past sessions for an appointment/encounter
 //
 // Requires DAILY_API_KEY secret configured in Supabase.
@@ -59,7 +59,7 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const { action } = body;
 
-    // ─── CREATE ROOM ──────────────────────────────────────────────────────
+    // ─── CREATE ROOM ────────────────────────────────────────
     if (action === "create_room") {
       const {
         appointment_id,
@@ -152,7 +152,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // ─── GET PATIENT JOIN TOKEN ──────────────────────────────────────────
+    // ─── GET PATIENT JOIN TOKEN ───────────────────────────────────
     if (action === "get_join_token") {
       const { room_name, participant_name } = body;
       if (!room_name) {
@@ -162,7 +162,6 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Verify the session exists and is still active
       const { data: session, error: fetchErr } = await admin
         .from("video_sessions")
         .select("*")
@@ -206,34 +205,62 @@ Deno.serve(async (req) => {
       );
     }
 
-    // ─── END SESSION ─────────────────────────────────────────────────────
+    // ─── END SESSION ──────────────────────────────────────────
+    //
+    // Accepts EITHER room_name (single session) OR appointment_id (all active
+    // sessions tied to that appointment — used by the reschedule flow to clean
+    // up the old room before creating a new one for the new time).
+    //
     if (action === "end_session") {
-      const { room_name } = body;
-      if (!room_name) {
+      const { room_name, appointment_id } = body;
+
+      if (!room_name && !appointment_id) {
         return new Response(
-          JSON.stringify({ error: "room_name is required" }),
+          JSON.stringify({ error: "room_name or appointment_id is required" }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
       }
 
-      // Delete room in Daily.co
-      await dailyFetch(`/rooms/${room_name}`, { method: "DELETE" }).catch(() => {});
+      // Resolve which sessions to end.
+      let sessionsToEnd: { room_name: string }[] = [];
+      if (room_name) {
+        sessionsToEnd = [{ room_name }];
+      } else {
+        const { data } = await admin
+          .from("video_sessions")
+          .select("room_name")
+          .eq("appointment_id", appointment_id)
+          .eq("status", "active");
+        sessionsToEnd = (data || []).map((s: any) => ({ room_name: s.room_name }));
+      }
 
-      // Mark session ended in DB
-      const { data: session } = await admin
-        .from("video_sessions")
-        .update({ status: "ended", ended_at: new Date().toISOString() })
-        .eq("room_name", room_name)
-        .select()
-        .maybeSingle();
+      if (sessionsToEnd.length === 0) {
+        return new Response(
+          JSON.stringify({ ended: false, sessions: [], note: "No active sessions to end" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      const endedSessions: any[] = [];
+      for (const s of sessionsToEnd) {
+        // Best-effort Daily.co cleanup; room may already be expired/deleted upstream.
+        await dailyFetch(`/rooms/${s.room_name}`, { method: "DELETE" }).catch(() => {});
+        const { data: updated } = await admin
+          .from("video_sessions")
+          .update({ status: "ended", ended_at: new Date().toISOString() })
+          .eq("room_name", s.room_name)
+          .select()
+          .maybeSingle();
+        if (updated) endedSessions.push(updated);
+      }
 
       return new Response(
-        JSON.stringify({ ended: true, session }),
+        JSON.stringify({ ended: true, sessions: endedSessions, count: endedSessions.length }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    // ─── LIST SESSIONS ───────────────────────────────────────────────────
+    // ─── LIST SESSIONS ──────────────────────────────────────
     if (action === "list_sessions") {
       const { appointment_id, encounter_id, patient_id, limit = 20 } = body;
       let q = admin.from("video_sessions").select("*").order("created_at", { ascending: false }).limit(limit);

@@ -26,11 +26,6 @@ function slugify(first: string, last: string): string {
   return `${first}-${last}`.toLowerCase().replace(/[^a-z0-9-]/g, "");
 }
 
-/**
- * Compose the UTC moment for `timeStr` (HH:MM, clinic-local wall clock) on the
- * calendar date represented by `date` (a UTC-anchored Date from parseISO of an
- * ISO date string). The returned Date is a true UTC instant.
- */
 function setTimeOnDate(date: Date, timeStr: string, tz: string): Date {
   const [h, m] = timeStr.split(":").map((n: string) => parseInt(n, 10));
   const year = date.getUTCFullYear();
@@ -62,12 +57,6 @@ function generateSlots(start: Date, end: Date, breakStart: Date | null, breakEnd
   return slots;
 }
 
-/**
- * Strict resolution: the provider's primary clinic's timezone is the single
- * source of truth. No hardcoded fallback. Returns null if no primary clinic
- * assignment exists or the assigned clinic has no timezone set — callers must
- * surface that as a configuration error, not silently default.
- */
 async function resolveProviderTz(admin: any, providerId: string): Promise<string | null> {
   const { data: assignment } = await admin
     .from("provider_clinic_assignments")
@@ -90,7 +79,6 @@ Deno.serve(async (req: Request) => {
   );
 
   try {
-    // ── /providers ─ list all marketplace-enabled providers w/ active membership ──
     if (path === "providers") {
       const { data: providers, error } = await admin
         .from("providers")
@@ -148,7 +136,6 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // ── /provider ─ single provider by slug ────────────────────────────────────
     if (path === "provider") {
       const slug = url.searchParams.get("slug");
       if (!slug) return new Response(JSON.stringify({ error: "slug required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -205,7 +192,6 @@ Deno.serve(async (req: Request) => {
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // ── /treatments ─ public catalog ─────────────────────────────────────────
     if (path === "treatments") {
       const { data, error } = await admin
         .from("treatments")
@@ -218,7 +204,6 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // ── /slots ─ available slots for a provider on a given date ──────────────
     if (path === "slots") {
       const slug = url.searchParams.get("slug");
       const dateStr = url.searchParams.get("date");
@@ -246,8 +231,6 @@ Deno.serve(async (req: Request) => {
         return new Response(JSON.stringify({ error: "Treatment not found" }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
-      // Resolve clinic timezone strictly from the provider's primary clinic.
-      // Surface a configuration error if unset rather than silently guessing.
       const tz = await resolveProviderTz(admin, provider.id);
       if (!tz) {
         return new Response(JSON.stringify({
@@ -298,7 +281,6 @@ Deno.serve(async (req: Request) => {
         generateSlots(b.start, b.end, b.breakStart, b.breakEnd, treatment.duration_minutes || 30),
       );
 
-      // Conflict-check window: clinic-local midnight → midnight in UTC instants.
       const dayStartUtc = setTimeOnDate(date, "00:00", tz);
       const dayEndUtc = setTimeOnDate(date, "23:59", tz);
       const { data: existing } = await admin
