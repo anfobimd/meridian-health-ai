@@ -45,7 +45,7 @@ export default function FrontDesk() {
   const [focusOpen, setFocusOpen] = useState(false);
 
   const { data: appointments, isLoading } = useQuery({
-    queryKey: ["frontdesk-today"],
+    queryKey: ["frontdesk-day"],
     queryFn: async () => {
       const today = new Date();
       const start = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString();
@@ -127,7 +127,7 @@ export default function FrontDesk() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["frontdesk-today"] });
+      queryClient.invalidateQueries({ queryKey: ["frontdesk-day"] });
       toast.success("Status updated");
     },
   });
@@ -187,7 +187,7 @@ export default function FrontDesk() {
       return { id, prevStatus, patientId };
     },
     onSuccess: ({ id, prevStatus, patientId }) => {
-      queryClient.invalidateQueries({ queryKey: ["frontdesk-today"] });
+      queryClient.invalidateQueries({ queryKey: ["frontdesk-day"] });
       // Toast with an Undo action. Sonner keeps the toast visible for the
       // configured duration (10s); clicking Undo within that window reverts
       // both the status and the patient's no_show_count.
@@ -198,7 +198,7 @@ export default function FrontDesk() {
           onClick: async () => {
             try {
               await restoreFromNoShow(id, prevStatus, patientId, true);
-              queryClient.invalidateQueries({ queryKey: ["frontdesk-today"] });
+              queryClient.invalidateQueries({ queryKey: ["frontdesk-day"] });
               toast.success("No-show undone");
             } catch (e) {
               toast.error(`Undo failed: ${e instanceof Error ? e.message : String(e)}`);
@@ -219,7 +219,7 @@ export default function FrontDesk() {
       await restoreFromNoShow(id, targetStatus, patientId, true);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["frontdesk-today"] });
+      queryClient.invalidateQueries({ queryKey: ["frontdesk-day"] });
       toast.success("No-show reversed");
     },
     onError: (e: Error) => toast.error(`Restore failed: ${e.message}`),
@@ -260,7 +260,7 @@ export default function FrontDesk() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["frontdesk-today"] });
+      queryClient.invalidateQueries({ queryKey: ["frontdesk-day"] });
       queryClient.invalidateQueries({ queryKey: ["all-patients-fd"] });
       setWalkinOpen(false);
       toast.success("Walk-in checked in");
@@ -300,7 +300,7 @@ export default function FrontDesk() {
             <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
             <Input placeholder="Search patients..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-8 h-9 w-48" />
           </div>
-          <Button variant="outline" size="sm" onClick={() => queryClient.invalidateQueries({ queryKey: ["frontdesk-today"] })}>
+          <Button variant="outline" size="sm" onClick={() => queryClient.invalidateQueries({ queryKey: ["frontdesk-day"] })}>
             <RefreshCw className="h-3.5 w-3.5" />
           </Button>
         </div>
