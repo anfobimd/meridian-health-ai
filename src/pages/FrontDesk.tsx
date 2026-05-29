@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { format } from "date-fns";
+import { format, addDays, startOfDay, endOfDay, isSameDay } from "date-fns";
 import { QueueCard } from "@/components/front-desk/QueueCard";
 import { ActionBar } from "@/components/front-desk/ActionBar";
 import { QuickDock } from "@/components/front-desk/QuickDock";
@@ -18,8 +18,10 @@ import { InvitationTracker } from "@/components/front-desk/InvitationTracker";
 import { CheckInPanel } from "@/components/front-desk/CheckInPanel";
 import {
   UserPlus, CheckCircle2, DoorOpen, Play, Flag, Clock, Users,
-  Loader2, AlertTriangle, Search, RefreshCw,
+  Loader2, AlertTriangle, Search, RefreshCw, ChevronLeft, ChevronRight, Calendar as CalendarIcon,
 } from "lucide-react";
+import { Calendar as CalendarWidget } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 type QueueStatus = "booked" | "checked_in" | "roomed" | "in_progress" | "completed" | "no_show" | "cancelled";
 
@@ -43,18 +45,18 @@ export default function FrontDesk() {
   const focusedPatientId = searchParams.get("patientId");
   const returnTo = searchParams.get("returnTo") || undefined;
   const [focusOpen, setFocusOpen] = useState(false);
+  const [viewDate, setViewDate] = useState(new Date());
 
   const { data: appointments, isLoading } = useQuery({
-    queryKey: ["frontdesk-today"],
+    queryKey: ["frontdesk-day", viewDate.toISOString().slice(0, 10)],
     queryFn: async () => {
-      const today = new Date();
-      const start = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString();
-      const end = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1).toISOString();
+      const start = startOfDay(viewDate).toISOString();
+      const end = endOfDay(viewDate).toISOString();
       const { data, error } = await supabase
         .from("appointments")
         .select("*, patients(id, first_name, last_name, date_of_birth, phone, no_show_count), providers(id, first_name, last_name), treatments(id, name, duration_minutes), rooms:room_id(id, name)")
         .gte("scheduled_at", start)
-        .lt("scheduled_at", end)
+        .lte("scheduled_at", end)
         .order("scheduled_at", { ascending: true });
       if (error) throw error;
       return data ?? [];
@@ -127,7 +129,7 @@ export default function FrontDesk() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["frontdesk-today"] });
+      queryClient.invalidateQueries({ queryKey: ["frontdesk-day"] });
       toast.success("Status updated");
     },
   });
@@ -187,7 +189,7 @@ export default function FrontDesk() {
       return { id, prevStatus, patientId };
     },
     onSuccess: ({ id, prevStatus, patientId }) => {
-      queryClient.invalidateQueries({ queryKey: ["frontdesk-today"] });
+      queryClient.invalidateQueries({ queryKey: ["frontdesk-day"] });
       // Toast with an Undo action. Sonner keeps the toast visible for the
       // configured duration (10s); clicking Undo within that window reverts
       // both the status and the patient's no_show_count.
@@ -198,7 +200,7 @@ export default function FrontDesk() {
           onClick: async () => {
             try {
               await restoreFromNoShow(id, prevStatus, patientId, true);
-              queryClient.invalidateQueries({ queryKey: ["frontdesk-today"] });
+              queryClient.invalidateQueries({ queryKey: ["frontdesk-day"] });
               toast.success("No-show undone");
             } catch (e) {
               toast.error(`Undo failed: ${e instanceof Error ? e.message : String(e)}`);
@@ -219,7 +221,7 @@ export default function FrontDesk() {
       await restoreFromNoShow(id, targetStatus, patientId, true);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["frontdesk-today"] });
+      queryClient.invalidateQueries({ queryKey: ["frontdesk-day"] });
       toast.success("No-show reversed");
     },
     onError: (e: Error) => toast.error(`Restore failed: ${e.message}`),
@@ -260,7 +262,7 @@ export default function FrontDesk() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["frontdesk-today"] });
+      queryClient.invalidateQueries({ queryKey: ["frontdesk-day"] });
       queryClient.invalidateQueries({ queryKey: ["all-patients-fd"] });
       setWalkinOpen(false);
       toast.success("Walk-in checked in");
@@ -291,16 +293,35 @@ export default function FrontDesk() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold">Front Desk</h1>
-          <p className="text-muted-foreground text-sm">
-            Today — {format(new Date(), "EEEE, MMMM d")} · {stats.total} appointments
-          </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="icon" className="h-9 w-9" aria-label="Previous day" onClick={() => setViewDate(d => addDays(d, -1))}>
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="h-9 gap-2">
+                <CalendarIcon className="h-4 w-4" />
+                <span className="text-sm">
+                  {isSameDay(viewDate, new Date()) ? "Today — " : ""}{format(viewDate, "EEEE, MMM d")} · {stats.total} appts
+                </span>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <CalendarWidget mode="single" selected={viewDate} onSelect={(d) => d && setViewDate(d)} initialFocus className="p-3 pointer-events-auto" />
+            </PopoverContent>
+          </Popover>
+          <Button variant="outline" size="icon" className="h-9 w-9" aria-label="Next day" onClick={() => setViewDate(d => addDays(d, 1))}>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+          {!isSameDay(viewDate, new Date()) && (
+            <Button variant="ghost" size="sm" className="h-9" onClick={() => setViewDate(new Date())}>Today</Button>
+          )}
           <div className="relative">
             <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
             <Input placeholder="Search patients..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-8 h-9 w-48" />
           </div>
-          <Button variant="outline" size="sm" onClick={() => queryClient.invalidateQueries({ queryKey: ["frontdesk-today"] })}>
+          <Button variant="outline" size="sm" onClick={() => queryClient.invalidateQueries({ queryKey: ["frontdesk-day"] })}>
             <RefreshCw className="h-3.5 w-3.5" />
           </Button>
         </div>
