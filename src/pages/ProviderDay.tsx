@@ -9,15 +9,18 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { toast } from "sonner";
-import { format, parseISO, differenceInYears, differenceInDays } from "date-fns";
+import { format, parseISO, differenceInYears, differenceInDays, addDays, startOfWeek, endOfDay, startOfDay, isSameDay } from "date-fns";
 import {
   Stethoscope, Clock, FileText, User, AlertTriangle,
   Package, Sparkles, Loader2, CheckCircle2, Play, ChevronRight,
   ChevronDown, Send, Calendar, ClipboardList, MessageSquare,
-  RefreshCw, TrendingUp, Video, Phone,
+  RefreshCw, TrendingUp, Video, Phone, CalendarIcon, ChevronLeft,
 } from "lucide-react";
 import { StatCard } from "@/components/StatCard";
 import { AftercareModal } from "@/components/clinical/AftercareModal";
+import { Calendar as CalendarWidget } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const statusColor: Record<string, string> = {
   booked: "bg-primary/10 text-primary border-primary/20",
@@ -45,6 +48,8 @@ export default function ProviderDay() {
   const [dayBrief, setDayBrief] = useState<string | null>(null);
   const [dayBriefLoading, setDayBriefLoading] = useState(false);
   const [completedOpen, setCompletedOpen] = useState(false);
+  const [viewDate, setViewDate] = useState(new Date());
+  const [viewMode, setViewMode] = useState<"day" | "week">("day");
   // Phase 3 #2: Aftercare goes through a review modal now, not auto-send.
   // Holds the appointment whose aftercare we're currently composing, plus
   // the resolved encounter_id so the modal can call the AI generator.
@@ -72,13 +77,15 @@ export default function ProviderDay() {
       });
   }, [user]);
 
-  const today = new Date();
-  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString();
-  const todayEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1).toISOString();
+  const rangeStart = viewMode === "day" ? startOfDay(viewDate) : startOfWeek(viewDate, { weekStartsOn: 1 });
+  const rangeEnd = viewMode === "day" ? endOfDay(viewDate) : addDays(rangeStart, 7);
+  const today = viewDate;
+  const todayStart = rangeStart.toISOString();
+  const todayEnd = rangeEnd.toISOString();
 
   // Today's appointments
   const { data: todayApts, isLoading } = useQuery({
-    queryKey: ["provider-day-cmd", myProviderId],
+    queryKey: ["provider-day-cmd", myProviderId, viewDate.toISOString().slice(0, 10), viewMode],
     enabled: !!myProviderId,
     queryFn: async () => {
       const { data, error } = await supabase
@@ -261,6 +268,61 @@ export default function ProviderDay() {
 
   return (
     <div className="space-y-6">
+      {/* Date navigation */}
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => setViewDate(d => viewMode === "day" ? addDays(d, -1) : addDays(d, -7))}
+          aria-label="Previous"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" className="gap-2">
+              <CalendarIcon className="h-4 w-4" />
+              {viewMode === "day"
+                ? format(viewDate, "EEE, MMM d")
+                : `${format(startOfWeek(viewDate, { weekStartsOn: 1 }), "MMM d")} – ${format(addDays(startOfWeek(viewDate, { weekStartsOn: 1 }), 6), "MMM d")}`}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <CalendarWidget
+              mode="single"
+              selected={viewDate}
+              onSelect={(d) => d && setViewDate(d)}
+              initialFocus
+            />
+          </PopoverContent>
+        </Popover>
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => setViewDate(d => viewMode === "day" ? addDays(d, 1) : addDays(d, 7))}
+          aria-label="Next"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setViewDate(new Date())}
+          disabled={isSameDay(viewDate, new Date())}
+        >
+          Today
+        </Button>
+        <Select value={viewMode} onValueChange={(v) => setViewMode(v as "day" | "week")}>
+          <SelectTrigger className="w-[110px] ml-auto">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="day">Day</SelectItem>
+            <SelectItem value="week">Week</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold">{greeting}, {providerName || "Doctor"}</h1>
