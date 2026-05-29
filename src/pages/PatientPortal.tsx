@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
 import { Button } from "@/components/ui/button";
@@ -11,11 +11,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Activity, Calendar, Package, LogIn, LogOut, Loader2,
   Clock, CheckCircle, AlertCircle, User, FileText, Mail, KeyRound,
-  Video, PhoneOff, Eye, EyeOff,
+  Video, PhoneOff, Eye, EyeOff, CalendarPlus, X, RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import type { User as AuthUser } from "@supabase/supabase-js";
+import { useNavigate } from "react-router-dom";
 
 export default function PatientPortal() {
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
@@ -289,6 +290,20 @@ function PortalAuth() {
 
 // ── Appointments Tab ──────────────────────────────────────────────────────────
 function AppointmentsTab({ patientId }: { patientId: string }) {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const cancelMutation = useMutation({
+    mutationFn: async (aptId: string) => {
+      const { error } = await supabase.from("appointments").update({ status: "cancelled" }).eq("id", aptId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Appointment cancelled");
+      queryClient.invalidateQueries({ queryKey: ["portal-appointments"] });
+    },
+    onError: () => toast.error("Couldn't cancel — please call the clinic"),
+  });
+
   const { data: appointments, isLoading } = useQuery({
     queryKey: ["portal-appointments", patientId],
     queryFn: async () => {
@@ -307,6 +322,41 @@ function AppointmentsTab({ patientId }: { patientId: string }) {
 
   if (isLoading) return <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
 
+  const downloadIcs = (apt: any) => {
+    const start = new Date(apt.scheduled_at);
+    const end = new Date(start.getTime() + (apt.duration_minutes || 30) * 60000);
+    const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+    const treatmentName = (apt.treatments as any)?.name || "Appointment";
+    const providerName = (apt.providers as any)
+      ? `${(apt.providers as any).first_name} ${(apt.providers as any).last_name}`
+      : "Meridian";
+    const ics = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//Meridian Wellness//EN",
+      "BEGIN:VEVENT",
+      `UID:${apt.id}@meridian`,
+      `DTSTAMP:${fmt(new Date())}`,
+      `DTSTART:${fmt(start)}`,
+      `DTEND:${fmt(end)}`,
+      `SUMMARY:${treatmentName} with ${providerName}`,
+      "END:VEVENT",
+      "END:VCALENDAR",
+    ].join("\r\n");
+    const blob = new Blob([ics], { type: "text/calendar" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `meridian-${apt.id.slice(0, 8)}.ics`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const providerSlug = (apt: any) => {
+    const p = apt.providers as any;
+    return p ? `${p.first_name}-${p.last_name}`.toLowerCase() : "";
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -317,8 +367,8 @@ function AppointmentsTab({ patientId }: { patientId: string }) {
           <div className="space-y-2">
             {upcoming.map(apt => (
               <Card key={apt.id}>
-                <CardContent className="py-3 px-4 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
+                <CardContent className="py-3 px-4 flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
                     <Calendar className="h-5 w-5 text-primary" />
                     <div>
                       <p className="text-sm font-medium">{(apt.treatments as any)?.name || "Appointment"}</p>
@@ -328,7 +378,37 @@ function AppointmentsTab({ patientId }: { patientId: string }) {
                       </p>
                     </div>
                   </div>
-                  <Badge variant={apt.status === "booked" ? "secondary" : "default"} className="text-[11px]">{apt.status}</Badge>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant={apt.status === "booked" ? "secondary" : "default"} className="text-[11px]">{apt.status}</Badge>
+                    <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => downloadIcs(apt)}>
+                      <CalendarPlus className="h-3 w-3 mr-1" /> Add to calendar
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={() => {
+                        // TODO: server-side reschedule that links old + new appointments is a follow-up.
+                        // For now, the patient cancels the old one and books a new slot via /book/:slug.
+                        navigate(`/book/${providerSlug(apt)}`);
+                      }}
+                    >
+                      <RotateCcw className="h-3 w-3 mr-1" /> Reschedule
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs text-destructive hover:text-destructive"
+                      disabled={cancelMutation.isPending}
+                      onClick={() => {
+                        if (confirm("Cancel this appointment? You'll need to rebook through the portal or by calling the clinic.")) {
+                          cancelMutation.mutate(apt.id);
+                        }
+                      }}
+                    >
+                      <X className="h-3 w-3 mr-1" /> Cancel
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             ))}
@@ -344,15 +424,25 @@ function AppointmentsTab({ patientId }: { patientId: string }) {
           <div className="space-y-2">
             {past.slice(0, 10).map(apt => (
               <Card key={apt.id} className="opacity-75">
-                <CardContent className="py-3 px-4 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
+                <CardContent className="py-3 px-4 flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
                     <CheckCircle className="h-4 w-4 text-muted-foreground" />
                     <div>
                       <p className="text-sm">{(apt.treatments as any)?.name || "Visit"}</p>
                       <p className="text-xs text-muted-foreground">{format(new Date(apt.scheduled_at), "MMM d, yyyy")}</p>
                     </div>
                   </div>
-                  <Badge variant="outline" className="text-[11px]">{apt.status}</Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="text-[11px]">{apt.status}</Badge>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={() => navigate(`/book/${providerSlug(apt)}`)}
+                    >
+                      <RotateCcw className="h-3 w-3 mr-1" /> Rebook this
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             ))}
