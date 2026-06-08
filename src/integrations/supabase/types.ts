@@ -93,11 +93,14 @@ export type Database = {
           checked_in_at: string | null
           completed_at: string | null
           created_at: string
+          device_id: string | null
           duration_minutes: number | null
           id: string
           notes: string | null
           patient_id: string
           provider_id: string | null
+          room_id: string | null
+          roomed_at: string | null
           scheduled_at: string
           status: Database["public"]["Enums"]["appointment_status"]
           treatment_id: string | null
@@ -107,11 +110,14 @@ export type Database = {
           checked_in_at?: string | null
           completed_at?: string | null
           created_at?: string
+          device_id?: string | null
           duration_minutes?: number | null
           id?: string
           notes?: string | null
           patient_id: string
           provider_id?: string | null
+          room_id?: string | null
+          roomed_at?: string | null
           scheduled_at: string
           status?: Database["public"]["Enums"]["appointment_status"]
           treatment_id?: string | null
@@ -121,17 +127,27 @@ export type Database = {
           checked_in_at?: string | null
           completed_at?: string | null
           created_at?: string
+          device_id?: string | null
           duration_minutes?: number | null
           id?: string
           notes?: string | null
           patient_id?: string
           provider_id?: string | null
+          room_id?: string | null
+          roomed_at?: string | null
           scheduled_at?: string
           status?: Database["public"]["Enums"]["appointment_status"]
           treatment_id?: string | null
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "appointments_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "devices"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "appointments_patient_id_fkey"
             columns: ["patient_id"]
@@ -144,6 +160,13 @@ export type Database = {
             columns: ["provider_id"]
             isOneToOne: false
             referencedRelation: "providers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
             referencedColumns: ["id"]
           },
           {
@@ -193,37 +216,52 @@ export type Database = {
       }
       chart_template_fields: {
         Row: {
+          ai_variable: string | null
+          config: Json | null
           created_at: string
           default_value: string | null
+          field_key: string | null
           field_type: string
           id: string
           is_required: boolean
           label: string
+          maps_to_column: string | null
           options: Json | null
+          placeholder: string | null
           section_id: string
           sort_order: number | null
           unit: string | null
         }
         Insert: {
+          ai_variable?: string | null
+          config?: Json | null
           created_at?: string
           default_value?: string | null
+          field_key?: string | null
           field_type?: string
           id?: string
           is_required?: boolean
           label: string
+          maps_to_column?: string | null
           options?: Json | null
+          placeholder?: string | null
           section_id: string
           sort_order?: number | null
           unit?: string | null
         }
         Update: {
+          ai_variable?: string | null
+          config?: Json | null
           created_at?: string
           default_value?: string | null
+          field_key?: string | null
           field_type?: string
           id?: string
           is_required?: boolean
           label?: string
+          maps_to_column?: string | null
           options?: Json | null
+          placeholder?: string | null
           section_id?: string
           sort_order?: number | null
           unit?: string | null
@@ -238,27 +276,92 @@ export type Database = {
           },
         ]
       }
+      chart_template_orders: {
+        Row: {
+          cpt_code: string | null
+          created_at: string | null
+          description: string | null
+          followup_days: number | null
+          id: string
+          is_auto_added: boolean | null
+          lab_panel: string | null
+          label: string
+          order_key: string
+          order_type: string
+          rx_name: string | null
+          sort_order: number | null
+          template_id: string
+        }
+        Insert: {
+          cpt_code?: string | null
+          created_at?: string | null
+          description?: string | null
+          followup_days?: number | null
+          id?: string
+          is_auto_added?: boolean | null
+          lab_panel?: string | null
+          label: string
+          order_key: string
+          order_type: string
+          rx_name?: string | null
+          sort_order?: number | null
+          template_id: string
+        }
+        Update: {
+          cpt_code?: string | null
+          created_at?: string | null
+          description?: string | null
+          followup_days?: number | null
+          id?: string
+          is_auto_added?: boolean | null
+          lab_panel?: string | null
+          label?: string
+          order_key?: string
+          order_type?: string
+          rx_name?: string | null
+          sort_order?: number | null
+          template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chart_template_orders_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "chart_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chart_template_sections: {
         Row: {
           created_at: string
+          icon: string | null
           id: string
+          is_collapsible: boolean | null
           is_required: boolean
+          section_key: string | null
           sort_order: number | null
           template_id: string
           title: string
         }
         Insert: {
           created_at?: string
+          icon?: string | null
           id?: string
+          is_collapsible?: boolean | null
           is_required?: boolean
+          section_key?: string | null
           sort_order?: number | null
           template_id: string
           title: string
         }
         Update: {
           created_at?: string
+          icon?: string | null
           id?: string
+          is_collapsible?: boolean | null
           is_required?: boolean
+          section_key?: string | null
           sort_order?: number | null
           template_id?: string
           title?: string
@@ -275,37 +378,64 @@ export type Database = {
       }
       chart_templates: {
         Row: {
+          auto_labs: boolean | null
+          auto_protocol_milestone: boolean | null
           category: string | null
+          cc_keywords: string[] | null
+          color: string | null
           created_at: string
+          default_cpt: string[] | null
+          default_icd10: string[] | null
           description: string | null
+          icon: string | null
           id: string
           is_active: boolean
+          is_shared: boolean | null
           is_system: boolean
           keywords: string[] | null
           name: string
           updated_at: string
+          usage_count: number | null
         }
         Insert: {
+          auto_labs?: boolean | null
+          auto_protocol_milestone?: boolean | null
           category?: string | null
+          cc_keywords?: string[] | null
+          color?: string | null
           created_at?: string
+          default_cpt?: string[] | null
+          default_icd10?: string[] | null
           description?: string | null
+          icon?: string | null
           id?: string
           is_active?: boolean
+          is_shared?: boolean | null
           is_system?: boolean
           keywords?: string[] | null
           name: string
           updated_at?: string
+          usage_count?: number | null
         }
         Update: {
+          auto_labs?: boolean | null
+          auto_protocol_milestone?: boolean | null
           category?: string | null
+          cc_keywords?: string[] | null
+          color?: string | null
           created_at?: string
+          default_cpt?: string[] | null
+          default_icd10?: string[] | null
           description?: string | null
+          icon?: string | null
           id?: string
           is_active?: boolean
+          is_shared?: boolean | null
           is_system?: boolean
           keywords?: string[] | null
           name?: string
           updated_at?: string
+          usage_count?: number | null
         }
         Relationships: []
       }
@@ -379,33 +509,110 @@ export type Database = {
           },
         ]
       }
+      devices: {
+        Row: {
+          created_at: string
+          device_type: string
+          id: string
+          is_active: boolean
+          maintenance_notes: string | null
+          name: string
+          room_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          device_type?: string
+          id?: string
+          is_active?: boolean
+          maintenance_notes?: string | null
+          name: string
+          room_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          device_type?: string
+          id?: string
+          is_active?: boolean
+          maintenance_notes?: string | null
+          name?: string
+          room_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "devices_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       encounter_field_responses: {
         Row: {
           ai_suggested: boolean
           created_at: string
           encounter_id: string
           field_id: string
+          field_key: string | null
+          field_label: string | null
+          field_type: string | null
           id: string
+          is_abnormal: boolean | null
+          ref_range_high: number | null
+          ref_range_low: number | null
+          section_id: string | null
+          section_key: string | null
+          template_id: string | null
           updated_at: string
           value: string | null
+          value_boolean: boolean | null
+          value_json: Json | null
+          value_numeric: number | null
         }
         Insert: {
           ai_suggested?: boolean
           created_at?: string
           encounter_id: string
           field_id: string
+          field_key?: string | null
+          field_label?: string | null
+          field_type?: string | null
           id?: string
+          is_abnormal?: boolean | null
+          ref_range_high?: number | null
+          ref_range_low?: number | null
+          section_id?: string | null
+          section_key?: string | null
+          template_id?: string | null
           updated_at?: string
           value?: string | null
+          value_boolean?: boolean | null
+          value_json?: Json | null
+          value_numeric?: number | null
         }
         Update: {
           ai_suggested?: boolean
           created_at?: string
           encounter_id?: string
           field_id?: string
+          field_key?: string | null
+          field_label?: string | null
+          field_type?: string | null
           id?: string
+          is_abnormal?: boolean | null
+          ref_range_high?: number | null
+          ref_range_low?: number | null
+          section_id?: string | null
+          section_key?: string | null
+          template_id?: string | null
           updated_at?: string
           value?: string | null
+          value_boolean?: boolean | null
+          value_json?: Json | null
+          value_numeric?: number | null
         }
         Relationships: [
           {
@@ -420,6 +627,20 @@ export type Database = {
             columns: ["field_id"]
             isOneToOne: false
             referencedRelation: "chart_template_fields"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encounter_field_responses_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "chart_template_sections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encounter_field_responses_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "chart_templates"
             referencedColumns: ["id"]
           },
         ]
@@ -437,6 +658,7 @@ export type Database = {
           signed_by: string | null
           started_at: string | null
           status: Database["public"]["Enums"]["encounter_status"]
+          template_id: string | null
           updated_at: string
         }
         Insert: {
@@ -451,6 +673,7 @@ export type Database = {
           signed_by?: string | null
           started_at?: string | null
           status?: Database["public"]["Enums"]["encounter_status"]
+          template_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -465,6 +688,7 @@ export type Database = {
           signed_by?: string | null
           started_at?: string | null
           status?: Database["public"]["Enums"]["encounter_status"]
+          template_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -496,6 +720,13 @@ export type Database = {
             referencedRelation: "providers"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "encounters_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "chart_templates"
+            referencedColumns: ["id"]
+          },
         ]
       }
       hormone_visits: {
@@ -510,12 +741,23 @@ export type Database = {
           edited_monitoring: string | null
           edited_treatment: string | null
           id: string
+          intake_focus: string[] | null
+          intake_goals: string[] | null
+          intake_symptoms: string[] | null
           lab_a1c: number | null
           lab_alt: number | null
+          lab_ana: string | null
+          lab_apoe: string | null
           lab_ast: number | null
+          lab_b12: number | null
+          lab_calcitonin: number | null
+          lab_cd4cd8: string | null
+          lab_crp: number | null
           lab_crt: number | null
           lab_dhea: number | null
           lab_e2: number | null
+          lab_fins: number | null
+          lab_folate: number | null
           lab_fsh: number | null
           lab_ft: number | null
           lab_ft3: number | null
@@ -523,15 +765,22 @@ export type Database = {
           lab_glc: number | null
           lab_hct: number | null
           lab_hgb: number | null
+          lab_igf1: number | null
+          lab_igfbp3: number | null
+          lab_igg: string | null
           lab_lh: number | null
           lab_p4: number | null
           lab_prl: number | null
           lab_psa: number | null
           lab_rbc: number | null
+          lab_rpr: string | null
           lab_shbg: number | null
           lab_tsh: number | null
           lab_tt: number | null
+          lab_vitd: number | null
           patient_id: string
+          peptide_categories: string[] | null
+          peptide_contraindications: string[] | null
           provider_id: string | null
           updated_at: string
           visit_date: string
@@ -547,12 +796,23 @@ export type Database = {
           edited_monitoring?: string | null
           edited_treatment?: string | null
           id?: string
+          intake_focus?: string[] | null
+          intake_goals?: string[] | null
+          intake_symptoms?: string[] | null
           lab_a1c?: number | null
           lab_alt?: number | null
+          lab_ana?: string | null
+          lab_apoe?: string | null
           lab_ast?: number | null
+          lab_b12?: number | null
+          lab_calcitonin?: number | null
+          lab_cd4cd8?: string | null
+          lab_crp?: number | null
           lab_crt?: number | null
           lab_dhea?: number | null
           lab_e2?: number | null
+          lab_fins?: number | null
+          lab_folate?: number | null
           lab_fsh?: number | null
           lab_ft?: number | null
           lab_ft3?: number | null
@@ -560,15 +820,22 @@ export type Database = {
           lab_glc?: number | null
           lab_hct?: number | null
           lab_hgb?: number | null
+          lab_igf1?: number | null
+          lab_igfbp3?: number | null
+          lab_igg?: string | null
           lab_lh?: number | null
           lab_p4?: number | null
           lab_prl?: number | null
           lab_psa?: number | null
           lab_rbc?: number | null
+          lab_rpr?: string | null
           lab_shbg?: number | null
           lab_tsh?: number | null
           lab_tt?: number | null
+          lab_vitd?: number | null
           patient_id: string
+          peptide_categories?: string[] | null
+          peptide_contraindications?: string[] | null
           provider_id?: string | null
           updated_at?: string
           visit_date?: string
@@ -584,12 +851,23 @@ export type Database = {
           edited_monitoring?: string | null
           edited_treatment?: string | null
           id?: string
+          intake_focus?: string[] | null
+          intake_goals?: string[] | null
+          intake_symptoms?: string[] | null
           lab_a1c?: number | null
           lab_alt?: number | null
+          lab_ana?: string | null
+          lab_apoe?: string | null
           lab_ast?: number | null
+          lab_b12?: number | null
+          lab_calcitonin?: number | null
+          lab_cd4cd8?: string | null
+          lab_crp?: number | null
           lab_crt?: number | null
           lab_dhea?: number | null
           lab_e2?: number | null
+          lab_fins?: number | null
+          lab_folate?: number | null
           lab_fsh?: number | null
           lab_ft?: number | null
           lab_ft3?: number | null
@@ -597,15 +875,22 @@ export type Database = {
           lab_glc?: number | null
           lab_hct?: number | null
           lab_hgb?: number | null
+          lab_igf1?: number | null
+          lab_igfbp3?: number | null
+          lab_igg?: string | null
           lab_lh?: number | null
           lab_p4?: number | null
           lab_prl?: number | null
           lab_psa?: number | null
           lab_rbc?: number | null
+          lab_rpr?: string | null
           lab_shbg?: number | null
           lab_tsh?: number | null
           lab_tt?: number | null
+          lab_vitd?: number | null
           patient_id?: string
+          peptide_categories?: string[] | null
+          peptide_contraindications?: string[] | null
           provider_id?: string | null
           updated_at?: string
           visit_date?: string
@@ -1167,69 +1452,105 @@ export type Database = {
           address: string | null
           allergies: string[] | null
           city: string | null
+          contraindications: string[] | null
           created_at: string
           date_of_birth: string | null
           email: string | null
           emergency_contact_name: string | null
           emergency_contact_phone: string | null
+          fertility_goals: string | null
           first_name: string
+          focus: string[] | null
           gender: string | null
+          goals: string[] | null
+          height_in: number | null
           id: string
           insurance_id: string | null
           insurance_provider: string | null
           is_active: boolean
           last_name: string
+          lmp_status: string | null
           medications: string[] | null
+          meno_status: string | null
           phone: string | null
           preferences: Json | null
+          preferred_routes: string[] | null
+          prior_therapy: string | null
           state: string | null
+          symptoms: string[] | null
           updated_at: string
+          uterine_status: string | null
+          weight_lbs: number | null
           zip: string | null
         }
         Insert: {
           address?: string | null
           allergies?: string[] | null
           city?: string | null
+          contraindications?: string[] | null
           created_at?: string
           date_of_birth?: string | null
           email?: string | null
           emergency_contact_name?: string | null
           emergency_contact_phone?: string | null
+          fertility_goals?: string | null
           first_name: string
+          focus?: string[] | null
           gender?: string | null
+          goals?: string[] | null
+          height_in?: number | null
           id?: string
           insurance_id?: string | null
           insurance_provider?: string | null
           is_active?: boolean
           last_name: string
+          lmp_status?: string | null
           medications?: string[] | null
+          meno_status?: string | null
           phone?: string | null
           preferences?: Json | null
+          preferred_routes?: string[] | null
+          prior_therapy?: string | null
           state?: string | null
+          symptoms?: string[] | null
           updated_at?: string
+          uterine_status?: string | null
+          weight_lbs?: number | null
           zip?: string | null
         }
         Update: {
           address?: string | null
           allergies?: string[] | null
           city?: string | null
+          contraindications?: string[] | null
           created_at?: string
           date_of_birth?: string | null
           email?: string | null
           emergency_contact_name?: string | null
           emergency_contact_phone?: string | null
+          fertility_goals?: string | null
           first_name?: string
+          focus?: string[] | null
           gender?: string | null
+          goals?: string[] | null
+          height_in?: number | null
           id?: string
           insurance_id?: string | null
           insurance_provider?: string | null
           is_active?: boolean
           last_name?: string
+          lmp_status?: string | null
           medications?: string[] | null
+          meno_status?: string | null
           phone?: string | null
           preferences?: Json | null
+          preferred_routes?: string[] | null
+          prior_therapy?: string | null
           state?: string | null
+          symptoms?: string[] | null
           updated_at?: string
+          uterine_status?: string | null
+          weight_lbs?: number | null
           zip?: string | null
         }
         Relationships: []
@@ -1738,6 +2059,47 @@ export type Database = {
           },
         ]
       }
+      rooms: {
+        Row: {
+          assigned_provider_id: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          room_type: string
+          sort_order: number | null
+          updated_at: string
+        }
+        Insert: {
+          assigned_provider_id?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          room_type?: string
+          sort_order?: number | null
+          updated_at?: string
+        }
+        Update: {
+          assigned_provider_id?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          room_type?: string
+          sort_order?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rooms_assigned_provider_id_fkey"
+            columns: ["assigned_provider_id"]
+            isOneToOne: false
+            referencedRelation: "providers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       treatment_categories: {
         Row: {
           created_at: string
@@ -1767,6 +2129,45 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      treatment_device_requirements: {
+        Row: {
+          created_at: string
+          device_id: string
+          id: string
+          is_required: boolean
+          treatment_id: string
+        }
+        Insert: {
+          created_at?: string
+          device_id: string
+          id?: string
+          is_required?: boolean
+          treatment_id: string
+        }
+        Update: {
+          created_at?: string
+          device_id?: string
+          id?: string
+          is_required?: boolean
+          treatment_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "treatment_device_requirements_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "devices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "treatment_device_requirements_treatment_id_fkey"
+            columns: ["treatment_id"]
+            isOneToOne: false
+            referencedRelation: "treatments"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       treatments: {
         Row: {
@@ -1854,6 +2255,7 @@ export type Database = {
       appointment_status:
         | "booked"
         | "checked_in"
+        | "roomed"
         | "in_progress"
         | "completed"
         | "no_show"
@@ -2013,6 +2415,7 @@ export const Constants = {
       appointment_status: [
         "booked",
         "checked_in",
+        "roomed",
         "in_progress",
         "completed",
         "no_show",
