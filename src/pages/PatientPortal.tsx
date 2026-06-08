@@ -177,6 +177,11 @@ function PortalAuth() {
     if (result.error) toast.error(String(result.error));
   };
 
+  const handleAppleAuth = async () => {
+    const result = await lovable.auth.signInWithOAuth("apple", { redirect_uri: window.location.origin + "/portal" });
+    if (result.error) toast.error(String(result.error));
+  };
+
   if (mode === "forgot") {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
