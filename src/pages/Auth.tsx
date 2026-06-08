@@ -147,6 +147,28 @@ export default function Auth() {
     }
   };
 
+  const handleAppleSignIn = async () => {
+    setLoading(true);
+    try {
+      const result = await lovable.auth.signInWithOAuth("apple", {
+        redirect_uri: window.location.origin,
+      });
+      if (result.error) {
+        toast({
+          title: "Error",
+          description: result.error instanceof Error ? result.error.message : "Apple sign-in failed",
+          variant: "destructive",
+        });
+      }
+      if (result.redirected) return;
+      navigate("/");
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleForgotPassword = async () => {
     if (!email) {
       toast({ title: "Enter your email first", variant: "destructive" });
