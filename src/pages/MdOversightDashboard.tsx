@@ -11,13 +11,25 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Shield, Brain, Users, Activity, DollarSign, Settings, Loader2, UserCog, Plus, Building2 } from "lucide-react";
+import { Shield, Brain, Users, Activity, DollarSign, Settings, Loader2, UserCog, Plus, Building2, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
+
+type ProcVolumeRow = {
+  clinic_id: string | null;
+  clinic_name: string | null;
+  treatment_id: string;
+  treatment_name: string;
+  category: string | null;
+  bucket: string; // first day of the month, YYYY-MM-DD
+  procedure_count: number;
+};
 
 export default function MdOversightDashboard() {
   const { user } = useAuth();
   const [coachingProviderId, setCoachingProviderId] = useState<string | null>(null);
   const [filterClinic, setFilterClinic] = useState("all");
+  const [volMonths, setVolMonths] = useState("6");
+  const [volClinic, setVolClinic] = useState("all");
   const queryClient = useQueryClient();
 
   // ── MD's assigned clinics with pending counts ──
@@ -56,6 +68,38 @@ export default function MdOversightDashboard() {
     },
     enabled: !!user?.id,
   });
+
+  // ── 3.1 Procedure volume across assigned clinics (server-side aggregate) ──
+  const { data: procVolume, isLoading: volLoading, error: volError } = useQuery({
+    queryKey: ["md-procedure-volume", volMonths, volClinic, user?.id],
+    enabled: !!user?.id,
+    queryFn: async () => {
+      const end = new Date();
+      const start = new Date();
+      start.setMonth(start.getMonth() - parseInt(volMonths, 10));
+      start.setHours(0, 0, 0, 0);
+      // RPC isn't in the generated types yet — cast until types are regenerated.
+      const { data, error } = await (supabase as any).rpc("md_procedure_volume", {
+        p_start: start.toISOString(),
+        p_end: end.toISOString(),
+        p_clinic_id: volClinic === "all" ? null : volClinic,
+      });
+      if (error) throw error;
+      return (data ?? []) as ProcVolumeRow[];
+    },
+  });
+
+  const totalProcedures = (procVolume ?? []).reduce((s, r) => s + Number(r.procedure_count), 0);
+  const byProcedure = (() => {
+    const map = new Map<string, { treatment_id: string; treatment_name: string; category: string | null; count: number }>();
+    for (const r of procVolume ?? []) {
+      const ex = map.get(r.treatment_id);
+      if (ex) ex.count += Number(r.procedure_count);
+      else map.set(r.treatment_id, { treatment_id: r.treatment_id, treatment_name: r.treatment_name, category: r.category, count: Number(r.procedure_count) });
+    }
+    return [...map.values()].sort((a, b) => b.count - a.count);
+  })();
+  const formatMonth = (b: string) => new Date(`${b}T00:00:00`).toLocaleDateString("en-US", { month: "short", year: "numeric" });
 
   // Fetch oversight reports
   const { data: reports, isLoading: reportsLoading } = useQuery({
@@ -266,8 +310,9 @@ export default function MdOversightDashboard() {
       )}
 
       <Tabs defaultValue="reports">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="reports"><Brain className="h-3 w-3 mr-1" /> AI Reports</TabsTrigger>
+          <TabsTrigger value="procedures"><BarChart3 className="h-3 w-3 mr-1" /> Procedures</TabsTrigger>
           <TabsTrigger value="md"><Shield className="h-3 w-3 mr-1" /> MD Performance</TabsTrigger>
           <TabsTrigger value="providers"><Users className="h-3 w-3 mr-1" /> Providers</TabsTrigger>
           <TabsTrigger value="system"><DollarSign className="h-3 w-3 mr-1" /> System</TabsTrigger>
@@ -553,6 +598,113 @@ export default function MdOversightDashboard() {
                   </div>
                 </div>
               ))}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Tab: Procedure Volume (3.1) */}
+        <TabsContent value="procedures" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base"><BarChart3 className="h-4 w-4" /> Procedure Volume</CardTitle>
+              <CardDescription>Procedures performed across your assigned clinics. Counts reflect completed appointments, scoped to clinics you cover.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <Select value={volMonths} onValueChange={setVolMonths}>
+                  <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="3">Last 3 months</SelectItem>
+                    <SelectItem value="6">Last 6 months</SelectItem>
+                    <SelectItem value="12">Last 12 months</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={volClinic} onValueChange={setVolClinic}>
+                  <SelectTrigger className="w-[220px]"><SelectValue placeholder="All assigned clinics" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All assigned clinics</SelectItem>
+                    {assignedClinics.map((c: any) => (
+                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {volLoading ? (
+                <div className="flex items-center justify-center gap-2 py-10 text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Loading procedure volume…
+                </div>
+              ) : volError ? (
+                <div className="py-8 text-center text-sm text-destructive">
+                  Couldn't load procedure volume.{" "}
+                  {String((volError as Error).message || "").includes("md_procedure_volume")
+                    ? "The md_procedure_volume database function isn't deployed yet."
+                    : "Please try again."}
+                </div>
+              ) : !procVolume?.length ? (
+                <div className="py-10 text-center text-sm text-muted-foreground">No procedures performed in this period.</div>
+              ) : (
+                <>
+                  <div className="flex flex-wrap gap-6">
+                    <div>
+                      <p className="text-2xl font-bold">{totalProcedures}</p>
+                      <p className="text-xs text-muted-foreground">Total procedures</p>
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold">{byProcedure.length}</p>
+                      <p className="text-xs text-muted-foreground">Distinct procedure types</p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">By procedure type</p>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Procedure</TableHead>
+                          <TableHead>Category</TableHead>
+                          <TableHead className="text-right">Count</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {byProcedure.map((p) => (
+                          <TableRow key={p.treatment_id}>
+                            <TableCell className="font-medium">{p.treatment_name}</TableCell>
+                            <TableCell className="text-muted-foreground">{p.category || "—"}</TableCell>
+                            <TableCell className="text-right">{p.count}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  <div>
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Monthly detail{volClinic === "all" ? " (per clinic)" : ""}
+                    </p>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Month</TableHead>
+                          <TableHead>Clinic</TableHead>
+                          <TableHead>Procedure</TableHead>
+                          <TableHead className="text-right">Count</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {procVolume.map((r, i) => (
+                          <TableRow key={`${r.bucket}-${r.treatment_id}-${r.clinic_id ?? "none"}-${i}`}>
+                            <TableCell>{formatMonth(r.bucket)}</TableCell>
+                            <TableCell className="text-muted-foreground">{r.clinic_name || "—"}</TableCell>
+                            <TableCell>{r.treatment_name}</TableCell>
+                            <TableCell className="text-right">{r.procedure_count}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

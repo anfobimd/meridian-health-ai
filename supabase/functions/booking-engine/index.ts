@@ -357,16 +357,113 @@ Deno.serve(async (req) => {
 
     const intakeRequired = true;
 
-    // ── Log to communication timeline ─────────────────────────────────────────
+    // ── Send booking confirmation (email + SMS) and log what was sent ───────────
+    //
+    // Notifications are best-effort: a provider/notification outage must never
+    // roll back a valid booking, so every send is wrapped and failures are only
+    // logged. The patient_communication_log rows record the real delivery status
+    // and provider message IDs for an audit trail.
+    const { data: ptContact } = await admin
+      .from("patients")
+      .select("email, phone, first_name")
+      .eq("id", patient_id)
+      .maybeSingle();
+
+    const notifyEmail = (typeof email === "string" && email.includes("@")) ? email : (ptContact?.email || null);
+    const notifyPhone = phone || ptContact?.phone || null;
+    const providerName = `${provider.first_name} ${provider.last_name}`;
+    const apptWhen = startTime.toLocaleString("en-US", { dateStyle: "full", timeStyle: "short" });
+    const visitNote = resolvedVisitType === "telehealth"
+      ? " This is a telehealth visit — your join link will be in your patient portal."
+      : "";
+
+    const confirmText =
+      `Your appointment is confirmed!\n\n` +
+      `Confirmation: ${confirmationCode}\n` +
+      `Service: ${treatment.name}\n` +
+      `Provider: ${providerName}\n` +
+      `When: ${apptWhen}.${visitNote}`;
+    const confirmHtml =
+      `<h2>Appointment Confirmed</h2>` +
+      `<p>Hi ${ptContact?.first_name || first_name || "there"},</p>` +
+      `<p>Your appointment is confirmed.</p>` +
+      `<ul>` +
+      `<li><strong>Confirmation code:</strong> ${confirmationCode}</li>` +
+      `<li><strong>Service:</strong> ${treatment.name}</li>` +
+      `<li><strong>Provider:</strong> ${providerName}</li>` +
+      `<li><strong>When:</strong> ${apptWhen}</li>` +
+      `</ul>` +
+      (visitNote ? `<p>${visitNote.trim()}</p>` : "") +
+      `<p>Need to reschedule? Contact our front desk.</p>`;
+
+    // Email — always attempt when we have an address.
+    let emailStatus = "skipped";
+    let emailMsgId: string | null = null;
+    if (notifyEmail) {
+      try {
+        const { data: emailRes, error: emailErr } = await admin.functions.invoke("send-email", {
+          body: { action: "send", to: notifyEmail, subject: `Appointment Confirmed — ${treatment.name}`, html: confirmHtml, text: confirmText },
+        });
+        if (emailErr || (emailRes as any)?.error) {
+          emailStatus = "failed";
+          console.error("Booking confirmation email failed (non-fatal):", emailErr?.message || (emailRes as any)?.error);
+        } else {
+          emailStatus = "sent";
+          emailMsgId = (emailRes as any)?.messageId ?? null;
+        }
+      } catch (e) {
+        emailStatus = "failed";
+        console.error("Booking confirmation email threw (non-fatal):", e);
+      }
+    }
+
+    // SMS — only when a phone number is present.
+    let smsStatus = "skipped";
+    let smsSid: string | null = null;
+    if (notifyPhone) {
+      try {
+        const { data: smsRes, error: smsErr } = await admin.functions.invoke("send-sms", {
+          body: { to: notifyPhone, body: confirmText },
+        });
+        if (smsErr || (smsRes as any)?.error) {
+          smsStatus = "failed";
+          console.error("Booking confirmation SMS failed (non-fatal):", smsErr?.message || (smsRes as any)?.error);
+        } else {
+          smsStatus = "sent";
+          smsSid = (smsRes as any)?.sid ?? null;
+        }
+      } catch (e) {
+        smsStatus = "failed";
+        console.error("Booking confirmation SMS threw (non-fatal):", e);
+      }
+    }
+
+    // ── Log to communication timeline — one row per channel actually used ───────
     try {
-      await admin.from("patient_communication_log").insert({
-        patient_id,
-        direction: "outbound",
-        channel: "portal",
-        subject: "Booking Confirmed",
-        body: `Appointment ${confirmationCode} confirmed for ${treatment.name} with ${provider.first_name} ${provider.last_name} on ${startTime.toLocaleDateString()}.${resolvedVisitType === "telehealth" ? " Telehealth visit — join link will be in your portal." : ""}`,
-        is_read: true,
+      const logRows: Record<string, unknown>[] = [];
+      if (notifyEmail) {
+        logRows.push({
+          patient_id, appointment_id: appointment.id, direction: "outbound", channel: "email",
+          content: `Booking confirmation for ${treatment.name} with ${providerName} on ${apptWhen}. Code ${confirmationCode}.`,
+          delivery_status: emailStatus, template_used: "booking_confirmation",
+          metadata: { confirmation_code: confirmationCode, message_id: emailMsgId, recipient: notifyEmail },
+        });
+      }
+      if (notifyPhone) {
+        logRows.push({
+          patient_id, appointment_id: appointment.id, direction: "outbound", channel: "sms",
+          content: confirmText, delivery_status: smsStatus, template_used: "booking_confirmation",
+          metadata: { confirmation_code: confirmationCode, message_sid: smsSid, recipient: notifyPhone },
+        });
+      }
+      // Always leave a portal-visible confirmation in the patient's timeline.
+      logRows.push({
+        patient_id, appointment_id: appointment.id, direction: "outbound", channel: "portal",
+        content: `Appointment ${confirmationCode} confirmed for ${treatment.name} with ${providerName} on ${apptWhen}.${visitNote}`,
+        delivery_status: "sent", template_used: "booking_confirmation",
+        metadata: { confirmation_code: confirmationCode },
       });
+      await admin.from("patient_communication_log").insert(logRows);
     } catch (e) {
       console.error("Comm log error (non-fatal):", e);
     }

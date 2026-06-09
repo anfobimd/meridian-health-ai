@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -172,15 +171,17 @@ function PortalAuth() {
     }
   };
 
-  const handleGoogleAuth = async () => {
-    const result = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin + "/portal" });
-    if (result.error) toast.error(String(result.error));
+  // Native Supabase OAuth — redirects back to the portal on success.
+  const handleOAuth = async (provider: "google" | "apple") => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: { redirectTo: window.location.origin + "/portal" },
+    });
+    if (error) toast.error(error.message);
   };
 
-  const handleAppleAuth = async () => {
-    const result = await lovable.auth.signInWithOAuth("apple", { redirect_uri: window.location.origin + "/portal" });
-    if (result.error) toast.error(String(result.error));
-  };
+  const handleGoogleAuth = () => handleOAuth("google");
+  const handleAppleAuth = () => handleOAuth("apple");
 
   if (mode === "forgot") {
     return (

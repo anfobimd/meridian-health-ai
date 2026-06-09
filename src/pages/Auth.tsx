@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable/index";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -125,49 +124,32 @@ export default function Auth() {
     }
   };
 
-  const handleGoogleSignIn = async () => {
+  // Native Supabase OAuth. On success the browser redirects to the provider,
+  // so no post-call navigation is needed; an error means the redirect never
+  // started (e.g. provider not enabled in the Supabase project).
+  const handleOAuthSignIn = async (provider: "google" | "apple") => {
     setLoading(true);
     try {
-      const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: window.location.origin,
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: { redirectTo: window.location.origin },
       });
-      if (result.error) {
+      if (error) {
         toast({
           title: "Error",
-          description: result.error instanceof Error ? result.error.message : "Google sign-in failed",
+          description: error.message || `${provider === "google" ? "Google" : "Apple"} sign-in failed`,
           variant: "destructive",
         });
+        setLoading(false);
       }
-      if (result.redirected) return;
-      navigate("/");
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
-    } finally {
       setLoading(false);
     }
   };
 
-  const handleAppleSignIn = async () => {
-    setLoading(true);
-    try {
-      const result = await lovable.auth.signInWithOAuth("apple", {
-        redirect_uri: window.location.origin,
-      });
-      if (result.error) {
-        toast({
-          title: "Error",
-          description: result.error instanceof Error ? result.error.message : "Apple sign-in failed",
-          variant: "destructive",
-        });
-      }
-      if (result.redirected) return;
-      navigate("/");
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
-    } finally {
-      setLoading(false);
-    }
-  };
+  const handleGoogleSignIn = () => handleOAuthSignIn("google");
+  const handleAppleSignIn = () => handleOAuthSignIn("apple");
 
   const handleForgotPassword = async () => {
     if (!email) {

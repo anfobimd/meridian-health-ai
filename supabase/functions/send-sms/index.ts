@@ -14,16 +14,25 @@ Deno.serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const accountSid = Deno.env.get("TWILIO_ACCOUNT_SID");
     const authToken = Deno.env.get("TWILIO_AUTH_TOKEN");
     const defaultFrom = Deno.env.get("TWILIO_PHONE_NUMBER");
     if (!accountSid || !authToken) throw new Error("TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN must be configured");
 
-    // Verify caller
-    const userClient = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authHeader } } });
-    const { data: userData, error: userErr } = await userClient.auth.getUser();
-    if (userErr || !userData?.user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    // Trusted server-to-server calls (e.g. booking-engine confirming an
+    // anonymous public booking) present the service-role key as the bearer
+    // token. Those skip the user check. All other callers must be a
+    // logged-in user.
+    const bearerToken = authHeader.slice("Bearer ".length).trim();
+    const isInternalCall = !!serviceKey && bearerToken === serviceKey;
+
+    if (!isInternalCall) {
+      const userClient = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authHeader } } });
+      const { data: userData, error: userErr } = await userClient.auth.getUser();
+      if (userErr || !userData?.user) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
     }
 
     const { to, body, from } = await req.json();

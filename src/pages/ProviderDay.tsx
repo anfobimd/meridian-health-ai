@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { toast } from "sonner";
-import { format, parseISO, differenceInYears, differenceInDays, addDays, startOfWeek, endOfDay, startOfDay, isSameDay } from "date-fns";
+import { format, parseISO, differenceInYears, differenceInDays, addDays, addMonths, startOfWeek, startOfMonth, endOfMonth, endOfDay, startOfDay, isSameDay } from "date-fns";
 import {
   Stethoscope, Clock, FileText, User, AlertTriangle,
   Package, Sparkles, Loader2, CheckCircle2, Play, ChevronRight,
@@ -49,7 +49,7 @@ export default function ProviderDay() {
   const [dayBriefLoading, setDayBriefLoading] = useState(false);
   const [completedOpen, setCompletedOpen] = useState(false);
   const [viewDate, setViewDate] = useState(new Date());
-  const [viewMode, setViewMode] = useState<"day" | "week">("day");
+  const [viewMode, setViewMode] = useState<"day" | "week" | "month">("day");
   // Phase 3 #2: Aftercare goes through a review modal now, not auto-send.
   // Holds the appointment whose aftercare we're currently composing, plus
   // the resolved encounter_id so the modal can call the AI generator.
@@ -77,8 +77,14 @@ export default function ProviderDay() {
       });
   }, [user]);
 
-  const rangeStart = viewMode === "day" ? startOfDay(viewDate) : startOfWeek(viewDate, { weekStartsOn: 1 });
-  const rangeEnd = viewMode === "day" ? endOfDay(viewDate) : addDays(rangeStart, 7);
+  const rangeStart =
+    viewMode === "day" ? startOfDay(viewDate)
+    : viewMode === "week" ? startOfWeek(viewDate, { weekStartsOn: 1 })
+    : startOfMonth(viewDate);
+  const rangeEnd =
+    viewMode === "day" ? endOfDay(viewDate)
+    : viewMode === "week" ? addDays(startOfWeek(viewDate, { weekStartsOn: 1 }), 7)
+    : endOfMonth(viewDate);
   const today = viewDate;
   const todayStart = rangeStart.toISOString();
   const todayEnd = rangeEnd.toISOString();
@@ -155,6 +161,19 @@ export default function ProviderDay() {
   const upcomingApts = todayApts?.filter((a: any) => ["booked", "checked_in"].includes(a.status)) ?? [];
   const completedApts = todayApts?.filter((a: any) => a.status === "completed") ?? [];
   const totalApts = todayApts?.length ?? 0;
+
+  // Month view: group all appointments in range by calendar day for a readable
+  // list. Day/week keep their existing status-based layout untouched.
+  const monthGroups: [string, any[]][] = (() => {
+    if (viewMode !== "month") return [];
+    const map = new Map<string, any[]>();
+    for (const apt of todayApts ?? []) {
+      const key = format(parseISO(apt.scheduled_at), "yyyy-MM-dd");
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(apt);
+    }
+    return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
+  })();
 
   // AI Day Brief
   const loadDayBrief = async () => {
@@ -273,7 +292,7 @@ export default function ProviderDay() {
         <Button
           variant="outline"
           size="icon"
-          onClick={() => setViewDate(d => viewMode === "day" ? addDays(d, -1) : addDays(d, -7))}
+          onClick={() => setViewDate(d => viewMode === "day" ? addDays(d, -1) : viewMode === "week" ? addDays(d, -7) : addMonths(d, -1))}
           aria-label="Previous"
         >
           <ChevronLeft className="h-4 w-4" />
@@ -284,7 +303,9 @@ export default function ProviderDay() {
               <CalendarIcon className="h-4 w-4" />
               {viewMode === "day"
                 ? format(viewDate, "EEE, MMM d")
-                : `${format(startOfWeek(viewDate, { weekStartsOn: 1 }), "MMM d")} – ${format(addDays(startOfWeek(viewDate, { weekStartsOn: 1 }), 6), "MMM d")}`}
+                : viewMode === "week"
+                ? `${format(startOfWeek(viewDate, { weekStartsOn: 1 }), "MMM d")} – ${format(addDays(startOfWeek(viewDate, { weekStartsOn: 1 }), 6), "MMM d")}`
+                : format(viewDate, "MMMM yyyy")}
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0" align="start">
@@ -299,7 +320,7 @@ export default function ProviderDay() {
         <Button
           variant="outline"
           size="icon"
-          onClick={() => setViewDate(d => viewMode === "day" ? addDays(d, 1) : addDays(d, 7))}
+          onClick={() => setViewDate(d => viewMode === "day" ? addDays(d, 1) : viewMode === "week" ? addDays(d, 7) : addMonths(d, 1))}
           aria-label="Next"
         >
           <ChevronRight className="h-4 w-4" />
@@ -312,13 +333,14 @@ export default function ProviderDay() {
         >
           Today
         </Button>
-        <Select value={viewMode} onValueChange={(v) => setViewMode(v as "day" | "week")}>
+        <Select value={viewMode} onValueChange={(v) => setViewMode(v as "day" | "week" | "month")}>
           <SelectTrigger className="w-[110px] ml-auto">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="day">Day</SelectItem>
             <SelectItem value="week">Week</SelectItem>
+            <SelectItem value="month">Month</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -388,8 +410,48 @@ export default function ProviderDay() {
         </div>
       )}
 
+      {/* Month view — all appointments grouped by day */}
+      {viewMode === "month" && !isLoading && (todayApts?.length ?? 0) > 0 && (
+        <div className="space-y-5">
+          {monthGroups.map(([day, apts]) => (
+            <div key={day}>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                {format(parseISO(`${day}T00:00:00`), "EEEE, MMM d")} · {apts.length}
+              </p>
+              <div className="space-y-1.5">
+                {apts.map((apt: any) => (
+                  <div key={apt.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-[11px] font-bold text-muted-foreground shrink-0">
+                        {apt.patients?.first_name?.[0]}{apt.patients?.last_name?.[0]}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">{apt.patients?.first_name} {apt.patients?.last_name}</p>
+                        <p className="text-[11px] text-muted-foreground truncate">
+                          {format(parseISO(apt.scheduled_at), "h:mm a")} · {apt.treatments?.name || "General"}
+                          {apt.visit_type === "telehealth" && " · 📹"}
+                          {apt.visit_type === "phone" && " · 📞"}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <Badge variant="secondary" className={`text-[11px] ${statusColor[apt.status] || ""}`}>
+                        {statusLabel[apt.status] || apt.status}
+                      </Badge>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => apt.visit_type === "telehealth" ? navigate(`/telehealth/${apt.id}`) : openChart(apt)} aria-label="Open chart">
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Current Patient */}
-      {currentApt && (
+      {viewMode !== "month" && currentApt && (
         <div>
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
             <Play className="h-3 w-3 text-primary" /> Current Patient
@@ -450,7 +512,7 @@ export default function ProviderDay() {
       )}
 
       {/* Up Next */}
-      {upcomingApts.length > 0 && (
+      {viewMode !== "month" && upcomingApts.length > 0 && (
         <div>
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
             Up Next ({upcomingApts.length})
@@ -540,7 +602,7 @@ export default function ProviderDay() {
       )}
 
       {/* Completed - collapsible */}
-      {completedApts.length > 0 && (
+      {viewMode !== "month" && completedApts.length > 0 && (
         <Collapsible open={completedOpen} onOpenChange={setCompletedOpen}>
           <CollapsibleTrigger className="w-full">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5 cursor-pointer hover:text-foreground/70 transition-colors">
@@ -603,7 +665,9 @@ export default function ProviderDay() {
       {!isLoading && !todayApts?.length && myProviderId && (
         <div className="text-center py-16">
           <Stethoscope className="h-12 w-12 mx-auto text-muted-foreground/30" />
-          <p className="text-muted-foreground mt-3">No patients scheduled for today</p>
+          <p className="text-muted-foreground mt-3">
+            {viewMode === "day" ? "No patients scheduled for today" : viewMode === "week" ? "No patients scheduled this week" : "No patients scheduled this month"}
+          </p>
         </div>
       )}
 
