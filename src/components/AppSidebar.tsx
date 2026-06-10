@@ -123,6 +123,7 @@ const navSections: NavSection[] = [
     roles: ["admin"],
     items: [
       { to: "/master-catalog", icon: BookOpen, label: "Master Catalog" },
+      { to: "/clinic-payments", icon: CreditCard, label: "Payments & Pricing", defer: true },
       { to: "/contracts", icon: Building2, label: "Contracts", defer: true },
       { to: "/md-coverage", icon: ShieldCheck, label: "MD Coverage", defer: true },
       { to: "/benchmarks", icon: BarChart3, label: "Benchmarks", defer: true },

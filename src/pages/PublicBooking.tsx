@@ -8,9 +8,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Loader2, ArrowLeft, CheckCircle2, MapPin, Video, KeyRound } from "lucide-react";
+import { Loader2, ArrowLeft, CheckCircle2, MapPin, Video, KeyRound, CreditCard } from "lucide-react";
 import { format, addDays } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
+import { StripePaymentDialog } from "@/components/payments/StripePaymentDialog";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://oqjupcgtxsbyelaigrxn.supabase.co";
 const SUPABASE_ANON =
@@ -45,7 +46,9 @@ export default function PublicBooking() {
     phone: "",
     date_of_birth: "",
   });
-  const [confirmation, setConfirmation] = useState<{ code: string; date: string; appointment_id: string } | null>(null);
+  const [confirmation, setConfirmation] = useState<{ code: string; date: string; appointment_id: string; deposit_amount?: number; client_secret?: string | null } | null>(null);
+  const [depositPaid, setDepositPaid] = useState(false);
+  const [payOpen, setPayOpen] = useState(false);
   const [claimPassword, setClaimPassword] = useState("");
   const [claimState, setClaimState] = useState<"idle" | "submitting" | "done" | "skipped">("idle");
   const [claimError, setClaimError] = useState<string | null>(null);
@@ -142,7 +145,13 @@ export default function PublicBooking() {
         code: result.confirmation_code,
         date: result.scheduled_start,
         appointment_id: result.appointment_id,
+        deposit_amount: result.deposit_amount,
+        client_secret: result.stripe_client_secret,
       });
+      // If a deposit is due and a Stripe intent was created, prompt for payment.
+      if (result.stripe_client_secret && Number(result.deposit_amount) > 0) {
+        setPayOpen(true);
+      }
     } catch {
       // useBooking handles the toast
     }
@@ -187,6 +196,41 @@ export default function PublicBooking() {
             <p className="font-mono font-bold">{confirmation.code}</p>
           </CardContent>
         </Card>
+
+        {/* Deposit (P0-8) — collected via Stripe Payment Element. */}
+        {confirmation.client_secret && Number(confirmation.deposit_amount) > 0 && (
+          depositPaid ? (
+            <Card className="text-left border-primary/40 bg-primary/5">
+              <CardContent className="pt-4 flex items-center gap-2 text-sm">
+                <CheckCircle2 className="h-4 w-4 text-primary" />
+                <span>Deposit of ${Number(confirmation.deposit_amount).toFixed(2)} received — your appointment is secured.</span>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="text-left border-primary/30">
+              <CardContent className="pt-4 space-y-2">
+                <p className="text-sm font-medium">Secure your appointment</p>
+                <p className="text-xs text-muted-foreground">
+                  A ${Number(confirmation.deposit_amount).toFixed(2)} deposit is required to hold this slot.
+                </p>
+                <Button size="sm" className="w-full" onClick={() => setPayOpen(true)}>
+                  <CreditCard className="mr-1.5 h-4 w-4" /> Pay deposit
+                </Button>
+              </CardContent>
+            </Card>
+          )
+        )}
+
+        <StripePaymentDialog
+          open={payOpen}
+          onOpenChange={setPayOpen}
+          clientSecret={confirmation.client_secret ?? null}
+          amount={Number(confirmation.deposit_amount) || 0}
+          title="Pay your deposit"
+          description="This secures your appointment. The balance is due at your visit."
+          onConfirmed={() => setDepositPaid(true)}
+        />
+
         {/* Claim portal account */}
         {claimState === "done" ? (
           <Card className="text-left border-primary/40 bg-primary/5">

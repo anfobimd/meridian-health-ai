@@ -66,6 +66,7 @@ const Reports = lazy(() => import("./pages/Reports"));
 const ContractsAdmin = lazy(() => import("./pages/ContractsAdmin"));
 const MdCoverage = lazy(() => import("./pages/MdCoverage"));
 const MasterCatalog = lazy(() => import("./pages/MasterCatalog"));
+const ClinicPayments = lazy(() => import("./pages/ClinicPayments"));
 const Benchmarks = lazy(() => import("./pages/Benchmarks"));
 const AutomationRules = lazy(() => import("./pages/AutomationRules"));
 const AuditLog = lazy(() => import("./pages/AuditLog").then((m) => ({ default: m.AuditLog })));
@@ -185,6 +186,7 @@ const App = () => (
                     <Route path="/contracts" element={<ContractsAdmin />} />
                     <Route path="/md-coverage" element={<MdCoverage />} />
                     <Route path="/master-catalog" element={<MasterCatalog />} />
+                    <Route path="/clinic-payments" element={<ClinicPayments />} />
                     <Route path="/benchmarks" element={<Benchmarks />} />
                     <Route path="/automation-rules" element={<AutomationRules />} />
                     <Route path="/audit-log" element={<AuditLog />} />

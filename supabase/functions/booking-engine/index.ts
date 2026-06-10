@@ -316,42 +316,96 @@ Deno.serve(async (req) => {
       console.error("marketplace_bookings insert failed (non-fatal):", e);
     }
 
-    // ── Pricing / Stripe deposit ────────────────────────────────────────────
-    const serviceAmount = Number(treatment.price) || 0;
-    const depositPct = 0.2; // 20 % deposit
-    const depositAmount = Math.round(serviceAmount * depositPct * 100) / 100;
+    // ── Pricing / deposit — resolve the CLINIC's price + deposit (P0-2/P0-5) ──
+    // Clinic-scoped resolution is the single source of truth; the hardcoded 20%
+    // deposit is gone. resolve_treatment_price returns the clinic price, the
+    // effective (member-aware) price, and the resolved deposit amount.
+    let serviceAmount = Number(treatment.price) || 0;
+    let depositAmount = 0;
+    try {
+      const { data: resolved, error: resolveErr } = await admin.rpc("resolve_treatment_price", {
+        p_clinic_id: clinicId,
+        p_treatment_id: treatment.id,
+        p_is_member: false,
+      });
+      const row = Array.isArray(resolved) ? resolved[0] : resolved;
+      if (!resolveErr && row) {
+        serviceAmount = Number(row.effective_price ?? row.price ?? serviceAmount) || serviceAmount;
+        depositAmount = Math.round((Number(row.deposit_amount) || 0) * 100) / 100;
+      }
+    } catch (e) {
+      console.error("Price resolution failed (falling back to treatment.price):", e);
+    }
     const balanceAmount = Math.round((serviceAmount - depositAmount) * 100) / 100;
 
+    // ── Stripe deposit — destination charge to the clinic's connected account ──
+    // (P0-6/P0-8). Only charged when the clinic is Connect-enabled (charges
+    // enabled) and a deposit is configured. The platform fee is the USMD cut.
     let stripeClientSecret: string | null = null;
+    let depositPaymentIntentId: string | null = null;
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
 
-    if (stripeKey && depositAmount > 0) {
+    // Pull the clinic's Connect status + platform fee.
+    let clinicStripe: { stripe_account_id: string | null; stripe_charges_enabled: boolean; platform_fee_percent: number } | null = null;
+    if (clinicId) {
+      const { data: c } = await admin
+        .from("clinics")
+        .select("stripe_account_id, stripe_charges_enabled, platform_fee_percent")
+        .eq("id", clinicId)
+        .maybeSingle();
+      clinicStripe = c as any;
+    }
+
+    const canCharge = !!stripeKey && depositAmount > 0
+      && !!clinicStripe?.stripe_account_id && !!clinicStripe?.stripe_charges_enabled;
+
+    if (canCharge) {
       try {
-        const stripeRes = await fetch(
-          "https://api.stripe.com/v1/payment_intents",
-          {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${stripeKey}`,
-              "Content-Type": "application/x-www-form-urlencoded",
-            },
-            body: new URLSearchParams({
-              amount: String(Math.round(depositAmount * 100)),
-              currency: "usd",
-              "metadata[appointment_id]": appointment.id,
-              "metadata[patient_id]": patient_id,
-              "metadata[confirmation_code]": confirmationCode,
-            }),
+        const feePct = Number(clinicStripe!.platform_fee_percent) || 0;
+        const applicationFee = Math.round(depositAmount * (feePct / 100) * 100); // cents
+        const params: Record<string, string> = {
+          amount: String(Math.round(depositAmount * 100)),
+          currency: "usd",
+          "metadata[appointment_id]": appointment.id,
+          "metadata[patient_id]": patient_id,
+          "metadata[confirmation_code]": confirmationCode,
+          "metadata[kind]": "deposit",
+          // Destination charge: funds settle to the clinic's connected account.
+          "transfer_data[destination]": clinicStripe!.stripe_account_id!,
+        };
+        if (applicationFee > 0) params["application_fee_amount"] = String(applicationFee);
+
+        const stripeRes = await fetch("https://api.stripe.com/v1/payment_intents", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${stripeKey}`,
+            "Content-Type": "application/x-www-form-urlencoded",
           },
-        );
+          body: new URLSearchParams(params),
+        });
         const piData = await stripeRes.json();
         if (stripeRes.ok && piData.client_secret) {
           stripeClientSecret = piData.client_secret;
+          depositPaymentIntentId = piData.id;
         } else {
           console.error("Stripe PaymentIntent error:", JSON.stringify(piData));
         }
       } catch (stripeErr) {
         console.error("Stripe call failed (non-fatal):", stripeErr);
+      }
+    }
+
+    // Record deposit intent on the appointment so checkout / intake-clearance
+    // (auto-refund) and the webhook can reconcile it. Webhook flips to 'paid'.
+    if (depositAmount > 0) {
+      try {
+        await admin.from("appointments").update({
+          deposit_amount: depositAmount,
+          deposit_payment_intent_id: depositPaymentIntentId,
+          deposit_status: depositPaymentIntentId ? "pending" : "none",
+        }).eq("id", appointment.id);
+      } catch (e) {
+        console.error("Deposit record update failed (non-fatal):", e);
       }
     }
 

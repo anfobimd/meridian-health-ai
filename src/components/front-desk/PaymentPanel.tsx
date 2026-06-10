@@ -7,6 +7,8 @@ import { toast } from "sonner";
 import {
   CreditCard, Package, Tag, CheckCircle2, DollarSign,
 } from "lucide-react";
+import { stripeConfigured } from "@/lib/stripe";
+import { StripePaymentDialog } from "@/components/payments/StripePaymentDialog";
 
 interface PaymentSuggestion {
   type: "package_credit" | "membership_discount";
@@ -43,6 +45,14 @@ export function PaymentPanel({
   const [selectedMethod, setSelectedMethod] = useState<string>("card");
   const [appliedCredits, setAppliedCredits] = useState<Set<string>>(new Set());
   const [processing, setProcessing] = useState(false);
+  const [payOpen, setPayOpen] = useState(false);
+  const [chargeSecret, setChargeSecret] = useState<string | null>(null);
+
+  const settleComplete = () => {
+    queryClient.invalidateQueries({ queryKey: ["invoices"] });
+    queryClient.invalidateQueries({ queryKey: ["frontdesk-today"] });
+    onPaymentComplete();
+  };
 
   const packageCredits = paymentSuggestions.filter(s => s.type === "package_credit");
   const memberDiscounts = paymentSuggestions.filter(s => s.type === "membership_discount");
@@ -92,7 +102,22 @@ export function PaymentPanel({
         return;
       }
 
-      // Record the cash/card payment. When a package credit fully covers the
+      // CARD path (P0-9) → real Stripe destination charge to the clinic's
+      // connected account via checkout-charge. The stripe-webhook settles the
+      // invoice on success; we never mark it paid from the client.
+      if (selectedMethod === "card" && adjustedBalance > 0 && stripeConfigured()) {
+        const { data, error } = await supabase.functions.invoke("checkout-charge", {
+          body: { invoice_id: inv.id, amount: adjustedBalance },
+        });
+        if (error || (data as any)?.error) throw new Error((data as any)?.error || error?.message || "Could not start card payment");
+        setChargeSecret((data as any).client_secret);
+        setPayOpen(true);
+        setProcessing(false);
+        return; // Payment Element + webhook take it from here.
+      }
+
+      // CASH (or Stripe not configured) → record directly and settle. When a
+      // package credit fully covers the visit, adjustedBalance is 0 and we
       // visit, adjustedBalance is 0 and we skip the $0 payment row but still
       // settle the invoice below.
       if (adjustedBalance > 0) {
@@ -229,6 +254,19 @@ export function PaymentPanel({
       <Button className="w-full" size="sm" onClick={handleCollect} disabled={processing}>
         {processing ? "Processing…" : adjustedBalance > 0 ? `Collect $${adjustedBalance.toFixed(2)}` : "Apply Credit & Complete"}
       </Button>
+
+      <StripePaymentDialog
+        open={payOpen}
+        onOpenChange={setPayOpen}
+        clientSecret={chargeSecret}
+        amount={adjustedBalance}
+        title="Collect payment"
+        description="Charge the patient's card. The visit is marked paid once the payment confirms."
+        onConfirmed={() => {
+          toast.success("Payment submitted — settling invoice…");
+          settleComplete();
+        }}
+      />
     </div>
   );
 }

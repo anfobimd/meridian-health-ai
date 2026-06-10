@@ -37,11 +37,19 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Build Stripe refund request
+    // Build Stripe refund request.
+    // Our charges are destination charges to the clinic's connected account with
+    // a platform application fee. On refund we must (a) reverse the transfer so
+    // the funds come back from the clinic and (b) refund the application fee
+    // proportionally, otherwise the platform keeps a fee on a refunded charge and
+    // the books are wrong. Both default on; pass reverse_transfer:false /
+    // refund_application_fee:false in metadata-free args to override if ever needed.
     const params = new URLSearchParams();
     params.append("payment_intent", payment_intent_id);
     params.append("reason", reason);
     if (amount) params.append("amount", String(amount));
+    params.append("reverse_transfer", "true");
+    params.append("refund_application_fee", "true");
     for (const [k, v] of Object.entries(metadata)) {
       params.append(`metadata[${k}]`, String(v));
     }

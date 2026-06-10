@@ -75,6 +75,12 @@ export function CheckoutPanel({ appointmentId, open, onOpenChange }: {
   const [taxRate, setTaxRate] = useState(0);
   const [creatingInvoice, setCreatingInvoice] = useState(false);
   const [seeded, setSeeded] = useState(false);
+  // P0-4 — invoice-level discount on top of line discounts.
+  const [invoiceDiscountType, setInvoiceDiscountType] = useState<"percent" | "flat">("percent");
+  const [invoiceDiscountValue, setInvoiceDiscountValue] = useState(0);
+  const [discountReason, setDiscountReason] = useState("");
+  // Manual overrides/discounts above this share of gross require a logged reason.
+  const LARGE_DISCOUNT_THRESHOLD = 0.2;
 
   const needsInvoice = reviewed && (invoiceSummary.invoice_count ?? 0) === 0;
 
@@ -141,14 +147,27 @@ export function CheckoutPanel({ appointmentId, open, onOpenChange }: {
   const lineDiscounts = +lineItems
     .reduce((s, l) => s + ((Number(l.quantity) || 0) * (Number(l.unit_price) || 0) - lineTotal(l)), 0)
     .toFixed(2);
-  const taxableBase = +(grossSubtotal - lineDiscounts).toFixed(2);
+  const baseAfterLines = +(grossSubtotal - lineDiscounts).toFixed(2);
+  const invoiceDiscount = +(
+    invoiceDiscountType === "flat"
+      ? Math.min(Number(invoiceDiscountValue) || 0, baseAfterLines)
+      : baseAfterLines * (Number(invoiceDiscountValue) || 0) / 100
+  ).toFixed(2);
+  const taxableBase = +Math.max(0, baseAfterLines - invoiceDiscount).toFixed(2);
+  const totalDiscount = +(lineDiscounts + invoiceDiscount).toFixed(2);
   const taxAmount = +(taxableBase * (Number(taxRate) || 0) / 100).toFixed(2);
-  const invoiceTotal = +(taxableBase + taxAmount).toFixed(2);
+  const invoiceTotal = +Math.max(0, taxableBase + taxAmount).toFixed(2);
+  const discountShare = grossSubtotal > 0 ? totalDiscount / grossSubtotal : 0;
+  const needsDiscountReason = discountShare > LARGE_DISCOUNT_THRESHOLD;
 
   const generateInvoice = async () => {
     if (!patientId) { toast.error("No patient linked to this appointment"); return; }
     const validLines = lineItems.filter((l) => l.description.trim() && (Number(l.quantity) || 0) > 0);
     if (validLines.length === 0) { toast.error("Add at least one charge with a description and quantity"); return; }
+    if (needsDiscountReason && !discountReason.trim()) {
+      toast.error(`Discounts over ${LARGE_DISCOUNT_THRESHOLD * 100}% require a reason`);
+      return;
+    }
     setCreatingInvoice(true);
     try {
       const { data: inv, error: invErr } = await supabase
@@ -158,15 +177,27 @@ export function CheckoutPanel({ appointmentId, open, onOpenChange }: {
           appointment_id: appointmentId,
           status: "sent",
           subtotal: grossSubtotal,
-          discount_amount: lineDiscounts,
+          discount_amount: totalDiscount,
           tax_amount: taxAmount,
           total: invoiceTotal,
           amount_paid: 0,
           balance_due: invoiceTotal,
-        })
+          // New columns (pricing migration) — typed loosely until types regen.
+          ...( { invoice_discount_type: invoiceDiscountType, invoice_discount_value: Number(invoiceDiscountValue) || 0, discount_reason: discountReason.trim() || null } as any),
+        } as any)
         .select("id")
         .single();
       if (invErr) throw invErr;
+
+      // Audit large overrides with the actor.
+      if (needsDiscountReason) {
+        try {
+          await (supabase as any).from("audit_logs").insert({
+            resource_type: "invoice", resource_id: inv.id, action: "large_discount_applied",
+            details: { discount_amount: totalDiscount, discount_share: discountShare, reason: discountReason.trim() },
+          });
+        } catch { /* best-effort */ }
+      }
 
       const itemsPayload = validLines.map((l) => ({
         invoice_id: inv.id,
@@ -407,6 +438,27 @@ export function CheckoutPanel({ appointmentId, open, onOpenChange }: {
                     <Plus className="h-3.5 w-3.5 mr-1.5" />Add charge
                   </Button>
 
+                  {/* Invoice-level discount (P0-4) */}
+                  <div className="flex items-center justify-between gap-2">
+                    <Label className="text-[11px] text-muted-foreground">Invoice discount</Label>
+                    <div className="flex items-center gap-1">
+                      <Button type="button" size="sm" variant={invoiceDiscountType === "percent" ? "default" : "outline"} className="h-8 px-2" onClick={() => setInvoiceDiscountType("percent")}>%</Button>
+                      <Button type="button" size="sm" variant={invoiceDiscountType === "flat" ? "default" : "outline"} className="h-8 px-2" onClick={() => setInvoiceDiscountType("flat")}>$</Button>
+                      <Input
+                        type="number" min="0" step="0.01" inputMode="decimal"
+                        value={invoiceDiscountValue}
+                        onChange={(e) => setInvoiceDiscountValue(Number(e.target.value))}
+                        className="h-8 w-24"
+                      />
+                    </div>
+                  </div>
+                  {needsDiscountReason && (
+                    <div className="space-y-1">
+                      <Label className="text-[11px] text-warning">Reason required (discount over {LARGE_DISCOUNT_THRESHOLD * 100}%)</Label>
+                      <Input value={discountReason} onChange={(e) => setDiscountReason(e.target.value)} placeholder="Why this override?" className="h-8" />
+                    </div>
+                  )}
+
                   <div className="flex items-center justify-between gap-2">
                     <Label className="text-[11px] text-muted-foreground">Tax %</Label>
                     <Input
@@ -420,7 +472,10 @@ export function CheckoutPanel({ appointmentId, open, onOpenChange }: {
                   <div className="rounded-md bg-muted/40 p-2 space-y-0.5 text-sm">
                     <div className="flex justify-between text-muted-foreground"><span>Subtotal</span><span>${grossSubtotal.toFixed(2)}</span></div>
                     {lineDiscounts > 0 && (
-                      <div className="flex justify-between text-muted-foreground"><span>Discounts</span><span>−${lineDiscounts.toFixed(2)}</span></div>
+                      <div className="flex justify-between text-muted-foreground"><span>Line discounts</span><span>−${lineDiscounts.toFixed(2)}</span></div>
+                    )}
+                    {invoiceDiscount > 0 && (
+                      <div className="flex justify-between text-muted-foreground"><span>Invoice discount</span><span>−${invoiceDiscount.toFixed(2)}</span></div>
                     )}
                     {taxAmount > 0 && (
                       <div className="flex justify-between text-muted-foreground"><span>Tax</span><span>${taxAmount.toFixed(2)}</span></div>
