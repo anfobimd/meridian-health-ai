@@ -12,6 +12,10 @@ dist
 dist-ssr
 *.local
 
+# Remotion bundle + render output
+/build
+/out
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
