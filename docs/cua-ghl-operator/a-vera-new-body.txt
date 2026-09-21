@@ -1,0 +1,2 @@
+Hi {{contact.first_name}}, this is Vera with US Medical Directors. You asked about a medical director. Two quick questions and I can run your real savings number. First, are you a med spa owner, opening one, or a patient looking for treatment?
+If you aren't interested in a Medical Director reply Stop to opt out.
